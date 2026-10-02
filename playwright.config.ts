@@ -7,6 +7,6 @@ export default defineConfig({
   webServer: {
     command: 'npx vite --port 5199 --strictPort',
     url: 'http://localhost:5199',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: true,
   },
 });
