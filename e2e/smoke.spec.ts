@@ -66,10 +66,10 @@ test('flying: thrust, camera cycle, flight assist, input visualizer', async ({ p
 
   await page.goto('/');
   await expect(page.locator('#hud')).toBeVisible();
+  // hold until moving: software GL can be slow, so don't assume a frame rate
   await page.keyboard.down('KeyW');
-  await page.waitForTimeout(800);
+  await expect.poll(async () => Number(await page.locator('#hud .speed').textContent()), { timeout: 15000 }).toBeGreaterThan(10);
   await page.keyboard.up('KeyW');
-  expect(Number(await page.locator('#hud .speed').textContent())).toBeGreaterThan(10);
   await page.screenshot({ path: 'test-results/10-flying.png' });
 
   await page.keyboard.press('KeyV');
@@ -84,5 +84,27 @@ test('flying: thrust, camera cycle, flight assist, input visualizer', async ({ p
   await page.screenshot({ path: 'test-results/11-input-viz.png' });
   await page.keyboard.up('ArrowLeft');
 
+  expect(errors).toEqual([]);
+});
+
+test('render debug views and visual presets', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
+
+  await page.goto('/?debug');
+  const search = page.locator('.kd-panel .search');
+  await search.fill('render.debug.view');
+  const select = row(page, 'render.debug.view').locator('select');
+  for (const view of ['edges', 'normals', 'depth', 'color', 'final']) {
+    await select.selectOption(view);
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: `test-results/20-view-${view}.png` });
+  }
+  for (const preset of ['visual/pastel', 'visual/mono', 'visual/neon']) {
+    await page.locator('.preset select').selectOption(preset);
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: `test-results/21-${preset.replace('/', '-')}.png` });
+  }
   expect(errors).toEqual([]);
 });

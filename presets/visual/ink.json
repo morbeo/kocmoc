@@ -2,8 +2,19 @@
   "desc": "Black ink on paper",
   "vars": {
     "render.background": "#efe8d8",
+    "render.sky.zenith": "#d9cfb8",
+    "render.sky.bands": 3,
+    "render.stars.enabled": false,
     "ship.color": "#f5f0e6",
+    "ship.trim": "#1b1b1b",
+    "world.rocks.color": "#e6dcc6",
+    "world.rings.color": "#f5f0e6",
     "render.toon.steps": 2,
-    "render.light.color": "#ffffff"
+    "render.toon.floor": 0.55,
+    "render.light.color": "#ffffff",
+    "render.rim.strength": 0,
+    "render.outline.color": "#111111",
+    "render.outline.thickness": 2,
+    "render.bloom.enabled": false
   }
 }

@@ -5,6 +5,7 @@ import { toon } from './toon';
 const color = vars.color('ship.color', '#ff2fa8', { tags: ['ship', 'render'] });
 const trim = vars.color('ship.trim', '#2a2440', { tags: ['ship', 'render'] });
 const glow = vars.color('ship.glow', '#7fe7ff', { tags: ['ship', 'render'] });
+const glowIntensity = vars.num('ship.glow.intensity', 3, { min: 0, max: 10, hardMin: 0, tags: ['ship', 'render'], desc: 'above the bloom threshold the engine glows' });
 
 /** Low-poly ship pointing down -Z. `update` tints it and drives the engine glow (0..1). */
 export function createShipModel() {
@@ -30,12 +31,15 @@ export function createShipModel() {
   g.add(body, wings, fin, ...tips, nozzle);
 
   const base = new THREE.Color();
+  const hot = new THREE.Color();
   return {
     object: g,
     update(thrust: number) {
       hull.color.set(color.value);
       dark.color.set(trim.value);
-      engine.color.copy(base.set(trim.value).lerp(new THREE.Color(glow.value), 0.25 + 0.75 * thrust));
+      engine.color
+        .copy(base.set(trim.value).lerp(hot.set(glow.value), 0.25 + 0.75 * thrust))
+        .multiplyScalar(1 + (glowIntensity.value - 1) * thrust);
       nozzle.scale.set(1, 1 + thrust, 1);
     },
   };

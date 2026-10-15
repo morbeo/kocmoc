@@ -1,0 +1,25 @@
+{
+  "desc": "Soft pastel daylight",
+  "vars": {
+    "render.background": "#ffd9e8",
+    "render.sky.zenith": "#b8d8ff",
+    "render.sky.bands": 6,
+    "render.stars.enabled": false,
+    "ship.color": "#9ad9c5",
+    "ship.trim": "#f6f1ff",
+    "ship.glow": "#ffb3c7",
+    "world.rocks.color": "#c9b8e8",
+    "world.rings.color": "#ffe29a",
+    "render.toon.steps": 3,
+    "render.toon.floor": 0.6,
+    "render.ambient": 0.6,
+    "render.light.color": "#fff6e0",
+    "render.rim.strength": 0.35,
+    "render.rim.color": "#ffffff",
+    "render.outline.color": "#6b5a7a",
+    "render.outline.thickness": 1.5,
+    "render.bloom.enabled": true,
+    "render.bloom.strength": 0.5,
+    "render.bloom.threshold": 1.6
+  }
+}

@@ -10,10 +10,11 @@ import { camMode, cycleCamera, updateCamera } from './cam/rigs';
 import { createShipModel } from './render/shipModel';
 import { createField } from './world/field';
 import { createHud } from './ui/hud';
+import { createSky } from './render/sky';
+import { createPipeline } from './render/pipeline';
 import './ui/hud.css';
 
 // --- vars ------------------------------------------------------------------
-const background = vars.color('render.background', '#05010f', { tags: ['render'] });
 const lightColor = vars.color('render.light.color', '#ffffff', { tags: ['render'] });
 const lightIntensity = vars.num('render.light.intensity', 3, { min: 0, max: 10, hardMin: 0, tags: ['render'] });
 const lightDir = vars.vec3('render.light.dir', [1, 1.5, 1], { tags: ['render'], desc: 'direction towards the light' });
@@ -65,9 +66,11 @@ const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 document.body.appendChild(renderer.domElement);
 
+renderer.info.autoReset = false; // several passes per frame: count them all
+const pipeline = createPipeline(renderer);
+
 const scene = new THREE.Scene();
-const bgColor = new THREE.Color();
-scene.background = bgColor;
+const sky = createSky(scene);
 const camera = new THREE.PerspectiveCamera(70, 1, 0.1, 5000);
 const sun = new THREE.DirectionalLight();
 const amb = new THREE.AmbientLight(0x8899ff);
@@ -80,6 +83,7 @@ const hud = createHud();
 
 function resize(): void {
   renderer.setSize(innerWidth, innerHeight);
+  pipeline.setSize(innerWidth, innerHeight);
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
 }
@@ -132,7 +136,6 @@ renderer.setAnimationLoop((now) => {
   });
   lerpShip(view, prev, curr, alpha);
 
-  bgColor.set(background.value);
   sun.color.set(lightColor.value);
   sun.intensity = lightIntensity.value;
   sun.position.fromArray(lightDir.value);
@@ -151,7 +154,9 @@ renderer.setAnimationLoop((now) => {
       : '';
   hud.update(view, { assist: assist.value, cam: camMode.value, cruise: inputDebug.cruise, hint });
 
-  renderer.render(scene, camera);
+  sky.update(camera, renderer.getPixelRatio());
+  renderer.info.reset();
+  pipeline.render(scene, camera);
   frameMs = performance.now() - t0;
 });
 
