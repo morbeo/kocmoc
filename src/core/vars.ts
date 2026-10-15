@@ -5,8 +5,12 @@ export type Vec3 = [number, number, number];
 export type VarValue = number | boolean | string | Vec3;
 
 export interface VarMeta {
+  /** safe range: slider bounds; values outside it are allowed but flagged */
   min?: number;
   max?: number;
+  /** hard limits: values are clamped here so they can't break anything */
+  hardMin?: number;
+  hardMax?: number;
   step?: number;
   unit?: string;
   tags?: string[];
@@ -65,6 +69,14 @@ export class Var<T extends VarValue = VarValue> {
 
   get modified(): boolean {
     return !valueEquals(this.sig.value, this.def);
+  }
+
+  /** Number outside its safe `min`/`max` range (still valid, but risky). */
+  get risky(): boolean {
+    const v = this.sig.value;
+    if (typeof v !== 'number') return false;
+    const { min, max } = this.meta;
+    return (min !== undefined && v < min) || (max !== undefined && v > max);
   }
 
   /** Validate a raw (possibly imported) value; `undefined` if unusable. */
@@ -317,12 +329,16 @@ export function valueEquals(a: unknown, b: unknown): boolean {
 
 const isNum = (x: unknown): x is number => typeof x === 'number' && Number.isFinite(x);
 
+function clamp(n: number, { hardMin = -Infinity, hardMax = Infinity }: VarMeta): number {
+  return Math.min(hardMax, Math.max(hardMin, n));
+}
+
 function coerce(type: VarType, meta: VarMeta, raw: unknown): VarValue | undefined {
   switch (type) {
     case 'num':
-      return isNum(raw) ? raw : undefined;
+      return isNum(raw) ? clamp(raw, meta) : undefined;
     case 'int':
-      return isNum(raw) ? Math.round(raw) : undefined;
+      return isNum(raw) ? Math.round(clamp(raw, meta)) : undefined;
     case 'bool':
       return typeof raw === 'boolean' ? raw : undefined;
     case 'enum':

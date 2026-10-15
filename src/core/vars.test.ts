@@ -68,6 +68,29 @@ describe('layers', () => {
     expect(p.value).toEqual([0, 0, 0]);
   });
 
+  it('clamps numbers to hard limits', () => {
+    const n = r.num('n', 1, { hardMin: 0, hardMax: 10 });
+    r.set('n', -5);
+    expect(n.value).toBe(0);
+    r.set('n', 99);
+    expect(n.value).toBe(10);
+    const i = r.int('i2', 2, { hardMin: 2, hardMax: 8 });
+    r.set('i2', 1);
+    expect(i.value).toBe(2);
+    r.set('i2', 8.4);
+    expect(i.value).toBe(8);
+  });
+
+  it('flags values outside the safe range as risky', () => {
+    const n = r.num('n', 5, { min: 0, max: 10 });
+    expect(n.risky).toBe(false);
+    r.set('n', 50);
+    expect(n.risky).toBe(true);
+    r.set('n', -1);
+    expect(n.risky).toBe(true);
+    expect(r.str('s', 'x').risky).toBe(false);
+  });
+
   it('setLayer replaces a whole layer', () => {
     const a = r.num('a', 0);
     const b = r.num('b', 0);

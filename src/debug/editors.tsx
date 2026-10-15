@@ -18,10 +18,11 @@ function onWheelNudge(e: WheelEvent, value: number, step: number, apply: (n: num
 function NumberEditor({ v }: { v: Var<number> }) {
   const value = v.sig.value;
   const step = autoStep(v);
-  const { min, max } = v.meta;
+  const { min, max, hardMin, hardMax } = v.meta;
   const apply = (n: number) => Number.isFinite(n) && v.set(n);
+  const risky = v.risky;
   return (
-    <span class="ed-num">
+    <span class={risky ? 'ed-num risky' : 'ed-num'}>
       {min !== undefined && max !== undefined && (
         <input
           type="range"
@@ -35,11 +36,22 @@ function NumberEditor({ v }: { v: Var<number> }) {
       <input
         type="number"
         step={step}
+        min={hardMin}
+        max={hardMax}
         value={value}
-        onChange={(e) => apply(+e.currentTarget.value)}
+        onChange={(e) => {
+          apply(+e.currentTarget.value);
+          // show the clamped value even when it didn't change the signal
+          e.currentTarget.value = String(v.value);
+        }}
         onWheel={(e) => onWheelNudge(e, value, step, apply)}
       />
       {v.meta.unit && <span class="unit">{v.meta.unit}</span>}
+      {risky && (
+        <span class="warn" title={`outside safe range ${min ?? '−∞'} … ${max ?? '∞'}`}>
+          ⚠
+        </span>
+      )}
     </span>
   );
 }

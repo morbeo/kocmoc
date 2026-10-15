@@ -8,13 +8,13 @@ initPersistence(vars);
 
 // --- vars ------------------------------------------------------------------
 const background = vars.color('render.background', '#05010f', { tags: ['render'] });
-const toonSteps = vars.enum('render.toon.steps', 3, [2, 3, 4, 5], { tags: ['render', 'toon'], desc: 'shading bands' });
+const toonSteps = vars.int('render.toon.steps', 3, { min: 2, max: 8, hardMin: 2, hardMax: 64, tags: ['render', 'toon'], desc: 'shading bands' });
 const lightColor = vars.color('render.light.color', '#ffffff', { tags: ['render'] });
-const lightIntensity = vars.num('render.light.intensity', 3, { min: 0, max: 10, tags: ['render'] });
+const lightIntensity = vars.num('render.light.intensity', 3, { min: 0, max: 10, hardMin: 0, tags: ['render'] });
 const lightDir = vars.vec3('render.light.dir', [1, 1.5, 1], { tags: ['render'], desc: 'direction towards the light' });
-const ambient = vars.num('render.ambient', 0.25, { min: 0, max: 2, tags: ['render'] });
-const fov = vars.num('cam.fov', 60, { min: 20, max: 120, unit: '°', tags: ['cam'] });
-const camDistance = vars.num('cam.distance', 6, { min: 2, max: 30, unit: 'm', tags: ['cam'] });
+const ambient = vars.num('render.ambient', 0.25, { min: 0, max: 2, hardMin: 0, tags: ['render'] });
+const fov = vars.num('cam.fov', 60, { min: 20, max: 120, hardMin: 1, hardMax: 179, unit: '°', tags: ['cam'] });
+const camDistance = vars.num('cam.distance', 6, { min: 2, max: 30, hardMin: 0.5, hardMax: 900, unit: 'm', tags: ['cam'] });
 const shape = vars.enum('demo.shape', 'torusKnot', ['torusKnot', 'icosahedron', 'box'], { tags: ['demo'] });
 const color = vars.color('demo.color', '#ff2fa8', { tags: ['demo'] });
 const spin = vars.num('demo.spin.speed', 0.6, { min: -5, max: 5, unit: 'rad/s', tags: ['demo'] });
