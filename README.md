@@ -37,6 +37,9 @@ Every binding, curve (deadzone / expo / sensitivity) and flight parameter is a v
 - `Ctrl/Cmd+Z` / `Ctrl/Cmd+Shift+Z` undo / redo, `F2` flips A/B snapshots.
 - Changes autosave locally; **share** copies a link containing the full setup.
 - `time.paused` / `time.scale` freeze or slow the sim; `sim.rate` sets the fixed physics step.
+- `render.debug.view` shows a pipeline stage (`color`, `edges`, `normals`, `depth`); `render.wireframe`,
+  `render.outline.enabled`, `render.bloom.enabled` and `render.stars.enabled` toggle individual passes.
+- Visual presets: Ink, Neon, Pastel, Mono.
 
 Adding a tunable value anywhere in the code:
 

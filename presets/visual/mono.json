@@ -1,0 +1,24 @@
+{
+  "desc": "Greyscale, hard two-tone",
+  "vars": {
+    "render.background": "#101010",
+    "render.sky.zenith": "#2a2a2a",
+    "render.sky.bands": 4,
+    "render.stars.enabled": true,
+    "ship.color": "#e8e8e8",
+    "ship.trim": "#3a3a3a",
+    "ship.glow": "#ffffff",
+    "world.rocks.color": "#9a9a9a",
+    "world.rings.color": "#ffffff",
+    "render.toon.steps": 2,
+    "render.toon.floor": 0.2,
+    "render.light.color": "#ffffff",
+    "render.rim.strength": 0.5,
+    "render.rim.color": "#ffffff",
+    "render.outline.color": "#000000",
+    "render.outline.thickness": 2,
+    "render.bloom.enabled": true,
+    "render.bloom.strength": 0.8,
+    "render.bloom.threshold": 1.4
+  }
+}

@@ -2,8 +2,21 @@
   "desc": "Neon toon on deep space",
   "vars": {
     "render.background": "#05010f",
+    "render.sky.zenith": "#1a0b3d",
+    "render.sky.bands": 5,
+    "render.stars.enabled": true,
     "ship.color": "#ff2fa8",
+    "ship.trim": "#2a2440",
+    "world.rocks.color": "#8b86a8",
+    "world.rings.color": "#ffd23f",
     "render.toon.steps": 3,
-    "render.light.color": "#7fe7ff"
+    "render.toon.floor": 0.15,
+    "render.light.color": "#7fe7ff",
+    "render.rim.strength": 0.6,
+    "render.rim.color": "#ff7ad9",
+    "render.outline.color": "#000000",
+    "render.outline.thickness": 1.5,
+    "render.bloom.enabled": true,
+    "render.bloom.strength": 1.2
   }
 }
