@@ -13,3 +13,9 @@
 #hud .bar i.on { background: #ff2fa8; }
 #hud .bar i.locked { background: #888; }
 #hud .hint { margin-bottom: 8px; opacity: 0.85; }
+#controls-btn {
+  position: fixed; top: 10px; left: 10px; z-index: 50;
+  font: 12px ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: #1d1b26; background: rgba(255, 255, 255, 0.85);
+  border: 1px solid #dcdae4; border-radius: 4px; padding: 4px 8px; cursor: pointer;
+}
