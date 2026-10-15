@@ -142,6 +142,13 @@ pointer Y (`input.invert.pointerY`) and the pitch keys (`input.invert.keyPitch`)
   3. *Pinch*: `wheel` + `ctrlKey` (macOS) → throttle or zoom.
   4. Click/tap → bindable action.
 - Browser pinch-zoom / swipe-back suppressed on the canvas.
+- **Touch screens** (`src/ui/touch.ts`, `input.touch.*`, shown on coarse pointers or
+  after a first touch; `input.touch.ui` forces it): two floating thumb sticks
+  (default left = throttle + roll, right = pitch + yaw; each stick axis is a var),
+  pushing the throttle stick to the rim boosts, hold buttons for boost and lift,
+  a bar with tuning table, camera, assist, respawn, tilt and fullscreen.
+  *Tilt* (`input.tilt.*`) steers from gravity in screen space, calibrated to how the
+  device is held when switched on. `render.pixelRatio` defaults lower on touch devices.
 
 ## 7. Flight model
 
@@ -192,7 +199,7 @@ Fixed-timestep simulation with interpolated rendering.
   `localStorage`.
 
 Out of scope: multiplayer, AI racers, weapons, story, customization, online
-leaderboards, mobile touch, track editor.
+leaderboards, track editor.
 
 ---
 
