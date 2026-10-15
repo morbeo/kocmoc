@@ -2,6 +2,8 @@ import { test, expect, type Page } from '@playwright/test';
 
 const row = (page: Page, path: string) =>
   page.locator('tr').filter({ has: page.locator('td.path', { hasText: new RegExp(`^${path.replace(/\./g, '\\.')}$`) }) });
+const presetSelect = (page: Page, group: string) =>
+  page.locator('.preset select').filter({ has: page.locator(`option[value^="${group}/"]`) });
 // the scene area left of the debug panel
 const scene = (page: Page) => page.screenshot({ clip: { x: 0, y: 0, width: 700, height: 720 } });
 
@@ -11,7 +13,7 @@ test('toon scene renders and the debug table drives it', async ({ page }) => {
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text() + ' ' + m.location().url));
 
   await page.goto('/?debug');
-  await expect(page.locator('canvas')).toBeVisible();
+  await expect(page.locator('canvas[data-engine]')).toBeVisible();
   await expect(page.locator('.kd-panel')).toBeVisible();
   await page.screenshot({ path: 'test-results/01-initial.png' });
 
@@ -41,7 +43,7 @@ test('toon scene renders and the debug table drives it', async ({ page }) => {
   await expect(row(page, 'ship.color').locator('.layer')).toHaveText('default');
 
   // preset applies to its layer
-  await page.locator('.preset select').selectOption('visual/ink');
+  await presetSelect(page, 'visual').selectOption('visual/ink');
   await search.fill('#render');
   await expect(row(page, 'render.background').locator('.layer')).toHaveText('visual');
   await expect(row(page, 'render.background').locator('code')).toHaveText('#efe8d8');
@@ -102,7 +104,7 @@ test('render debug views and visual presets', async ({ page }) => {
     await page.screenshot({ path: `test-results/20-view-${view}.png` });
   }
   for (const preset of ['visual/pastel', 'visual/mono', 'visual/neon']) {
-    await page.locator('.preset select').selectOption(preset);
+    await presetSelect(page, 'visual').selectOption(preset);
     await page.waitForTimeout(300);
     await page.screenshot({ path: `test-results/21-${preset.replace('/', '-')}.png` });
   }
@@ -185,5 +187,37 @@ test('race: seed in URL, scenario, gizmos, lap timer starts', async ({ page }) =
     await page.waitForTimeout(300);
     await page.screenshot({ path: `test-results/32-${look}.png` });
   }
+  expect(errors).toEqual([]);
+});
+
+test('gauntlet: obstacles, near the end, juice presets', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
+
+  await page.goto('/?scenario=gauntlet-ramp&debug');
+  await expect(page.locator('#race-hud .seed')).toHaveText('SEED 7');
+  const search = page.locator('.kd-panel .search');
+  await search.fill('gauntlet.chunks');
+  await expect(row(page, 'gauntlet.chunks').locator('code')).not.toHaveText('0');
+  await page.locator('.count').click(); // leave the search box so keys fly the ship
+  await page.keyboard.down('KeyW');
+  await expect(page.locator('#race-hud .lap')).toHaveText('LAP 1', { timeout: 20000 });
+  await page.waitForTimeout(1500);
+  await page.keyboard.up('KeyW');
+  await page.screenshot({ path: 'test-results/40-gauntlet.png' });
+
+  const juice = presetSelect(page, 'juice');
+  for (const preset of ['juice/overkill', 'juice/subtle', 'juice/off']) {
+    await juice.selectOption(preset);
+    await page.keyboard.down('ShiftLeft');
+    await page.keyboard.down('KeyW');
+    await page.waitForTimeout(800);
+    await page.screenshot({ path: `test-results/41-${preset.replace('/', '-')}.png` });
+    await page.keyboard.up('KeyW');
+    await page.keyboard.up('ShiftLeft');
+  }
+  await search.fill('juice.master');
+  await expect(row(page, 'juice.master').locator('.layer')).toHaveText('juice');
   expect(errors).toEqual([]);
 });

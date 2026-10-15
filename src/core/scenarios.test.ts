@@ -21,6 +21,7 @@ describe('parseScenario', () => {
     expect(parseScenario([1])).toBeUndefined();
     expect(parseScenario({ user: { a: 1 } })).toBeUndefined(); // an exported layers file
     expect(parseScenario({ mode: 'bogus' })).toEqual({ name: 'dropped' });
+    expect(parseScenario({ mode: 'gauntlet' })).toEqual({ name: 'dropped', mode: 'gauntlet' });
   });
 });
 
@@ -62,7 +63,7 @@ describe('applying and capturing', () => {
   it('capture round-trips through apply', () => {
     const r = new Registry();
     r.int('gen.race.seed', 1);
-    r.enum('game.mode', 'race', ['race', 'free']);
+    r.enum('game.mode', 'race', ['race', 'gauntlet', 'free']);
     r.num('ship.thrust', 60);
     r.set('gen.race.seed', 42);
     r.set('ship.thrust', 90);

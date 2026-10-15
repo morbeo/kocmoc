@@ -1,0 +1,30 @@
+{
+  "desc": "Light touch: gentle shake, FOV and trails; no freezes or slow-mo, no sound",
+  "vars": {
+    "juice.master": 1,
+    "juice.shake.enabled": true,
+    "juice.shake.intensity": 0.5,
+    "juice.fov.enabled": true,
+    "juice.fov.intensity": 0.5,
+    "juice.speedLines.enabled": true,
+    "juice.speedLines.intensity": 0.5,
+    "juice.hitStop.enabled": false,
+    "juice.hitStop.intensity": 0.5,
+    "juice.nearMiss.enabled": false,
+    "juice.nearMiss.intensity": 0.5,
+    "juice.camLag.enabled": true,
+    "juice.camLag.intensity": 0.5,
+    "juice.bank.enabled": true,
+    "juice.bank.intensity": 0.6,
+    "juice.trails.enabled": true,
+    "juice.trails.intensity": 0.6,
+    "juice.sparks.enabled": true,
+    "juice.sparks.intensity": 0.5,
+    "juice.flash.enabled": true,
+    "juice.flash.intensity": 0.5,
+    "juice.lens.enabled": true,
+    "juice.lens.intensity": 0.5,
+    "juice.audio.enabled": false,
+    "juice.audio.intensity": 0.5
+  }
+}
