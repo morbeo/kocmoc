@@ -1,0 +1,43 @@
+#controls {
+  --c-bg: #fbfaf7;
+  --c-fg: #1d1b26;
+  --c-dim: #8a879a;
+  --c-line: #dcdae4;
+  --c-accent: #e0217f;
+  --c-warn: #d97706;
+  font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--c-fg);
+}
+#controls * { box-sizing: border-box; }
+.ctl-backdrop {
+  position: fixed; inset: 0; z-index: 1100;
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+  background: rgba(240, 238, 232, 0.35);
+}
+.ctl-panel {
+  width: min(460px, 100%); max-height: 100%; overflow: auto;
+  background: var(--c-bg); border: 1px solid var(--c-line); border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
+  padding: 12px 16px;
+}
+.ctl-panel header { display: flex; align-items: center; justify-content: space-between; }
+.ctl-panel h2 { margin: 0; font-size: 15px; }
+.ctl-panel button {
+  white-space: nowrap;
+  font: inherit; color: inherit; cursor: pointer;
+  background: #fff; border: 1px solid var(--c-line); border-radius: 4px; padding: 3px 8px;
+}
+.ctl-panel button:hover { border-color: var(--c-accent); }
+.ctl-panel .close, .ctl-panel .reset { border: none; background: none; color: var(--c-dim); }
+.ctl-invert { display: grid; gap: 4px; margin: 10px 0; padding: 8px 0; border-block: 1px solid var(--c-line); }
+.ctl-invert label { display: flex; gap: 8px; align-items: center; cursor: pointer; }
+.ctl-panel table { width: 100%; border-collapse: collapse; }
+.ctl-panel th { text-align: left; font-weight: normal; padding: 2px 8px 2px 0; }
+.ctl-panel td { padding: 2px; }
+.ctl-panel td:last-child { width: 24px; }
+.ctl-panel .key { width: 100%; min-width: 72px; }
+.ctl-panel .key.empty { color: var(--c-dim); }
+.ctl-panel .key.listening { border-color: var(--c-accent); color: var(--c-accent); }
+.ctl-panel .key.conflict { border-color: var(--c-warn); color: var(--c-warn); }
+.ctl-panel footer { display: flex; gap: 8px; align-items: center; justify-content: space-between; margin-top: 10px; color: var(--c-dim); font-size: 11px; }
+.ctl-panel kbd { border: 1px solid var(--c-line); border-radius: 3px; padding: 0 3px; }

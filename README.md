@@ -25,11 +25,13 @@ npm run build        # static build → dist/
 | `F` | flight assist on/off (off = Newtonian drift) |
 | `V` | cycle camera (chase, cockpit) |
 | `F3` | input visualizer |
+| `K` | controls: rebind keys, invert pitch |
 
 Touchpad (`input.pointer.mode`): **stick** (default) — click the scene to capture the pointer, then move
 your finger to steer; it re-centres on its own, `Esc` releases. Held click = boost. **scroll** —
 two-finger scroll steers. Pinch sets a cruise throttle (or camera zoom, `input.pinch.action`).
-Every binding, curve (deadzone / expo / sensitivity) and flight parameter is a var in the debug table.
+Keys can be rebound in the controls panel (`K` or the **Controls** button), which also has invert-pitch
+toggles for the touchpad/mouse Y axis and for the pitch keys. Every binding, curve (deadzone / expo / sensitivity) and flight parameter is a var in the debug table.
 
 ## Debug tools
 

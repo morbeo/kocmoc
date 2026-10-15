@@ -108,3 +108,49 @@ test('render debug views and visual presets', async ({ page }) => {
   }
   expect(errors).toEqual([]);
 });
+
+test('controls panel: rebind a key, invert pitch, reset', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+
+  await page.goto('/');
+  await expect(page.locator('#controls-btn')).toHaveText('Controls (K)');
+  await page.keyboard.press('KeyK');
+  const panel = page.locator('.ctl-panel');
+  await expect(panel).toBeVisible();
+
+  // rebind thrust to I; the key being bound must not reach the game
+  const thrust = panel.locator('tr[data-action=forward] .key').first();
+  await thrust.click();
+  await expect(thrust).toHaveText('press a key…');
+  await page.keyboard.press('KeyI');
+  await expect(thrust).toHaveText('I');
+  // binding a key another action uses flags the clash
+  await panel.locator('tr[data-action=back] .key').nth(1).click();
+  await page.keyboard.press('KeyI');
+  await expect(thrust).toHaveClass(/conflict/);
+  await panel.locator('tr[data-action=back] .key').nth(1).click();
+  await page.keyboard.press('Backspace');
+  await expect(thrust).not.toHaveClass(/conflict/);
+
+  await panel.getByLabel('Invert pitch (touchpad / mouse Y)').check();
+  await page.screenshot({ path: 'test-results/30-controls.png' });
+  await page.keyboard.press('Escape');
+  await expect(panel).toBeHidden();
+
+  await page.keyboard.down('KeyI');
+  await expect.poll(async () => Number(await page.locator('#hud .speed').textContent()), { timeout: 15000 }).toBeGreaterThan(10);
+  await page.keyboard.up('KeyI');
+
+  // survives reload, then reset all restores defaults
+  await page.waitForTimeout(400);
+  await page.reload();
+  await page.locator('#controls-btn').click();
+  await expect(thrust).toHaveText('I');
+  await expect(panel.getByLabel('Invert pitch (touchpad / mouse Y)')).toBeChecked();
+  await panel.getByRole('button', { name: 'Reset all' }).click();
+  await expect(thrust).toHaveText('W');
+  await expect(panel.getByLabel('Invert pitch (touchpad / mouse Y)')).not.toBeChecked();
+
+  expect(errors).toEqual([]);
+});

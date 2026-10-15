@@ -27,9 +27,13 @@ const keys = {
 const boostKey = bind('boost', 'ShiftLeft,ShiftRight');
 export const assistKey = bind('assist', 'KeyF');
 export const cameraKey = bind('camera', 'KeyV');
+export const controlsKey = bind('controls', 'KeyK');
 
 const keyRamp = vars.num('input.key.ramp', 8, { min: 0, max: 30, hardMin: 0, unit: '/s', tags: keyTags, desc: 'how fast key axes move to full; 0 = instant' });
-const invertPitch = vars.bool('input.invertPitch', false, { tags });
+export const invert = {
+  pointer: vars.bool('input.invert.pointerY', false, { tags, desc: 'touchpad/mouse: moving up pitches the nose down' }),
+  keys: vars.bool('input.invert.keyPitch', false, { tags: keyTags, desc: 'swap the pitch up/down keys' }),
+};
 
 const pointerMode = vars.enum('input.pointer.mode', 'stick', ['stick', 'scroll', 'off'], {
   tags,
@@ -158,7 +162,8 @@ export function sampleInput(prev: Controls, dt: number): Controls {
   const k = debug.keys;
   for (const axis of AXES) {
     const [pos, neg] = keys[axis];
-    const target = (pressed(pos) ? 1 : 0) - (pressed(neg) ? 1 : 0);
+    let target = (pressed(pos) ? 1 : 0) - (pressed(neg) ? 1 : 0);
+    if (axis === 'pitch' && invert.keys.value) target = -target;
     k[axis] = ramp(k[axis], target, keyRamp.value, dt);
   }
 
@@ -176,6 +181,7 @@ export function sampleInput(prev: Controls, dt: number): Controls {
     p.yaw = scroll.yaw;
     p.pitch = scroll.pitch;
   }
+  if (invert.pointer.value) p.pitch = -p.pitch;
   const clickLive = clickHeld && (captured || pointerMode.value !== 'stick');
   if (clickLive && clickAction.value === 'thrust') p.thrust = 1;
   p.thrust = Math.max(p.thrust, cruise);
@@ -186,7 +192,6 @@ export function sampleInput(prev: Controls, dt: number): Controls {
     debug.curved[axis] = applyCurve(debug.raw[axis], curveOf(axis));
     out[axis] = debug.curved[axis];
   }
-  if (invertPitch.value) out.pitch = -out.pitch;
   out.boost = pressed(boostKey) || (clickLive && clickAction.value === 'boost');
 
   debug.boost = out.boost;

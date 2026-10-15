@@ -129,7 +129,9 @@ flash + HUD pop, chromatic aberration / vignette, audio pitch & doppler.
 ## 6. Input — keyboard + touchpad
 
 Devices → actions/axes → response curves (deadzone, exponent, sensitivity). All
-bindings and curve params are vars; rebinding panel.
+bindings and curve params are vars; rebinding panel (`K`, `src/ui/controls.tsx`)
+with up to two keys per action, clash warnings, and invert-pitch toggles for
+pointer Y (`input.invert.pointerY`) and the pitch keys (`input.invert.keyPitch`).
 
 - **Keyboard**: `W/S` thrust/brake, `A/D` strafe, `Space/C` up/down, `Q/E` roll,
   arrows pitch/yaw, `Shift` boost, `F` flight assist, `V` cycle camera.

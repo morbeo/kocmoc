@@ -5,7 +5,8 @@ import { initPersistence } from './core/persist';
 import { isTyping } from './core/dom';
 import { FixedLoop } from './core/loop';
 import { newShip, copyShip, lerpShip, stepShip, noControls, type ShipParams } from './sim/ship';
-import { attachInput, sampleInput, onKey, assistKey, cameraKey, zoom, debug as inputDebug, pointerMode } from './input/input';
+import { attachInput, sampleInput, onKey, assistKey, cameraKey, controlsKey, zoom, debug as inputDebug, pointerMode } from './input/input';
+import { keyLabel } from './input/bindings';
 import { camMode, cycleCamera, updateCamera } from './cam/rigs';
 import { createShipModel } from './render/shipModel';
 import { createField } from './world/field';
@@ -102,6 +103,22 @@ attachInput(renderer.domElement);
 onKey(assistKey, () => assist.set(!assist.value));
 onKey(cameraKey, cycleCamera);
 onKey(vizKey, () => inputViz.set(!inputViz.value));
+
+// controls panel (rebinding, invert pitch), lazy-loaded
+let controlsUi: Promise<typeof import('./ui/controls')> | undefined;
+const toggleControls = () => void (controlsUi ??= import('./ui/controls')).then((m) => m.toggle());
+onKey(controlsKey, toggleControls);
+const controlsBtn = document.createElement('button');
+controlsBtn.id = 'controls-btn';
+controlsBtn.addEventListener('click', () => {
+  controlsBtn.blur(); // keep Space from re-clicking it
+  toggleControls();
+});
+document.body.appendChild(controlsBtn);
+effect(() => {
+  const codes = controlsKey.value.split(',').filter(Boolean);
+  controlsBtn.textContent = codes.length ? `Controls (${keyLabel(codes[0].trim())})` : 'Controls';
+});
 
 let viz: Promise<typeof import('./debug/inputViz')> | undefined;
 effect(() => {
