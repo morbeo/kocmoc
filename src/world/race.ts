@@ -3,8 +3,11 @@ import { computed, effect } from '@preact/signals-core';
 import { vars } from '../core/vars';
 import { toon } from '../render/toon';
 import { generateTrack, type RaceGenParams, type Track } from '../gen/track';
+import { GAME_MODES } from '../core/scenarios';
 
-export const gameMode = vars.enum('game.mode', 'race', ['race', 'free'], { tags: ['game'], desc: 'race: generated track; free: open rock field' });
+export const gameMode = vars.enum('game.mode', 'race', GAME_MODES, { tags: ['game'], desc: 'race: generated track; gauntlet: the track filled with obstacles; free: open rock field' });
+/** Race and gauntlet both fly the generated track. */
+export const onTrack = () => gameMode.value !== 'free';
 
 const g = ['gen', 'race'];
 const gen = {
@@ -181,7 +184,7 @@ export function createRaceScene(scene: THREE.Scene) {
   return {
     group,
     update() {
-      group.visible = gameMode.value === 'race';
+      group.visible = onTrack();
       gateMat.color.set(stripeColor.value);
       cpMat.color.set(cpColor.value).multiplyScalar(cpGlow.value);
       startMat.color.set(startColor.value).multiplyScalar(cpGlow.value);

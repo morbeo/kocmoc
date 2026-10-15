@@ -1,0 +1,30 @@
+{
+  "desc": "No effects: plain flight, for tuning feel or for motion sensitivity",
+  "vars": {
+    "juice.master": 0,
+    "juice.shake.enabled": false,
+    "juice.shake.intensity": 1,
+    "juice.fov.enabled": false,
+    "juice.fov.intensity": 1,
+    "juice.speedLines.enabled": false,
+    "juice.speedLines.intensity": 1,
+    "juice.hitStop.enabled": false,
+    "juice.hitStop.intensity": 1,
+    "juice.nearMiss.enabled": false,
+    "juice.nearMiss.intensity": 1,
+    "juice.camLag.enabled": false,
+    "juice.camLag.intensity": 1,
+    "juice.bank.enabled": false,
+    "juice.bank.intensity": 1,
+    "juice.trails.enabled": false,
+    "juice.trails.intensity": 1,
+    "juice.sparks.enabled": false,
+    "juice.sparks.intensity": 1,
+    "juice.flash.enabled": false,
+    "juice.flash.intensity": 1,
+    "juice.lens.enabled": false,
+    "juice.lens.intensity": 1,
+    "juice.audio.enabled": false,
+    "juice.audio.intensity": 1
+  }
+}

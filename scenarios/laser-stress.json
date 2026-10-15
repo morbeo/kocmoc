@@ -1,0 +1,16 @@
+{
+  "name": "laser-stress",
+  "desc": "Only laser grids, at full difficulty from the start",
+  "mode": "gauntlet",
+  "seed": 21,
+  "spawn": { "trackT": 0, "speed": 40 },
+  "vars": {
+    "gen.gauntlet.kinds.ring": false,
+    "gen.gauntlet.kinds.slalom": false,
+    "gen.gauntlet.kinds.crusher": false,
+    "gen.gauntlet.kinds.turbine": false,
+    "gen.gauntlet.kinds.debris": false,
+    "gen.gauntlet.rampStart": 1,
+    "gen.gauntlet.rampEnd": 1
+  }
+}

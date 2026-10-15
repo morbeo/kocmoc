@@ -13,8 +13,10 @@ import { createField } from './world/field';
 import { createHud } from './ui/hud';
 import { createSky } from './render/sky';
 import { createPipeline } from './render/pipeline';
-import { createRaceScene, gameMode, genParams, seedVar, track } from './world/race';
-import { newRace, spawnOnTrack, stepRace, splitDelta, type RaceState, type WallParams } from './sim/race';
+import { createRaceScene, gameMode, genParams, onTrack, seedVar, track } from './world/race';
+import { createGauntletScene, gauntlet, gauntletParams, nearMissDistance, shipRadius } from './world/gauntlet';
+import { createJuice } from './juice';
+import { newRace, spawnOnTrack, stepRace, splitDelta, type Course, type RaceState, type WallParams } from './sim/race';
 import { scenarios, applyScenario, parseScenario, setSpawnHandler, setSpawnSource } from './core/scenarios';
 import './ui/hud.css';
 
@@ -63,7 +65,6 @@ const params = (): ShipParams => ({
 });
 
 const rtags = ['race', 'feel'];
-const shipRadius = vars.num('ship.radius', 1.5, { min: 0.2, max: 6, hardMin: 0.05, unit: 'm', tags: ['ship', 'race'], desc: 'collision sphere' });
 const wallBounce = vars.num('race.wall.bounce', 0.3, { min: 0, max: 1, hardMin: 0, hardMax: 2, tags: rtags, desc: 'share of into-wall speed bounced back' });
 const wallScrape = vars.num('race.wall.scrape', 0.8, { min: 0, max: 10, hardMin: 0, unit: '/s', tags: rtags, desc: 'speed lost while touching the wall' });
 const spawnT = vars.num('race.spawn.t', 0, { min: 0, max: 1, hardMin: 0, hardMax: 1, tags: ['race'], desc: 'spawn position as a fraction of the lap (0 = just behind the start line)' });
@@ -100,6 +101,8 @@ const shipModel = createShipModel();
 scene.add(shipModel.object);
 const field = createField(scene);
 const raceScene = createRaceScene(scene);
+const gauntletScene = createGauntletScene(scene);
+const juice = createJuice(scene, () => vars.get('ship.glow')?.value as string ?? '#7fe7ff');
 const hud = createHud();
 
 function resize(): void {
@@ -122,12 +125,16 @@ effect(() => void (loop.step = 1 / simRate.value));
 // --- race ------------------------------------------------------------------
 let race: RaceState | null = null;
 const walls = (): WallParams => ({ shipRadius: shipRadius.value, bounce: wallBounce.value, scrape: wallScrape.value });
-const bestKey = () => `kocmoc.best.${JSON.stringify(genParams.value)}`;
+const bestKey = () =>
+  gameMode.value === 'gauntlet'
+    ? `kocmoc.best.gauntlet.${JSON.stringify([genParams.value, gauntletParams.value])}`
+    : `kocmoc.best.${JSON.stringify(genParams.value)}`;
 let savedBest: number | null = null;
 
-/** Put the ship at a spawn point (fraction of the lap in race mode; origin in free mode). */
+/** Put the ship at a spawn point (fraction of the lap on a track; origin in free mode). */
 function respawn(t = spawnT.value, speed = spawnSpeed.value): void {
-  if (gameMode.value === 'race') {
+  juice.reset();
+  if (onTrack()) {
     const tr = track.value;
     // t = 0 spawns a little behind the line so crossing it starts the clock
     spawnOnTrack(curr, tr, t === 0 ? -Math.min(30, tr.length * 0.05) : t * tr.length, speed);
@@ -156,12 +163,13 @@ function respawn(t = spawnT.value, speed = spawnSpeed.value): void {
 effect(() => {
   void track.value;
   void gameMode.value;
+  void gauntlet.value;
   respawn();
 });
-// keep ?seed= in the address bar in race mode, so the URL names the track
+// keep ?seed= in the address bar on a track, so the URL names it
 effect(() => {
   const url = new URL(location.href);
-  if (gameMode.value === 'race') url.searchParams.set('seed', String(seedVar.value));
+  if (onTrack()) url.searchParams.set('seed', String(seedVar.value));
   else url.searchParams.delete('seed');
   history.replaceState(null, '', url.pathname + url.search + url.hash);
 });
@@ -225,7 +233,7 @@ effect(() => {
       ship: () => view,
       prevShip: () => prev,
       step: () => loop.step,
-      track: () => (gameMode.value === 'race' ? track.value : null),
+      track: () => (onTrack() ? track.value : null),
       near: () => race?.near ?? null,
       shipRadius: () => shipRadius.value,
     });
@@ -254,8 +262,16 @@ vars.watch('race.track.attempts', () => track.value.attempts, { tags: ['race'], 
 vars.watch('race.progress', () => (race ? (race.near.s / track.value.length).toFixed(3) : '–'), { tags: ['race'] });
 vars.watch('race.wallDist', () => (race ? (track.value.radius - race.near.dist).toFixed(1) : '–'), { tags: ['race'], unit: 'm', desc: 'distance to the wall' });
 vars.watch('race.wallHits', () => race?.wallHits ?? 0, { tags: ['race'] });
+vars.watch('race.obstacleHits', () => race?.obstacleHits ?? 0, { tags: ['race', 'gauntlet'] });
+vars.watch('gauntlet.chunks', () => gauntlet.value?.chunks.length ?? 0, { tags: ['gauntlet'] });
+vars.watch('gauntlet.chunk', () => {
+  const g = gauntlet.value;
+  const c = g && race && g.chunks.find((x) => race!.near.s >= x.s0 && race!.near.s < x.s1);
+  return c ? `${c.kind} ${(c.difficulty * 100).toFixed(0)}%` : '–';
+}, { tags: ['gauntlet'], desc: 'chunk under the ship and its difficulty' });
 
 // --- frame -----------------------------------------------------------------
+const _scrape = new THREE.Vector3();
 let last = performance.now();
 renderer.setAnimationLoop((now) => {
   const dt = Math.min((now - last) / 1000, 0.25);
@@ -265,11 +281,24 @@ renderer.setAnimationLoop((now) => {
 
   const ship = params();
   const wallParams = walls();
-  const alpha = loop.advance(paused.value ? 0 : dt * timeScale.value, (step) => {
+  const g = gauntlet.value;
+  const course: Course | undefined = g ? { gauntlet: g, nearMiss: nearMissDistance.value } : undefined;
+  const warp = juice.timeScale(paused.value ? 0 : dt);
+  const alpha = loop.advance(paused.value ? 0 : dt * timeScale.value * warp, (step) => {
     copyShip(prev, curr);
     stepShip(curr, sampleInput(controls, step), ship, step);
-    if (race) stepRace(race, curr, track.value, wallParams, step);
+    if (race) stepRace(race, curr, track.value, wallParams, step, course);
   });
+  // wall contact point (for sparks), and effects for what happened this frame
+  let scrape: THREE.Vector3 | null = null;
+  if (race?.contact) scrape = _scrape.subVectors(curr.pos, race.near.point).setLength(track.value.radius).add(race.near.point);
+  if (race) {
+    for (const e of race.events) {
+      const at = e.type === 'hit' ? (e.what === 'wall' ? (scrape ?? curr.pos) : race.obstacle.point) : undefined;
+      juice.event(e, curr, at);
+    }
+    race.events.length = 0;
+  }
   if (race && race.bestLap !== null && race.bestLap !== savedBest) {
     savedBest = race.bestLap;
     localStorage.setItem(bestKey(), JSON.stringify({ lap: race.bestLap, splits: race.bestSplits }));
@@ -282,6 +311,7 @@ renderer.setAnimationLoop((now) => {
   amb.intensity = ambient.value;
   field.update(gameMode.value === 'free');
   raceScene.update();
+  gauntletScene.update(race ? race.time - (1 - alpha) * loop.step : 0);
   gizmoUi?.update();
 
   shipModel.object.position.copy(view.pos);
@@ -289,6 +319,7 @@ renderer.setAnimationLoop((now) => {
   shipModel.object.visible = camMode.value !== 'cockpit';
   shipModel.update(view.boosting ? 1 : Math.max(0, controls.thrust));
   updateCamera(camera, view, dt, zoom.value);
+  juice.frame({ dt, camera, ship: view, shipModel: shipModel.object, maxSpeed: p.maxSpeed.value, chase: camMode.value !== 'cockpit', scrape });
 
   const hint =
     pointerMode.value === 'stick' && !inputDebug.captured
