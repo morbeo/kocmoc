@@ -25,6 +25,7 @@ npm run build        # static build → dist/
 | `F` | flight assist on/off (off = Newtonian drift) |
 | `V` | cycle camera (chase, cockpit) |
 | `F3` | input visualizer |
+| `R` | respawn at the start (race) or origin (free) |
 | `K` | controls: rebind keys, invert pitch |
 
 Touchpad (`input.pointer.mode`): **stick** (default) — click the scene to capture the pointer, then move
@@ -32,6 +33,20 @@ your finger to steer; it re-centres on its own, `Esc` releases. Held click = boo
 two-finger scroll steers. Pinch sets a cruise throttle (or camera zoom, `input.pinch.action`).
 Keys can be rebound in the controls panel (`K` or the **Controls** button), which also has invert-pitch
 toggles for the touchpad/mouse Y axis and for the pitch keys. Every binding, curve (deadzone / expo / sensitivity) and flight parameter is a var in the debug table.
+
+## Race
+
+`game.mode` is `race` (default) or `free` (open rock field). Race tracks are generated from
+`gen.race.seed` and the other `gen.race.*` vars: a closed Catmull-Rom loop with rotation-minimising
+frames, optional barrel rolls (`gen.race.twist`) and banking, checked for self-intersection and
+tight bends. `gen.race.profile` picks the look (tube, halfpipe, rails, gates); every profile collides
+with the same invisible corridor. Cross the start line to start the clock. Laps, checkpoint splits and
+a delta to your best are shown at the top, and best laps are saved per track.
+
+- `?seed=42` opens that track; the address bar always shows the current seed.
+- `?scenario=corkscrew-stress` loads a bundled scenario from `scenarios/`. Scenarios set mode, seed,
+  spawn point, vars and presets. Load them from the debug table's **scenario** menu or drop a scenario
+  JSON on the page; **save** downloads the current setup as one.
 
 ## Debug tools
 
@@ -42,6 +57,8 @@ toggles for the touchpad/mouse Y axis and for the pitch keys. Every binding, cur
 - `render.debug.view` shows a pipeline stage (`color`, `edges`, `normals`, `depth`); `render.wireframe`,
   `render.outline.enabled`, `render.bloom.enabled` and `render.stars.enabled` toggle individual passes.
 - Visual presets: Ink, Neon, Pastel, Mono.
+- Gizmos (`#gizmo`): velocity and acceleration vectors, collision sphere, track frames, checkpoint
+  planes, nearest track point.
 
 Adding a tunable value anywhere in the code:
 

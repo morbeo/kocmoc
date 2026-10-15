@@ -154,3 +154,36 @@ test('controls panel: rebind a key, invert pitch, reset', async ({ page }) => {
 
   expect(errors).toEqual([]);
 });
+
+test('race: seed in URL, scenario, gizmos, lap timer starts', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
+
+  await page.goto('/?seed=42');
+  await expect(page.locator('#race-hud .seed')).toHaveText('SEED 42');
+  expect(new URL(page.url()).searchParams.get('seed')).toBe('42');
+  await expect(page.locator('#race-hud .time')).toHaveText('cross the line');
+  await page.keyboard.down('KeyW');
+  await expect(page.locator('#race-hud .lap')).toHaveText('LAP 1', { timeout: 20000 });
+  await page.keyboard.up('KeyW');
+  await page.screenshot({ path: 'test-results/30-race.png' });
+
+  await page.goto('/?scenario=rails-night&debug');
+  await expect(page.locator('#race-hud .seed')).toHaveText('SEED 77');
+  const search = page.locator('.kd-panel .search');
+  for (const g of ['velocity', 'collision', 'frames', 'checkpoints', 'nearest']) {
+    await search.fill(`debug.gizmo.${g}`);
+    await row(page, `debug.gizmo.${g}`).locator('input[type=checkbox]').check();
+  }
+  await page.waitForTimeout(500);
+  await page.screenshot({ path: 'test-results/31-rails-gizmos.png' });
+
+  for (const look of ['halfpipe', 'gates']) {
+    await search.fill('gen.race.profile');
+    await row(page, 'gen.race.profile').locator('select').selectOption(look);
+    await page.waitForTimeout(300);
+    await page.screenshot({ path: `test-results/32-${look}.png` });
+  }
+  expect(errors).toEqual([]);
+});

@@ -1,0 +1,9 @@
+{
+  "name": "corkscrew-stress",
+  "desc": "Tight, twisting track at speed: two barrel rolls per lap plus heavy banking",
+  "mode": "race",
+  "seed": 4815,
+  "spawn": { "trackT": 0.42, "speed": 200 },
+  "vars": { "gen.race.twist": 2, "gen.race.twistNoise": 1.5, "gen.race.radius": 450, "cam.mode": "chase", "ship.flightAssist": false },
+  "presets": []
+}

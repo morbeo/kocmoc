@@ -1,0 +1,9 @@
+{
+  "name": "easy-oval",
+  "desc": "Wide, flat loop for tuning the basics",
+  "mode": "race",
+  "seed": 1,
+  "spawn": { "trackT": 0, "speed": 0 },
+  "vars": { "gen.race.wobble": 0.1, "gen.race.height": 0, "gen.race.twistNoise": 0, "gen.race.tubeRadius": 35 },
+  "presets": []
+}

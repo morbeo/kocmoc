@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from 'preact/hooks';
 import { vars, LAYERS, type Layer } from '../core/vars';
 import { presets, applyPreset, activePreset } from '../core/presets';
 import { shareUrl } from '../core/persist';
+import { scenarios, applyScenario, captureScenario, currentSpawn } from '../core/scenarios';
 import { parseQuery, filterRows, type Row } from './query';
 import { Editor, formatValue } from './editors';
 import {
@@ -155,6 +156,46 @@ function PresetPickers() {
   );
 }
 
+function download(name: string, data: unknown): void {
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' }));
+  a.download = name;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+function ScenarioPicker() {
+  return (
+    <label class="scenario">
+      scenario
+      <select
+        value=""
+        onChange={(e) => {
+          const sc = scenarios.find((x) => x.name === e.currentTarget.value);
+          if (sc) applyScenario(vars, sc);
+          e.currentTarget.value = '';
+        }}
+      >
+        <option value="">load…</option>
+        {scenarios.map((sc) => (
+          <option value={sc.name} title={sc.desc}>
+            {sc.name}
+          </option>
+        ))}
+      </select>
+      <button
+        title="save the current setup (and where the ship is) as a scenario file; drop it on the page to load it"
+        onClick={() => {
+          const name = prompt('Scenario name', 'my-scenario');
+          if (name) download(`${name}.json`, captureScenario(vars, name, currentSpawn()));
+        }}
+      >
+        save
+      </button>
+    </label>
+  );
+}
+
 function Snapshots() {
   const { a, b, current } = ab.value;
   return (
@@ -228,6 +269,7 @@ function Toolbar() {
       </div>
       <div class="row">
         <PresetPickers />
+        <ScenarioPicker />
       </div>
       <details>
         <summary>snapshots ({snapshots.value.length})</summary>
