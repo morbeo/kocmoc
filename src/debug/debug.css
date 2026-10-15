@@ -72,3 +72,14 @@
 .kd-panel .diff .row { display: flex; gap: 8px; align-items: center; }
 .kd-panel .diff td { padding: 1px 6px; }
 .kd-panel .diff .before { opacity: 0.6; text-decoration: line-through; }
+
+/* touch screens: leave the touch button bar (⚙ closes the panel) uncovered; 16px inputs stop iOS zooming on focus */
+@media (max-width: 800px) {
+  body.touch-ui .kd-panel { top: calc(60px + env(safe-area-inset-top)); border-top: 1px solid var(--kd-line); }
+}
+@media (pointer: coarse) {
+  .kd-panel { padding-bottom: env(safe-area-inset-bottom); padding-right: env(safe-area-inset-right); }
+  .kd-panel input:not([type='checkbox']):not([type='range']):not([type='color']), .kd-panel select, .search { font-size: 16px !important; }
+  .kd-panel button { min-height: 32px; }
+  .kd-panel input[type='checkbox'] { width: 22px; height: 22px; }
+}

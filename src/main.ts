@@ -21,6 +21,7 @@ import { createHudLayout, editKey as hudEditKey, editMode as hudEdit } from './u
 import { createSky } from './render/sky';
 import { createPipeline } from './render/pipeline';
 import { createViewports, layout } from './render/viewports';
+import { detectTouch, touchUi } from './input/touch';
 import { createRaceScene, gameMode, genParams, onTrack, seedVar, track } from './world/race';
 import { createGauntletScene, gauntlet, gauntletParams, nearMissDistance, shipRadius } from './world/gauntlet';
 import { createJuice } from './juice';
@@ -33,6 +34,9 @@ const lightColor = vars.color('render.light.color', '#ffffff', { tags: ['render'
 const lightIntensity = vars.num('render.light.intensity', 3, { min: 0, max: 10, hardMin: 0, tags: ['render'] });
 const lightDir = vars.vec3('render.light.dir', [1, 1.5, 1], { tags: ['render'], desc: 'direction towards the light' });
 const ambient = vars.num('render.ambient', 0.25, { min: 0, max: 2, hardMin: 0, tags: ['render'] });
+// phones have 3× screens and small GPUs: render touch devices at a lower ratio by default
+const coarse = matchMedia('(pointer: coarse)').matches;
+const pixelRatio = vars.num('render.pixelRatio', coarse ? 1.5 : 2, { min: 0.5, max: 3, hardMin: 0.25, hardMax: 4, tags: ['render', 'perf'], desc: 'max render resolution per CSS pixel (capped by the screen)' });
 
 const simRate = vars.int('sim.rate', 120, { min: 30, max: 240, hardMin: 10, hardMax: 1000, unit: 'Hz', tags: ['sim'], desc: 'fixed physics steps per second' });
 const timeScale = vars.num('time.scale', 1, { min: 0.05, max: 4, hardMin: 0, hardMax: 16, unit: '×', tags: ['sim', 'debug'] });
@@ -96,7 +100,6 @@ if (urlParams.has('seed') && Number.isFinite(urlSeed)) {
 
 // --- scene -----------------------------------------------------------------
 const renderer = new THREE.WebGLRenderer({ antialias: true });
-renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
 document.body.appendChild(renderer.domElement);
 
 renderer.info.autoReset = false; // several passes per frame: count them all
@@ -128,13 +131,15 @@ const viewports = createViewports(renderer, scene, sky);
 const hudLayout = createHudLayout(hud.elements);
 
 function resize(): void {
+  renderer.setPixelRatio(Math.min(devicePixelRatio, pixelRatio.value));
   renderer.setSize(innerWidth, innerHeight);
   pipeline.setSize(innerWidth, innerHeight);
   camera.aspect = innerWidth / innerHeight;
   camera.updateProjectionMatrix();
 }
 addEventListener('resize', resize);
-resize();
+screen.orientation?.addEventListener('change', resize);
+effect(resize); // also re-runs when render.pixelRatio changes
 
 // --- sim -------------------------------------------------------------------
 const sim = newSim();
@@ -340,6 +345,23 @@ effect(() => {
   controlsBtn.textContent = codes.length ? `Controls (${keyLabel(codes[0].trim())})` : 'Controls';
 });
 
+// on-screen sticks and buttons on touch screens, lazy-loaded
+detectTouch();
+let touchMod: Promise<typeof import('./ui/touch')> | undefined;
+effect(() => {
+  const on = touchUi.value;
+  if (!on && !touchMod) return;
+  void (touchMod ??= import('./ui/touch')).then((m) => {
+    m.mount({
+      respawn: () => respawn(),
+      camera: cycleCamera,
+      assist: () => assist.set(!assist.value),
+      debug: () => void openDebug(),
+    });
+    m.show(on);
+  });
+});
+
 let gizmoUi: ReturnType<typeof import('./debug/gizmos').createGizmos> | undefined;
 let gizmoLoading = false;
 effect(() => {
@@ -474,7 +496,7 @@ renderer.setAnimationLoop((now) => {
   juice.frame({ dt, camera, ship: view, shipModel: shipModel.object, maxSpeed: p.maxSpeed.value, chase: camMode.value === 'chase' || camMode.value === 'far', scrape });
 
   const hint =
-    pointerMode.value === 'stick' && !inputDebug.captured
+    pointerMode.value === 'stick' && !inputDebug.captured && !touchUi.value
       ? 'Click to steer with the touchpad · arrows/WASD to fly'
       : '';
   const raceHud = race && {

@@ -3,6 +3,7 @@ import { isTyping } from '../core/dom';
 import type { Controls } from '../sim/ship';
 import { applyCurve, type Curve } from './curve';
 import { moveStick, recenterStick, stickAxes, ramp, type Stick } from './stick';
+import { touch } from './touch';
 
 export const AXES = ['pitch', 'yaw', 'roll', 'strafe', 'lift', 'thrust'] as const;
 export type Axis = (typeof AXES)[number];
@@ -185,6 +186,8 @@ export function sampleInput(prev: Controls, dt: number): Controls {
     p.pitch = scroll.pitch;
   }
   if (invert.pointer.value) p.pitch = -p.pitch;
+  // on-screen sticks / tilt (already inverted where wanted)
+  for (const axis of AXES) p[axis] = clamp1(p[axis] + touch[axis]);
   const clickLive = clickHeld && (captured || pointerMode.value !== 'stick');
   if (clickLive && clickAction.value === 'thrust') p.thrust = 1;
   p.thrust = Math.max(p.thrust, cruise);
@@ -195,7 +198,7 @@ export function sampleInput(prev: Controls, dt: number): Controls {
     debug.curved[axis] = applyCurve(debug.raw[axis], curveOf(axis));
     out[axis] = debug.curved[axis];
   }
-  out.boost = pressed(boostKey) || (clickLive && clickAction.value === 'boost');
+  out.boost = pressed(boostKey) || (clickLive && clickAction.value === 'boost') || touch.boost;
 
   debug.boost = out.boost;
   debug.captured = captured;
