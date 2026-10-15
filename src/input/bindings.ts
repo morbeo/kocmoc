@@ -24,6 +24,8 @@ export const ACTION_LABELS: Record<string, string> = {
   inputViz: 'Input visualizer',
   controls: 'Controls panel',
   respawn: 'Respawn',
+  autopilot: 'Autopilot',
+  replay: 'Replay run / play-pause',
 };
 
 export const actionOf = (path: string) => path.slice(BIND_PREFIX.length);

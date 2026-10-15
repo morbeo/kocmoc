@@ -55,6 +55,8 @@ export function createHud() {
   const hint = $('.hint');
 
   return {
+    /** the widget roots, for the HUD layout editor */
+    elements: { speed: el, timer: top },
     update(ship: ShipState, info: { assist: boolean; cam: string; cruise: number; hint: string; race: RaceHud | null }) {
       const r = info.race;
       top.hidden = !r;

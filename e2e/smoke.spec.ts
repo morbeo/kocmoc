@@ -221,3 +221,57 @@ test('gauntlet: obstacles, near the end, juice presets', async ({ page }) => {
   await expect(row(page, 'juice.master').locator('.layer')).toHaveText('juice');
   expect(errors).toEqual([]);
 });
+
+test('M5: autopilot, replay, viewports, HUD editor, diff', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
+
+  await page.goto('/?seed=42');
+  // autopilot crosses the line and starts the clock on its own
+  await page.keyboard.press('KeyP');
+  await expect(page.locator('#race-hud .lap')).toHaveText('LAP 1', { timeout: 20000 });
+  await page.waitForTimeout(1000);
+  await page.screenshot({ path: 'test-results/50-autopilot.png' });
+  await page.keyboard.press('KeyP');
+
+  // replay the run so far, scrub, exit
+  await page.keyboard.press('KeyB');
+  await expect(page.locator('#replay-bar')).toBeVisible();
+  await page.locator('#replay-bar .play').click(); // pause
+  await page.locator('#replay-bar .scrub').fill('60');
+  await expect(page.locator('#replay-bar .time')).toContainText('0.50 /');
+  await page.screenshot({ path: 'test-results/51-replay.png' });
+  await page.locator('#replay-bar .exit').click();
+  await expect(page.locator('#replay-bar')).toBeHidden();
+
+  // HUD editor: drag the speed widget
+  await page.keyboard.press('KeyH');
+  await expect(page.locator('#hud-editor')).toBeVisible();
+  const box = (await page.locator('#hud').boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await page.mouse.move(200, 300, { steps: 5 });
+  await page.mouse.up();
+  const after = (await page.locator('#hud').boundingBox())!;
+  expect(Math.abs(after.x + after.width / 2 - 200)).toBeLessThan(30);
+  await page.screenshot({ path: 'test-results/52-hud-editor.png' });
+  await page.keyboard.press('KeyH');
+  await expect(page.locator('#hud-editor')).toBeHidden();
+
+  // viewports + diff in the debug panel
+  await page.keyboard.press('Backquote');
+  const search = page.locator('.kd-panel .search');
+  await search.fill('view.layout');
+  await row(page, 'view.layout').locator('select').selectOption('quad');
+  await expect(page.locator('#viewports .vp:not([hidden])')).toHaveCount(3);
+  await page.waitForTimeout(500);
+  await page.screenshot({ path: 'test-results/53-quad.png' });
+  await page.locator('.kd-panel .run button', { hasText: 'diff' }).click();
+  await expect(page.locator('.kd-panel .diff')).toContainText('view.layout');
+  await expect(page.locator('.kd-panel .diff')).toContainText('hud.speed.x');
+  await presetSelect(page, 'hud').selectOption('hud/racer');
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: 'test-results/54-racer-hud.png' });
+  expect(errors).toEqual([]);
+});

@@ -26,6 +26,7 @@ const ring: Gauntlet = {
   chunks: [],
   planes: [{ kind: 'ring', s: S, thickness: 1.5, shape: { k: 'hole', r: 10, a0: 0, omega: 0, gap: 5 } }],
   rocks: [],
+  lanes: [],
 };
 
 /** Move the ship from (s0, x, y) to (s1, x, y) in one step and collide. */
@@ -76,7 +77,7 @@ describe('collideObstacles', () => {
   });
 
   it('pushes the ship out of a debris rock', () => {
-    const rocks: Gauntlet = { chunks: [], planes: [], rocks: [{ s: S, x: 0, y: 0, r: 3 }] };
+    const rocks: Gauntlet = { chunks: [], planes: [], rocks: [{ s: S, x: 0, y: 0, r: 3 }], lanes: [] };
     const { ship, res } = pass(rocks, S - 5, S - 3, 0, 0);
     expect(res.contact).toBe(true);
     expect(res.impact).toBeGreaterThan(0);

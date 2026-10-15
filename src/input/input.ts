@@ -29,6 +29,8 @@ export const assistKey = bind('assist', 'KeyF');
 export const cameraKey = bind('camera', 'KeyV');
 export const controlsKey = bind('controls', 'KeyK');
 export const respawnKey = bind('respawn', 'KeyR');
+export const autopilotKey = bind('autopilot', 'KeyP');
+export const replayKey = bind('replay', 'KeyB');
 
 const keyRamp = vars.num('input.key.ramp', 8, { min: 0, max: 30, hardMin: 0, unit: '/s', tags: keyTags, desc: 'how fast key axes move to full; 0 = instant' });
 export const invert = {

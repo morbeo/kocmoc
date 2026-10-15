@@ -1,0 +1,30 @@
+#replay-bar {
+  position: fixed;
+  left: 50%;
+  bottom: 110px;
+  transform: translateX(-50%);
+  z-index: 60;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.92);
+  color: #222;
+  font: 12px ui-monospace, monospace;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+#replay-bar[hidden] {
+  display: none;
+}
+#replay-bar .scrub {
+  width: min(40vw, 420px);
+}
+#replay-bar .time {
+  min-width: 12ch;
+  text-align: right;
+}
+#replay-bar button,
+#replay-bar select {
+  font: inherit;
+}
