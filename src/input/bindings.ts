@@ -23,6 +23,7 @@ export const ACTION_LABELS: Record<string, string> = {
   camera: 'Cycle camera',
   inputViz: 'Input visualizer',
   controls: 'Controls panel',
+  respawn: 'Respawn',
 };
 
 export const actionOf = (path: string) => path.slice(BIND_PREFIX.length);

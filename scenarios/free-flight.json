@@ -1,0 +1,7 @@
+{
+  "name": "free-flight",
+  "desc": "Open rock field, no track",
+  "mode": "free",
+  "spawn": { "speed": 0 },
+  "vars": {}
+}

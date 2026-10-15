@@ -31,7 +31,7 @@
 .toolbar .row { display: flex; flex-wrap: wrap; gap: 4px; align-items: center; }
 .toolbar .spacer { flex: 1; }
 .toolbar .status { color: var(--kd-accent); }
-.toolbar .preset { display: inline-flex; gap: 4px; align-items: center; color: var(--kd-dim); margin-right: 8px; }
+.toolbar .preset, .toolbar .scenario { display: inline-flex; gap: 4px; align-items: center; color: var(--kd-dim); margin-right: 8px; }
 .toolbar summary { cursor: pointer; color: var(--kd-dim); }
 .snapshots { display: grid; gap: 3px; padding-top: 4px; }
 .snapshots .hint { color: var(--kd-dim); margin-left: 8px; }

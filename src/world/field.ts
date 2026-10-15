@@ -14,7 +14,9 @@ const rockColor = vars.color('world.rocks.color', '#8b86a8', { tags: ['world', '
 const ringColor = vars.color('world.rings.color', '#ffd23f', { tags: ['world', 'render'] });
 
 /** Seeded scenery so there's something to fly around: a rock field and a winding line of gates. */
-export function createField(scene: THREE.Scene) {
+export function createField(parent: THREE.Scene) {
+  const scene = new THREE.Group();
+  parent.add(scene);
   const rockMat = toon();
   const ringMat = toon();
   const rockGeo = new THREE.IcosahedronGeometry(1, 0);
@@ -70,7 +72,8 @@ export function createField(scene: THREE.Scene) {
   });
 
   return {
-    update() {
+    update(visible: boolean) {
+      scene.visible = visible;
       rockMat.color.set(rockColor.value);
       ringMat.color.set(ringColor.value);
     },
