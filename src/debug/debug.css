@@ -58,6 +58,8 @@
 .ed-num { display: inline-flex; gap: 4px; align-items: center; }
 .ed-num input[type='range'] { width: 110px; padding: 0 !important; accent-color: var(--kd-accent); }
 .ed-num input[type='number'] { width: 72px; }
+.ed-num.risky input[type='number'] { border-color: #ff9f1a; color: #ff9f1a; }
+.ed-num .warn { color: #ff9f1a; cursor: help; }
 .ed-vec3 { display: inline-flex; gap: 2px; }
 .ed-vec3 input { width: 56px; }
 .ed-color { display: inline-flex; gap: 4px; align-items: center; }
