@@ -1,0 +1,9 @@
+{
+  "name": "gauntlet-ramp",
+  "desc": "Full gauntlet from easy to hard, arcade juice",
+  "mode": "gauntlet",
+  "seed": 7,
+  "spawn": { "trackT": 0, "speed": 60 },
+  "vars": {},
+  "presets": ["juice/arcade"]
+}

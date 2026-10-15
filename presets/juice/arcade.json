@@ -1,0 +1,30 @@
+{
+  "desc": "Punchy: every effect on at its default strength, with sound",
+  "vars": {
+    "juice.master": 1,
+    "juice.shake.enabled": true,
+    "juice.shake.intensity": 1,
+    "juice.fov.enabled": true,
+    "juice.fov.intensity": 1,
+    "juice.speedLines.enabled": true,
+    "juice.speedLines.intensity": 1,
+    "juice.hitStop.enabled": true,
+    "juice.hitStop.intensity": 1,
+    "juice.nearMiss.enabled": true,
+    "juice.nearMiss.intensity": 1,
+    "juice.camLag.enabled": true,
+    "juice.camLag.intensity": 1,
+    "juice.bank.enabled": true,
+    "juice.bank.intensity": 1,
+    "juice.trails.enabled": true,
+    "juice.trails.intensity": 1,
+    "juice.sparks.enabled": true,
+    "juice.sparks.intensity": 1,
+    "juice.flash.enabled": true,
+    "juice.flash.intensity": 1,
+    "juice.lens.enabled": true,
+    "juice.lens.intensity": 1,
+    "juice.audio.enabled": true,
+    "juice.audio.intensity": 1
+  }
+}

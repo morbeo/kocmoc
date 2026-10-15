@@ -36,7 +36,7 @@ toggles for the touchpad/mouse Y axis and for the pitch keys. Every binding, cur
 
 ## Race
 
-`game.mode` is `race` (default) or `free` (open rock field). Race tracks are generated from
+`game.mode` is `race` (default), `gauntlet` (the track filled with obstacles) or `free` (open rock field). Race tracks are generated from
 `gen.race.seed` and the other `gen.race.*` vars: a closed Catmull-Rom loop with rotation-minimising
 frames, optional barrel rolls (`gen.race.twist`) and banking, checked for self-intersection and
 tight bends. `gen.race.profile` picks the look (tube, halfpipe, rails, gates); every profile collides
@@ -47,6 +47,24 @@ a delta to your best are shown at the top, and best laps are saved per track.
 - `?scenario=corkscrew-stress` loads a bundled scenario from `scenarios/`. Scenarios set mode, seed,
   spawn point, vars and presets. Load them from the debug table's **scenario** menu or drop a scenario
   JSON on the page; **save** downloads the current setup as one.
+
+## Gauntlet
+
+`game.mode = gauntlet` fills the race track with obstacle chunks after a clear run-up: rotating gap
+rings, slaloms, crushers, laser grids, turbines and debris fields. Difficulty ramps from
+`gen.gauntlet.rampStart` to `gen.gauntlet.rampEnd` over the lap; at full difficulty the tightest gap
+is `gen.gauntlet.minClearance` ship radii, and every gap is tested to stay flyable. Turn chunk kinds
+on or off with `gen.gauntlet.kinds.*`. Obstacles bounce you like walls. Try
+`?scenario=gauntlet-ramp` or `?scenario=laser-stress`.
+
+## Juice
+
+Each effect has `juice.<fx>.enabled`, `juice.<fx>.intensity` and its own params; `juice.master`
+scales them all. Presets **off / subtle / arcade / overkill** are in the debug table's **juice** menu.
+Effects: screen shake, FOV kick, speed lines, hit-stop, near-miss slow-mo, camera lag and overshoot,
+banking, wing-tip trails, wall sparks, checkpoint flash and HUD pop, chromatic aberration and
+vignette, and sound (engine pitch, impacts, near-miss whoosh, checkpoint chime; off by default, on
+in arcade and overkill).
 
 ## Debug tools
 

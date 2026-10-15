@@ -1,11 +1,15 @@
 import { presets, applyPreset, activePreset } from './presets';
 import { LAYERS, type Change, type LayerData, type Registry } from './vars';
 
+export const GAME_MODES = ['race', 'gauntlet', 'free'] as const;
+export type GameMode = (typeof GAME_MODES)[number];
+const isMode = (m: unknown): m is GameMode => GAME_MODES.includes(m as GameMode);
+
 /** A complete test situation: mode, seed, spawn point, var overrides and presets. */
 export interface Scenario {
   name: string;
   desc?: string;
-  mode?: 'race' | 'free';
+  mode?: GameMode;
   seed?: number;
   spawn?: { trackT?: number; speed?: number };
   vars?: LayerData;
@@ -27,7 +31,7 @@ export function parseScenario(raw: unknown): Scenario | undefined {
   if (!looksLike) return undefined;
   const out: Scenario = { name: typeof r.name === 'string' ? r.name : 'dropped' };
   if (typeof r.desc === 'string') out.desc = r.desc;
-  if (r.mode === 'race' || r.mode === 'free') out.mode = r.mode;
+  if (isMode(r.mode)) out.mode = r.mode;
   if (typeof r.seed === 'number' && Number.isFinite(r.seed)) out.seed = Math.round(r.seed);
   if (r.spawn && typeof r.spawn === 'object') {
     const s = r.spawn as Record<string, unknown>;
@@ -101,7 +105,7 @@ export function captureScenario(
   delete merged['game.mode'];
   delete merged['gen.race.seed'];
   const sc: Scenario = { name };
-  sc.mode = mode === 'free' ? 'free' : 'race';
+  sc.mode = isMode(mode) ? mode : 'race';
   sc.seed = typeof seed === 'number' ? seed : (registry.get('gen.race.seed')?.value as number | undefined);
   sc.spawn = { trackT: Math.round(spawn.trackT * 1e4) / 1e4, speed: Math.round(spawn.speed) };
   sc.vars = merged;

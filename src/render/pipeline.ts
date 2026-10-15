@@ -128,6 +128,33 @@ const outlineShader = {
     }`,
 };
 
+/** Chromatic aberration (radial RGB split) and vignette; driven by the juice system. */
+const lensShader = {
+  uniforms: {
+    tColor: { value: null as THREE.Texture | null },
+    aberration: { value: 0 },
+    vignette: { value: 0 },
+  },
+  vertexShader: outlineShader.vertexShader,
+  fragmentShader: /* glsl */ `
+    uniform sampler2D tColor;
+    uniform float aberration;
+    uniform float vignette;
+    varying vec2 vUv;
+    void main() {
+      vec2 d = vUv - 0.5;
+      vec2 off = d * aberration;
+      vec4 c = texture2D(tColor, vUv);
+      c.r = texture2D(tColor, vUv + off).r;
+      c.b = texture2D(tColor, vUv - off).b;
+      float v = 1.0 - vignette * smoothstep(0.25, 0.75, length(d) * 1.2);
+      gl_FragColor = vec4(c.rgb * v, 1.0);
+    }`,
+};
+
+/** Set each frame by the juice system; zero means the lens pass is skipped. */
+export const lens = { aberration: 0, vignette: 0 };
+
 /**
  * Colour pass (with depth) → normals pass → Sobel outline composite → bloom → output.
  * Debug views swap the composite output for an intermediate buffer.
@@ -137,6 +164,9 @@ export function createPipeline(renderer: THREE.WebGLRenderer) {
   const colorRT = new THREE.WebGLRenderTarget(1, 1, { ...opts, depthTexture: new THREE.DepthTexture(1, 1) });
   const normalRT = new THREE.WebGLRenderTarget(1, 1, opts);
   const compositeRT = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType });
+  const lensRT = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType });
+  const lensMat = new THREE.ShaderMaterial(lensShader);
+  const lensQuad = new FullScreenQuad(lensMat);
 
   const normalMat = new THREE.MeshNormalMaterial();
   const outline = new THREE.ShaderMaterial(outlineShader);
@@ -155,6 +185,7 @@ export function createPipeline(renderer: THREE.WebGLRenderer) {
       colorRT.setSize(W, H);
       normalRT.setSize(W, H);
       compositeRT.setSize(W, H);
+      lensRT.setSize(W, H);
       bloom.setSize(W, H);
       outline.uniforms.texel.value.set(1 / W, 1 / H);
     },
@@ -211,8 +242,17 @@ export function createPipeline(renderer: THREE.WebGLRenderer) {
         bloom.render(renderer, compositeRT, compositeRT, 0, false);
       }
 
-      // 5. linear → sRGB to screen
-      output.render(renderer, null as unknown as THREE.WebGLRenderTarget, compositeRT, 0, false);
+      // 5. lens effects (juice), then linear → sRGB to screen
+      let out = compositeRT;
+      if (v === 0 && (lens.aberration > 0 || lens.vignette > 0)) {
+        lensMat.uniforms.tColor.value = compositeRT.texture;
+        lensMat.uniforms.aberration.value = lens.aberration;
+        lensMat.uniforms.vignette.value = lens.vignette;
+        renderer.setRenderTarget(lensRT);
+        lensQuad.render(renderer);
+        out = lensRT;
+      }
+      output.render(renderer, null as unknown as THREE.WebGLRenderTarget, out, 0, false);
     },
   };
 }

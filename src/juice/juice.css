@@ -1,0 +1,22 @@
+#speed-lines,
+#juice-flash {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+}
+#juice-flash {
+  background: #fff;
+  opacity: 0;
+}
+#race-hud .time.pop {
+  animation: hud-pop 0.35s ease-out;
+}
+@keyframes hud-pop {
+  from {
+    transform: scale(var(--pop, 1.25));
+  }
+  to {
+    transform: scale(1);
+  }
+}
