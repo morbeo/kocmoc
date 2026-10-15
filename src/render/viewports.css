@@ -1,0 +1,43 @@
+#viewports {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 2;
+}
+#viewports .vp {
+  position: absolute;
+  box-sizing: border-box;
+  border: 2px solid rgba(255, 255, 255, 0.85);
+}
+#viewports .vp[hidden] {
+  display: none;
+}
+#viewports .vp.popped {
+  background: rgba(255, 255, 255, 0.85);
+}
+#viewports .vp.popped::after {
+  content: 'popped out';
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: #444;
+  font: 12px ui-monospace, monospace;
+}
+#viewports .bar {
+  position: absolute;
+  left: 4px;
+  bottom: 4px;
+  display: flex;
+  gap: 4px;
+  pointer-events: auto;
+  font: 11px ui-monospace, monospace;
+}
+#viewports .bar select,
+#viewports .bar button {
+  font: inherit;
+  background: rgba(255, 255, 255, 0.9);
+  color: #222;
+  border: 1px solid #999;
+  border-radius: 4px;
+}

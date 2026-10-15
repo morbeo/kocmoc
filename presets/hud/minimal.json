@@ -1,0 +1,21 @@
+{
+  "desc": "Just speed and the timer, small",
+  "vars": {
+    "hud.speed.x": 0.5,
+    "hud.speed.y": 0.93,
+    "hud.speed.scale": 0.8,
+    "hud.speed.visible": true,
+    "hud.timer.x": 0.5,
+    "hud.timer.y": 0.05,
+    "hud.timer.scale": 0.8,
+    "hud.timer.visible": true,
+    "hud.minimap.x": 0.9,
+    "hud.minimap.y": 0.82,
+    "hud.minimap.scale": 1,
+    "hud.minimap.visible": false,
+    "hud.arrow.x": 0.5,
+    "hud.arrow.y": 0.2,
+    "hud.arrow.scale": 1,
+    "hud.arrow.visible": false
+  }
+}

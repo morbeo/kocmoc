@@ -80,10 +80,13 @@
 
 /* the keyboard rebinding button gives way to the touch bar */
 body.touch-ui #controls-btn { display: none; }
-/* HUD clears the home indicator / notch */
-body.touch-ui #hud { bottom: calc(10px + env(safe-area-inset-bottom)); }
+/* HUD widgets are placed by the HUD layout (inline left/top), so these nudge with margins:
+   clear the home indicator / notch */
+body.touch-ui #hud { margin-top: calc(-1 * env(safe-area-inset-bottom)); }
 /* race HUD sits between the button bars, or below them when there's no room */
 body.touch-ui #race-hud .time { font-size: 20px; }
 @media (max-width: 800px) {
-  body.touch-ui #race-hud { top: calc(60px + env(safe-area-inset-top)); }
+  body.touch-ui #race-hud { margin-top: calc(50px + env(safe-area-inset-top)); }
 }
+/* the minimap's default spot is under the right stick: keep it faint so the stick reads */
+body.touch-ui #minimap { opacity: 0.45; }

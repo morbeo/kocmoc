@@ -64,6 +64,8 @@ export interface Gauntlet {
   /** sorted by s */
   planes: Plane[];
   rocks: Rock[];
+  /** clear straight lane through each debris field (for the autopilot) */
+  lanes: { s0: number; s1: number; x: number; y: number }[];
 }
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
@@ -150,6 +152,7 @@ export function generateGauntlet(track: Track, p: GauntletParams): Gauntlet {
   const chunks: Chunk[] = [];
   const planes: Plane[] = [];
   const rocks: Rock[] = [];
+  const lanes: Gauntlet['lanes'] = [];
   const pick = <T>(xs: readonly T[]) => xs[Math.floor(rand() * xs.length) % xs.length];
   const sign = () => (rand() < 0.5 ? -1 : 1);
 
@@ -168,18 +171,21 @@ export function generateGauntlet(track: Track, p: GauntletParams): Gauntlet {
 
     switch (kind) {
       case 'ring': {
-        const gap = Math.min(gapR, R * 0.6);
+        // a moving gap gets a little more room than a still one
+        const gap = Math.min(gapR * 1.3, R * 0.6);
         const r = (R - gap - 0.5) * lerp(0.2, 1, rand());
-        planes.push({ kind, s: mid, thickness: 1.5, shape: { k: 'hole', r, a0: rand() * TAU, omega: sign() * lerp(0.25, 1.4, d), gap } });
+        // cap how fast the hole sweeps sideways, so it can be chased
+        const omega = Math.min(lerp(0.25, 1.4, d), lerp(3, 6, d) / Math.max(r, 1));
+        planes.push({ kind, s: mid, thickness: 1.5, shape: { k: 'hole', r, a0: rand() * TAU, omega: sign() * omega, gap } });
         break;
       }
       case 'slalom': {
         const gap = Math.min(gapR * 1.3, R * 0.6);
-        const r = (R - gap - 0.5) * lerp(0.4, 1, d);
+        const r = (R - gap - 0.5) * lerp(0.3, 0.8, d);
         let a = rand() * TAU;
         for (let k = 0; k < 3; k++) {
           planes.push({ kind, s: s0 + (len * (k + 1)) / 4, thickness: 1.2, shape: { k: 'hole', r, a0: a, omega: 0, gap } });
-          a += Math.PI * lerp(0.6, 1, rand());
+          a += Math.PI * lerp(0.4, 0.8, d) * (0.8 + 0.2 * rand());
         }
         break;
       }
@@ -224,6 +230,7 @@ export function generateGauntlet(track: Track, p: GauntletParams): Gauntlet {
         const la = rand() * TAU;
         const lr = rand() * R * 0.5;
         const lane = [lr * Math.cos(la), lr * Math.sin(la)];
+        lanes.push({ s0, s1, x: lane[0], y: lane[1] });
         const want = Math.round(lerp(6, 30, d));
         for (let k = 0, tries = 0; k < want && tries < want * 20; tries++) {
           const r = lerp(1.5, lerp(3, 6, d), rand());
@@ -241,7 +248,7 @@ export function generateGauntlet(track: Track, p: GauntletParams): Gauntlet {
   }
   planes.sort((a, b) => a.s - b.s);
   rocks.sort((a, b) => a.s - b.s);
-  return { chunks, planes, rocks };
+  return { chunks, planes, rocks, lanes };
 }
 
 /** Track index of the sample at or before arc length `s`. */

@@ -190,7 +190,8 @@ export function createPipeline(renderer: THREE.WebGLRenderer) {
       outline.uniforms.texel.value.set(1 / W, 1 / H);
     },
 
-    render(scene: THREE.Scene, camera: THREE.PerspectiveCamera) {
+    /** Render to the screen, into `rect` (CSS px from the top-left) or the whole canvas. */
+    render(scene: THREE.Scene, camera: THREE.PerspectiveCamera, rect?: { x: number; y: number; w: number; h: number }) {
       const u = outline.uniforms;
       const v = VIEWS.indexOf(view.value);
 
@@ -252,7 +253,17 @@ export function createPipeline(renderer: THREE.WebGLRenderer) {
         lensQuad.render(renderer);
         out = lensRT;
       }
+      if (rect) {
+        const H = renderer.domElement.clientHeight;
+        renderer.setViewport(rect.x, H - rect.y - rect.h, rect.w, rect.h);
+        renderer.setScissor(rect.x, H - rect.y - rect.h, rect.w, rect.h);
+        renderer.setScissorTest(true);
+      }
       output.render(renderer, null as unknown as THREE.WebGLRenderTarget, out, 0, false);
+      if (rect) {
+        renderer.setScissorTest(false);
+        renderer.setViewport(0, 0, renderer.domElement.clientWidth, renderer.domElement.clientHeight);
+      }
     },
   };
 }

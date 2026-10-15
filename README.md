@@ -23,10 +23,13 @@ npm run build        # static build → dist/
 | `Q` / `E` | roll |
 | `Shift` | boost (release to re-arm once empty) |
 | `F` | flight assist on/off (off = Newtonian drift) |
-| `V` | cycle camera (chase, cockpit) |
+| `V` | cycle camera (chase, cockpit, far, look-back) |
 | `F3` | input visualizer |
 | `R` | respawn at the start (race) or origin (free) |
 | `K` | controls: rebind keys, invert pitch |
+| `P` | autopilot on/off |
+| `B` | replay the run since the last respawn; in a replay, play/pause |
+| `H` | HUD editor: drag widgets to move, scroll to resize, × to hide |
 
 Touchpad (`input.pointer.mode`): **stick** (default) — click the scene to capture the pointer, then move
 your finger to steer; it re-centres on its own, `Esc` releases. Held click = boost. **scroll** —
@@ -77,6 +80,18 @@ in arcade and overkill).
 - Visual presets: Ink, Neon, Pastel, Mono.
 - Gizmos (`#gizmo`): velocity and acceleration vectors, collision sphere, track frames, checkpoint
   planes, nearest track point.
+- **Replay**: every run is recorded (var layers, spawn, and each tick's controls) and replays
+  bit for bit. `B` or **run → replay** plays it with a scrub bar; **save repro** downloads it as a
+  bug-repro bundle, and **load repro** (or dropping the file on the page) plays one back.
+- **Ghost**: your best lap on each track is saved and flies alongside you (`race.ghost.*`).
+- **Autopilot** (`P`, `bot.enabled`) flies the track and threads gauntlet gaps. Unit tests use it to
+  check that generated tracks and gauntlets can be completed over a sweep of seeds.
+- **Viewports**: `view.layout` is single, pip, side or quad; each extra view picks a rig (look-back,
+  top-down, orbit, track-side…) and can **pop out** into its own window for another monitor.
+- **HUD layouts**: widget positions, sizes and visibility are `hud.*` vars; presets classic,
+  minimal, racer.
+- **diff** (run row) lists every var that differs from the defaults or from a saved snapshot, with
+  one-click revert and copy as JSON.
 
 Adding a tunable value anywhere in the code:
 

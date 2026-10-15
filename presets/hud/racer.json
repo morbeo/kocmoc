@@ -1,0 +1,21 @@
+{
+  "desc": "Big timer top left, speed bottom right, map bottom left",
+  "vars": {
+    "hud.speed.x": 0.88,
+    "hud.speed.y": 0.9,
+    "hud.speed.scale": 1.2,
+    "hud.speed.visible": true,
+    "hud.timer.x": 0.14,
+    "hud.timer.y": 0.09,
+    "hud.timer.scale": 1.4,
+    "hud.timer.visible": true,
+    "hud.minimap.x": 0.1,
+    "hud.minimap.y": 0.8,
+    "hud.minimap.scale": 1.1,
+    "hud.minimap.visible": true,
+    "hud.arrow.x": 0.5,
+    "hud.arrow.y": 0.12,
+    "hud.arrow.scale": 1.2,
+    "hud.arrow.visible": true
+  }
+}

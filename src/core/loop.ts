@@ -16,6 +16,11 @@ export class FixedLoop {
     public maxSteps = 8,
   ) {}
 
+  /** Drop any partial step (after a teleport or seek). */
+  reset(): void {
+    this.acc = 0;
+  }
+
   /** Advance by `dt` seconds of sim time, calling `tick(step)` 0..maxSteps times. Returns interpolation alpha in [0, 1). */
   advance(dt: number, tick: (step: number) => void): number {
     this.acc += Math.max(0, dt);

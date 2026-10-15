@@ -66,6 +66,13 @@
 .ed-color input { width: 32px; height: 20px; padding: 0 !important; }
 .unit { color: var(--kd-dim); }
 
+.kd-panel .run .label { opacity: 0.6; }
+.kd-panel .run button.on { outline: 1px solid currentColor; }
+.kd-panel .diff { max-height: 40vh; overflow: auto; padding: 4px 0 8px; border-bottom: 1px solid rgba(127, 127, 127, 0.3); }
+.kd-panel .diff .row { display: flex; gap: 8px; align-items: center; }
+.kd-panel .diff td { padding: 1px 6px; }
+.kd-panel .diff .before { opacity: 0.6; text-decoration: line-through; }
+
 /* touch screens: leave the touch button bar (⚙ closes the panel) uncovered; 16px inputs stop iOS zooming on focus */
 @media (max-width: 800px) {
   body.touch-ui .kd-panel { top: calc(60px + env(safe-area-inset-top)); border-top: 1px solid var(--kd-line); }

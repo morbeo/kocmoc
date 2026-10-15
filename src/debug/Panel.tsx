@@ -5,6 +5,9 @@ import { presets, applyPreset, activePreset } from '../core/presets';
 import { shareUrl } from '../core/persist';
 import { scenarios, applyScenario, captureScenario, currentSpawn } from '../core/scenarios';
 import { parseQuery, filterRows, type Row } from './query';
+import { diffVars } from './diff';
+import { session } from '../core/session';
+import { parseRecording } from '../sim/replay';
 import { Editor, formatValue } from './editors';
 import {
   snapshots,
@@ -67,6 +70,94 @@ function Highlight({ text, indexes }: { text: string; indexes: readonly number[]
 }
 
 const shortLayer = (s: string) => s.replace('preset:', '');
+
+/** diff view: on/off and the baseline ('' = defaults, else a snapshot id) */
+const diffOn = signal(false);
+const diffBase = signal('');
+
+function DiffView() {
+  layersVersion.value;
+  const base = diffBase.value ? snapshots.value.find((x) => x.id === diffBase.value) : undefined;
+  const list = vars.list().map((v) => ({ path: v.path, def: v.def, value: v.value, coerce: (r: unknown) => v.coerce(r) }));
+  const rows = diffVars(list, base ? base.state : null);
+  return (
+    <div class="diff">
+      <div class="row">
+        <label>
+          compare with{' '}
+          <select value={diffBase.value} onChange={(e) => (diffBase.value = e.currentTarget.value)}>
+            <option value="">defaults</option>
+            {snapshots.value.map((x) => (
+              <option value={x.id}>snapshot: {x.name}</option>
+            ))}
+          </select>
+        </label>
+        <span class="hint">
+          {rows.length} change{rows.length === 1 ? '' : 's'}
+        </span>
+        <button
+          title="copy the changed values as JSON"
+          onClick={() => void navigator.clipboard.writeText(JSON.stringify(Object.fromEntries(rows.map((r) => [r.path, r.after])), null, 2))}
+        >
+          copy
+        </button>
+      </div>
+      <table>
+        <tbody>
+          {rows.map((r) => (
+            <tr>
+              <td class="path">{r.path}</td>
+              <td class="before">{formatValue(r.before)}</td>
+              <td>→</td>
+              <td class="after">{formatValue(r.after)}</td>
+              <td>
+                <button title="set back to the compared value (as a user override)" onClick={() => vars.get(r.path)?.set(r.before as never)}>
+                  ↺
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function RunTools() {
+  const file = useRef<HTMLInputElement>(null);
+  return (
+    <div class="row run">
+      <span class="label">run</span>
+      <button title="replay the run since the last respawn (B)" onClick={() => session.replayRun()}>
+        replay
+      </button>
+      <button title="download this run (vars, spawn, every input) as a bug-repro bundle" onClick={() => session.saveRepro(prompt('What went wrong? (optional)') ?? undefined)}>
+        save repro
+      </button>
+      <button title="load a repro bundle and play it (or drop it on the page)" onClick={() => file.current?.click()}>
+        load repro
+      </button>
+      <input
+        ref={file}
+        type="file"
+        accept=".json,application/json"
+        hidden
+        onChange={async (e) => {
+          const f = e.currentTarget.files?.[0];
+          e.currentTarget.value = '';
+          if (!f) return;
+          const rec = parseRecording(JSON.parse(await f.text()));
+          if (rec) session.playRecording(rec);
+          else alert('Not a kocmoc repro bundle');
+        }}
+      />
+      <span class="spacer" />
+      <button class={diffOn.value ? 'on' : ''} title="show what changed against the defaults or a snapshot" onClick={() => (diffOn.value = !diffOn.value)}>
+        diff
+      </button>
+    </div>
+  );
+}
 
 function VarRow({ row, indexes }: { row: Row; indexes: readonly number[] }) {
   const fav = favs.value.has(row.path);
@@ -271,6 +362,7 @@ function Toolbar() {
         <PresetPickers />
         <ScenarioPicker />
       </div>
+      <RunTools />
       <details>
         <summary>snapshots ({snapshots.value.length})</summary>
         <Snapshots />
@@ -290,6 +382,7 @@ export function Panel() {
   return (
     <div class="kd-panel">
       <Toolbar />
+      {diffOn.value && <DiffView />}
       <input
         ref={input}
         class="search"
