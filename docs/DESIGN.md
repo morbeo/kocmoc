@@ -22,7 +22,7 @@ presets, A/B testing, snapshots, sharing and scenarios are all built on that.
 | URL sharing | `lz-string` (compressed state in URL hash) |
 | Large tables | `@tanstack/virtual-core` (when var count warrants it) |
 | Tests | Vitest (unit, generators, determinism) in CI; Playwright smoke run locally only (too costly for CI) |
-| Deploy | GitHub Actions → GitHub Pages on push to `master` |
+| Deploy | GitHub Actions → `gh-pages` branch: `master` at root, PR previews under `pr-preview/pr-N/` |
 
 Debug tooling ships in the public build behind the `` ` `` hotkey and is
 lazy-loaded (dynamic import), so players who never open it never download it.
