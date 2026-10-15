@@ -2,7 +2,7 @@
   "desc": "Neon toon on deep space",
   "vars": {
     "render.background": "#05010f",
-    "demo.color": "#ff2fa8",
+    "ship.color": "#ff2fa8",
     "render.toon.steps": 3,
     "render.light.color": "#7fe7ff"
   }

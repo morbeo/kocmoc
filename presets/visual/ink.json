@@ -2,7 +2,7 @@
   "desc": "Black ink on paper",
   "vars": {
     "render.background": "#efe8d8",
-    "demo.color": "#f5f0e6",
+    "ship.color": "#f5f0e6",
     "render.toon.steps": 2,
     "render.light.color": "#ffffff"
   }

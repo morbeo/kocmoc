@@ -13,11 +13,30 @@ npm run test:e2e     # browser smoke test, local only (first run: npx playwright
 npm run build        # static build → dist/
 ```
 
+## Controls
+
+| Key | Action |
+|---|---|
+| `W` / `S` | thrust / reverse |
+| `A` / `D`, `Space` / `C` | strafe left/right, up/down |
+| arrows | pitch / yaw |
+| `Q` / `E` | roll |
+| `Shift` | boost (release to re-arm once empty) |
+| `F` | flight assist on/off (off = Newtonian drift) |
+| `V` | cycle camera (chase, cockpit) |
+| `F3` | input visualizer |
+
+Touchpad (`input.pointer.mode`): **stick** (default) — click the scene to capture the pointer, then move
+your finger to steer; it re-centres on its own, `Esc` releases. Held click = boost. **scroll** —
+two-finger scroll steers. Pinch sets a cruise throttle (or camera zoom, `input.pinch.action`).
+Every binding, curve (deadzone / expo / sensitivity) and flight parameter is a var in the debug table.
+
 ## Debug tools
 
 - `` ` `` toggles the variable table. Query: fuzzy text, `#tag`, `:mod`, `:fav`, `:watch`.
 - `Ctrl/Cmd+Z` / `Ctrl/Cmd+Shift+Z` undo / redo, `F2` flips A/B snapshots.
 - Changes autosave locally; **share** copies a link containing the full setup.
+- `time.paused` / `time.scale` freeze or slow the sim; `sim.rate` sets the fixed physics step.
 
 Adding a tunable value anywhere in the code:
 
