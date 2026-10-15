@@ -73,7 +73,5 @@ Presets live in `presets/<group>/<name>.json` and apply to layer `preset:<group>
 
 Pushing to `master` runs unit tests, builds and publishes `dist/` to the `gh-pages` branch
 (site root). Every pull request gets a preview at `/kocmoc/pr-preview/pr-<N>/`, linked in a
-PR comment and removed when the PR closes. One-time setup, after the first `master` deploy has
-created the `gh-pages` branch: repo **Settings → Pages → Source: Deploy from a branch →
-`gh-pages` / `(root)`**, and **Settings → Actions → General → Workflow permissions: Read and
-write**.
+PR comment and removed when the PR closes. One-time setup, once a deploy has created the `gh-pages`
+branch: repo **Settings → Pages → Source: Deploy from a branch → `gh-pages` / `(root)`**.
