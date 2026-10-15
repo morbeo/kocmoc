@@ -13,7 +13,7 @@ export const touchVars = {
   ui: vars.enum('input.touch.ui', 'auto', ['auto', 'on', 'off'], { tags, desc: 'on-screen sticks and buttons; auto = on touch screens' }),
   radius: vars.num('input.touch.radius', 60, { min: 20, max: 200, hardMin: 1, unit: 'px', tags, desc: 'how far a thumb drags for full deflection' }),
   left: {
-    x: vars.enum('input.touch.left.x', 'roll', AXIS_OPTIONS, { tags }),
+    x: vars.enum('input.touch.left.x', 'strafe', AXIS_OPTIONS, { tags }),
     y: vars.enum('input.touch.left.y', 'thrust', AXIS_OPTIONS, { tags, desc: 'drag up = positive' }),
   },
   right: {

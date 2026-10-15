@@ -91,7 +91,7 @@ const left = thumb('left');
 const right = thumb('right');
 
 // --- buttons ---------------------------------------------------------------
-const held = { boost: false, up: false, down: false };
+const held = { boost: false, up: false, down: false, rollLeft: false, rollRight: false };
 
 /** A button that acts on press (no click delay, no focus), or reports held state. */
 function button(parent: HTMLElement, cls: string, text: string, onPress: () => void, onRelease?: () => void): HTMLButtonElement {
@@ -126,6 +126,10 @@ const lift = el('div', 'lift');
 root.appendChild(lift);
 hold(lift, 'lift-up', '▲', 'up');
 hold(lift, 'lift-down', '▼', 'down');
+const roll = el('div', 'roll');
+root.appendChild(roll);
+hold(roll, 'roll-left', '⟲', 'rollLeft');
+hold(roll, 'roll-right', '⟳', 'rollRight');
 hold(root, 'boost', 'BOOST', 'boost');
 const hint = el('div', 'hint');
 root.appendChild(hint);
@@ -211,6 +215,7 @@ function apply(): void {
     if (tv.tiltPitch.value) touch.pitch += tv.tiltInvert.value ? -tilt.pitch : tilt.pitch;
   }
   touch.lift += (held.up ? 1 : 0) - (held.down ? 1 : 0);
+  touch.roll += (held.rollRight ? 1 : 0) - (held.rollLeft ? 1 : 0);
   for (const k of ['pitch', 'yaw', 'roll', 'strafe', 'lift', 'thrust'] as const) touch[k] = Math.min(Math.max(touch[k], -1), 1);
   const rim = tv.boostAtRim.value;
   const pushed = (axis: TouchAxis, v: number) => axis === 'thrust' && v >= rim;
@@ -259,7 +264,7 @@ document.addEventListener('visibilitychange', () => {
 function releaseAll(): void {
   release(left);
   release(right);
-  held.boost = held.up = held.down = false;
+  held.boost = held.up = held.down = held.rollLeft = held.rollRight = false;
   for (const b of root.querySelectorAll('.held')) b.classList.remove('held');
   apply();
 }

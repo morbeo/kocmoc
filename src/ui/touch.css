@@ -47,7 +47,11 @@
   position: absolute; display: grid; gap: 8px;
   left: calc(12px + env(safe-area-inset-left)); bottom: calc(210px + env(safe-area-inset-bottom));
 }
-#touch-ui .lift button { width: 52px; height: 52px; font-size: 16px; }
+#touch-ui .lift button, #touch-ui .roll button { width: 52px; height: 52px; font-size: 16px; }
+#touch-ui .roll {
+  position: absolute; display: flex; gap: 8px;
+  right: calc(16px + env(safe-area-inset-right)); bottom: calc(300px + env(safe-area-inset-bottom));
+}
 #touch-ui .boost {
   position: absolute; width: 76px; height: 76px; border-radius: 50%;
   right: calc(16px + env(safe-area-inset-right)); bottom: calc(210px + env(safe-area-inset-bottom));
@@ -64,8 +68,10 @@
 
 /* short landscape phones: tighter stacks so the sticks keep their room */
 @media (max-height: 420px) {
-  #touch-ui .lift, #touch-ui .boost { bottom: calc(170px + env(safe-area-inset-bottom)); }
-  #touch-ui .lift button { width: 44px; height: 44px; }
+  #touch-ui .boost { bottom: calc(170px + env(safe-area-inset-bottom)); }
+  #touch-ui .lift button, #touch-ui .roll button { width: 44px; height: 44px; }
+  #touch-ui .lift { bottom: calc(150px + env(safe-area-inset-bottom)); }
+  #touch-ui .roll { right: calc(90px + env(safe-area-inset-right)); bottom: calc(180px + env(safe-area-inset-bottom)); }
   #touch-ui .boost { width: 64px; height: 64px; }
   #touch-ui .base.rest { top: calc(100% - 90px - env(safe-area-inset-bottom)); }
   #touch-ui .left .base.rest { left: calc(100px + env(safe-area-inset-left)); }

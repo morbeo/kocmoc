@@ -144,8 +144,8 @@ pointer Y (`input.invert.pointerY`) and the pitch keys (`input.invert.keyPitch`)
 - Browser pinch-zoom / swipe-back suppressed on the canvas.
 - **Touch screens** (`src/ui/touch.ts`, `input.touch.*`, shown on coarse pointers or
   after a first touch; `input.touch.ui` forces it): two floating thumb sticks
-  (default left = throttle + roll, right = pitch + yaw; each stick axis is a var),
-  pushing the throttle stick to the rim boosts, hold buttons for boost and lift,
+  (default left = throttle + strafe, right = pitch + yaw; each stick axis is a var),
+  pushing the throttle stick to the rim boosts, hold buttons for boost, lift and roll,
   a bar with tuning table, camera, assist, respawn, tilt and fullscreen.
   *Tilt* (`input.tilt.*`) steers from gravity in screen space, calibrated to how the
   device is held when switched on. `render.pixelRatio` defaults lower on touch devices.
