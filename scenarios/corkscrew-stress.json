@@ -4,6 +4,6 @@
   "mode": "race",
   "seed": 4815,
   "spawn": { "trackT": 0.42, "speed": 200 },
-  "vars": { "gen.race.twist": 2, "gen.race.twistNoise": 1.5, "gen.race.radius": 450, "cam.mode": "chase", "ship.flightAssist": false },
+  "vars": { "gen.race.twist": 2, "gen.race.twistNoise": 1.5, "gen.race.radius": 750, "cam.mode": "chase", "ship.flightAssist": false },
   "presets": []
 }

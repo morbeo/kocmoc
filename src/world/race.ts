@@ -13,12 +13,12 @@ const g = ['gen', 'race'];
 const gen = {
   seed: vars.int('gen.race.seed', 1, { min: 0, max: 99999, hardMin: 0, tags: g, regen: true, desc: 'also in the URL as ?seed=' }),
   points: vars.int('gen.race.points', 12, { min: 5, max: 40, hardMin: 4, hardMax: 200, tags: g, regen: true, desc: 'control points around the loop' }),
-  radius: vars.num('gen.race.radius', 600, { min: 150, max: 3000, hardMin: 50, unit: 'm', tags: g, regen: true }),
+  radius: vars.num('gen.race.radius', 1000, { min: 250, max: 4000, hardMin: 50, unit: 'm', tags: g, regen: true }),
   wobble: vars.num('gen.race.wobble', 0.35, { min: 0, max: 0.8, hardMin: 0, hardMax: 0.95, tags: g, regen: true, desc: 'radial randomness' }),
-  height: vars.num('gen.race.height', 150, { min: 0, max: 800, hardMin: 0, unit: 'm', tags: g, regen: true, desc: 'vertical randomness' }),
+  height: vars.num('gen.race.height', 250, { min: 0, max: 1200, hardMin: 0, unit: 'm', tags: g, regen: true, desc: 'vertical randomness' }),
   twist: vars.num('gen.race.twist', 0, { min: -4, max: 4, step: 1, tags: g, regen: true, desc: 'whole barrel rolls per lap (rounded)' }),
   twistNoise: vars.num('gen.race.twistNoise', 0.5, { min: 0, max: 3, hardMin: 0, unit: 'rad', tags: g, regen: true, desc: 'random banking per control point' }),
-  tube: vars.num('gen.race.tubeRadius', 22, { min: 8, max: 60, hardMin: 3, unit: 'm', tags: g, regen: true }),
+  tube: vars.num('gen.race.tubeRadius', 40, { min: 10, max: 120, hardMin: 3, unit: 'm', tags: g, regen: true, desc: 'corridor radius; keep the loop radius ~25× this for varied layouts' }),
   spacing: vars.num('gen.race.spacing', 4, { min: 1, max: 20, hardMin: 0.5, unit: 'm', tags: g, regen: true, desc: 'centreline sample spacing' }),
   checkpoints: vars.int('gen.race.checkpoints', 8, { min: 2, max: 32, hardMin: 1, hardMax: 200, tags: g, regen: true }),
 };
