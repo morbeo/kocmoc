@@ -162,6 +162,14 @@ Fixed-timestep simulation with interpolated rendering.
 - **Rigs** (each with `cam.<rig>.*` vars, `V` cycles): cockpit, close chase
   (spring arm), far chase, look-back, track-side cinematic, top-down tactical,
   free debug, orbit.
+- **Cinematic director** (`cinematic` rig, `X` toggles, `cam.cine.*` vars):
+  cuts between track-side (telephoto, panning operator), low fly-by, hero
+  (ahead, looking back), drone, orbit and low tail shots every 4–8 s, never the
+  same twice. Static shots stand inside the corridor ahead on the spline and
+  cut early once the ship is past. Near misses, hits and laps request a
+  reaction shot after a 1.5 s minimum hold. Hard cuts by default
+  (`cam.cine.blend` glides), letterbox bars, and replays play through it
+  (`cam.cine.replay`).
 - **Viewports**: scissor-rendered layouts in one canvas — single, PiP,
   side-by-side, 2×2; each viewport picks a rig (mirror, minimap, debug view).
   Layouts are presets.

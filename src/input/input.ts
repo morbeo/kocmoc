@@ -28,6 +28,7 @@ const keys = {
 const boostKey = bind('boost', 'ShiftLeft,ShiftRight');
 export const assistKey = bind('assist', 'KeyF');
 export const cameraKey = bind('camera', 'KeyV');
+export const cinematicKey = bind('cinematic', 'KeyX');
 export const controlsKey = bind('controls', 'KeyK');
 export const respawnKey = bind('respawn', 'KeyR');
 export const autopilotKey = bind('autopilot', 'KeyP');

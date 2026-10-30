@@ -23,7 +23,8 @@ npm run build        # static build → dist/
 | `Q` / `E` | roll |
 | `Shift` | boost (release to re-arm once empty) |
 | `F` | flight assist on/off (off = Newtonian drift) |
-| `V` | cycle camera (chase, cockpit, far, look-back) |
+| `V` | cycle camera (chase, cockpit, far, look-back, cinematic) |
+| `X` | cinematic camera on/off |
 | `F3` | input visualizer |
 | `R` | respawn at the start (race) or origin (free) |
 | `K` | controls: rebind keys, invert pitch |

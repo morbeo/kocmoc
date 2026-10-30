@@ -21,6 +21,7 @@ export const ACTION_LABELS: Record<string, string> = {
   boost: 'Boost',
   assist: 'Flight assist',
   camera: 'Cycle camera',
+  cinematic: 'Cinematic camera',
   inputViz: 'Input visualizer',
   controls: 'Controls panel',
   respawn: 'Respawn',

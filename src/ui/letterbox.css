@@ -1,0 +1,5 @@
+/* cinematic bars over the main view; first in the body, so the HUD paints over them */
+.letterbox { position: fixed; pointer-events: none; background: #000; transform: scaleY(0); transition: transform 0.4s ease; }
+.letterbox.top { transform-origin: top; }
+.letterbox.bottom { transform-origin: bottom; }
+.letterbox[data-on='true'] { transform: scaleY(1); }
