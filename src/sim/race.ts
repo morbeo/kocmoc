@@ -15,7 +15,7 @@ export interface WallParams {
 
 /** Things that happened during a step, for effects and sound; drained by the game each frame. */
 export type RaceEvent =
-  | { type: 'start' | 'checkpoint' | 'lap' }
+  | { type: 'start' | 'checkpoint' | 'lap' | 'finish' }
   | { type: 'hit'; what: 'wall' | 'obstacle'; impact: number }
   | { type: 'nearMiss' };
 
@@ -34,6 +34,16 @@ export interface RaceState {
   started: boolean;
   lap: number;
   lapTime: number;
+  /** time since the start-line crossing, s; stops at the finish */
+  raceTime: number;
+  /** laps in the race; 0 = endless practice */
+  laps: number;
+  /** set on crossing the line after the last lap */
+  finished: boolean;
+  /** race time at the finish */
+  finishTime: number | null;
+  /** every completed lap's time, in order */
+  lapTimes: number[];
   /** index of the next checkpoint to pass (0 = finish line) */
   nextCp: number;
   /** split times for checkpoints passed this lap */
@@ -55,7 +65,7 @@ export interface RaceState {
   obstacle: ObstacleResult;
 }
 
-export function newRace(track: Track, ship: ShipState): RaceState {
+export function newRace(track: Track, ship: ShipState, laps = 0): RaceState {
   const near = nearestOnTrack(track, ship.pos);
   return {
     near,
@@ -63,6 +73,11 @@ export function newRace(track: Track, ship: ShipState): RaceState {
     started: false,
     lap: 0,
     lapTime: 0,
+    raceTime: 0,
+    laps: Math.max(0, Math.round(laps)),
+    finished: false,
+    finishTime: null,
+    lapTimes: [],
     nextCp: 1 % track.checkpoints.length,
     splits: [],
     lastLap: null,
@@ -155,7 +170,10 @@ export function stepRace(r: RaceState, ship: ShipState, track: Track, p: WallPar
   else if (ds < -track.length / 2) ds += track.length;
   const before = r.along;
   r.along += ds;
-  if (r.started) r.lapTime += dt;
+  if (r.started && !r.finished) {
+    r.lapTime += dt;
+    r.raceTime += dt;
+  }
 
   // start line: first forward crossing starts the clock
   if (!r.started) {
@@ -163,11 +181,13 @@ export function stepRace(r: RaceState, ship: ShipState, track: Track, p: WallPar
       r.started = true;
       r.lap = 1;
       r.lapTime = 0;
+      r.raceTime = 0;
       r.nextCp = 1 % track.checkpoints.length;
       r.events.push({ type: 'start' });
     }
     return;
   }
+  if (r.finished) return;
 
   // checkpoints must be passed in order; the finish line is checkpoint 0 at one full lap
   const cps = track.checkpoints;
@@ -180,17 +200,29 @@ export function stepRace(r: RaceState, ship: ShipState, track: Track, p: WallPar
         r.bestLap = r.lapTime;
         r.bestSplits = [...r.splits];
       }
+      r.lapTimes.push(r.lapTime);
       r.lap++;
       r.lapTime = 0;
       r.splits = [];
       r.along -= track.length;
       r.events.push({ type: 'lap' });
+      // past the last lap: the clock stops (lap stays one past the count, so ghost recording sees the change)
+      if (r.laps > 0 && r.lap > r.laps) {
+        r.finished = true;
+        r.finishTime = r.raceTime;
+        r.events.push({ type: 'finish' });
+      }
     } else {
       r.splits.push(r.lapTime);
       r.events.push({ type: 'checkpoint' });
     }
     r.nextCp = (r.nextCp + 1) % cps.length;
   }
+}
+
+/** Distance flown since the start line over the whole race, m (negative before it). */
+export function raceDistance(r: RaceState, length: number): number {
+  return r.started ? (r.lap - 1) * length + r.along : r.along;
 }
 
 /** Difference between the latest split and the best lap's split at the same checkpoint (negative = ahead). */

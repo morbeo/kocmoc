@@ -28,11 +28,12 @@ export function newSim(): SimState {
   return { prev: newShip(), curr: newShip(), race: null, tick: 0 };
 }
 
-export function spawnSim(sim: SimState, track: Track | null, spawn: Spawn): void {
+/** `laps` sets the race length on a track (0 = endless practice). */
+export function spawnSim(sim: SimState, track: Track | null, spawn: Spawn, laps = 0): void {
   const c = sim.curr;
   if (track) {
     spawnOnTrack(c, track, spawn.s, spawn.speed);
-    sim.race = newRace(track, c);
+    sim.race = newRace(track, c, laps);
   } else {
     c.pos.set(0, 0, 0);
     c.quat.identity();

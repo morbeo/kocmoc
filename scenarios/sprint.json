@@ -1,0 +1,9 @@
+{
+  "name": "sprint",
+  "desc": "Short one-lap sprint against the ghost rivals",
+  "mode": "race",
+  "seed": 12,
+  "spawn": { "trackT": 0, "speed": 0 },
+  "vars": { "gen.race.radius": 300, "gen.race.height": 60, "race.laps": 1, "race.rival.bot": true },
+  "presets": []
+}

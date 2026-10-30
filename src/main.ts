@@ -9,6 +9,7 @@ import { newSim, spawnSim, stepSim, type SimConfig, type Spawn } from './sim/wor
 import { Player, Recorder, parseRecording, quantize, type Recording } from './sim/replay';
 import { GhostRecorder, parseGhost, sampleGhost, type Ghost } from './sim/ghost';
 import { botControls } from './sim/bot';
+import { flyBotLap, makeRival, standings, type Rival } from './sim/rivals';
 import { session } from './core/session';
 import { createReplayBar } from './ui/replayBar';
 import { attachInput, sampleInput, onKey, assistKey, cameraKey, cinematicKey, controlsKey, respawnKey, autopilotKey, replayKey, zoom, debug as inputDebug, pointerMode } from './input/input';
@@ -27,7 +28,7 @@ import { detectTouch, touchUi } from './input/touch';
 import { createRaceScene, gameMode, genParams, onTrack, seedVar, track } from './world/race';
 import { createGauntletScene, gauntlet, gauntletParams, nearMissDistance, shipRadius } from './world/gauntlet';
 import { createJuice } from './juice';
-import { splitDelta, type RaceState, type WallParams } from './sim/race';
+import { raceDistance, splitDelta, type RaceState, type WallParams } from './sim/race';
 import { scenarios, applyScenario, parseScenario, setSpawnHandler, setSpawnSource } from './core/scenarios';
 import './ui/hud.css';
 
@@ -87,6 +88,11 @@ const autopilot = vars.bool('bot.enabled', false, { tags: ['bot'], desc: 'autopi
 const ghostOn = vars.bool('race.ghost.enabled', true, { tags: ['race', 'ghost'], desc: 'race your best lap on this track' });
 const ghostOpacity = vars.num('race.ghost.opacity', 0.35, { min: 0, max: 1, hardMin: 0, hardMax: 1, tags: ['race', 'ghost'] });
 const ghostColor = vars.color('race.ghost.color', '#7fe7ff', { tags: ['race', 'ghost'] });
+const raceLaps = vars.int('race.laps', 3, { min: 0, max: 20, hardMin: 0, hardMax: 999, tags: ['race'], desc: 'laps to the finish; 0 = endless practice' });
+const rivalLast = vars.bool('race.rival.last', true, { tags: ['race', 'ghost'], desc: 'race your last lap this session too' });
+const rivalLastColor = vars.color('race.rival.lastColor', '#ffd166', { tags: ['race', 'ghost'] });
+const rivalBot = vars.bool('race.rival.bot', true, { tags: ['race', 'ghost'], desc: 'race a lap the autopilot flew from a standing start' });
+const rivalBotColor = vars.color('race.rival.botColor', '#b388ff', { tags: ['race', 'ghost'] });
 const gizmoNames = ['velocity', 'accel', 'collision', 'frames', 'checkpoints', 'nearest'] as const;
 const gizmos = gizmoNames.map((n) => vars.bool(`debug.gizmo.${n}`, false, { tags: ['debug', 'gizmo'] }));
 
@@ -124,6 +130,23 @@ ghostModel.traverse((o) => {
 });
 ghostModel.visible = false;
 scene.add(ghostModel);
+/** One translucent ship per rival kind; the best lap keeps the original ghost model. */
+type RivalKind = 'best' | 'last' | 'bot';
+const RIVAL_NAMES: Record<RivalKind, string> = { best: 'BEST', last: 'LAST', bot: 'AUTOPILOT' };
+const rivalModels: Record<RivalKind, { model: THREE.Object3D; mat: THREE.MeshBasicMaterial }> = {
+  best: { model: ghostModel, mat: ghostMat },
+  last: cloneGhost(),
+  bot: cloneGhost(),
+};
+function cloneGhost() {
+  const mat = ghostMat.clone();
+  const model = ghostModel.clone(true);
+  model.traverse((o) => {
+    if (o instanceof THREE.Mesh) o.material = mat;
+  });
+  scene.add(model);
+  return { model, mat };
+}
 const field = createField(scene);
 const raceScene = createRaceScene(scene);
 const gauntletScene = createGauntletScene(scene);
@@ -163,6 +186,64 @@ const bestKey = () =>
 const ghostKey = () => bestKey().replace('kocmoc.best.', 'kocmoc.ghost.');
 let savedBest: number | null = null;
 let ghost: Ghost | null = null;
+/** the last full lap flown this session, per track */
+const lastLaps = new Map<string, Ghost>();
+/** autopilot laps, per track and ship tuning (deterministic, so computed once) */
+const botLaps = new Map<string, Ghost | null>();
+const botKey = () => `${bestKey()}|${JSON.stringify(params())}`;
+let botPending: ReturnType<typeof setTimeout> | undefined;
+let botFlying = '';
+/** in a race, your best and last laps as they were at the start, so laps from this race don't join it */
+let startGhosts: { best: Ghost | null; last: Ghost | null } = { best: null, last: null };
+/** ghosts raced against, rebuilt when one of them changes */
+let rivals: { kind: RivalKind; rival: Rival }[] = [];
+let rivalsFor = '';
+
+/** Rebuild the rival list if the ghosts or the toggles behind it changed. */
+function refreshRivals(): void {
+  if (!race || !onTrack()) {
+    rivals = [];
+    rivalsFor = '';
+    return;
+  }
+  const live = race.laps === 0;
+  const last = rivalLast.value ? (live ? (lastLaps.get(bestKey()) ?? null) : startGhosts.last) : null;
+  const bot = rivalBot.value ? (botLaps.get(botKey()) ?? null) : null;
+  const best = ghostOn.value ? (live ? ghost : startGhosts.best) : null;
+  const want: [RivalKind, Ghost | null][] = [['best', best], ['last', last], ['bot', bot]];
+  const key = want.map(([k, g]) => (g ? `${k}${g.lap}` : '')).join(',') + track.value.length;
+  if (key === rivalsFor) return;
+  rivalsFor = key;
+  rivals = want.filter((w): w is [RivalKind, Ghost] => !!w[1]).map(([kind, g]) => ({ kind, rival: makeRival(RIVAL_NAMES[kind], g, track.value) }));
+}
+
+/** Fly the autopilot rival for this track in the background, once, a few ms per frame. */
+function queueBotLap(): void {
+  const key = botKey();
+  if (!rivalBot.value || !onTrack() || botLaps.has(key) || botFlying === key) return;
+  clearTimeout(botPending);
+  botFlying = key;
+  const cfg = simConfig();
+  const fly = flyBotLap(cfg, cfg.course?.gauntlet ?? null, loop.step);
+  const slice = () => {
+    if (key !== botKey()) {
+      botFlying = '';
+      return;
+    }
+    const t0 = performance.now();
+    while (performance.now() - t0 < 4) {
+      const r = fly.next();
+      if (r.done) {
+        botLaps.set(key, r.value);
+        botFlying = '';
+        return;
+      }
+    }
+    botPending = setTimeout(slice, 0);
+  };
+  botPending = setTimeout(slice, 200);
+}
+
 const ghostRec = new GhostRecorder();
 /** the run since the last spawn, for replays and bug reports */
 let recorder: Recorder | null = null;
@@ -181,7 +262,7 @@ function respawn(t = spawnT.value, speed = spawnSpeed.value, at?: Spawn): void {
   juice.reset();
   ghostRec.reset();
   const spawn = at ?? spawnFor(t, speed);
-  spawnSim(sim, onTrack() ? track.value : null, spawn);
+  spawnSim(sim, onTrack() ? track.value : null, spawn, raceLaps.value);
   race = sim.race;
   ghost = null;
   if (race) {
@@ -197,7 +278,9 @@ function respawn(t = spawnT.value, speed = spawnSpeed.value, at?: Spawn): void {
     }
     savedBest = race.bestLap;
   }
+  startGhosts = { best: ghost, last: lastLaps.get(bestKey()) ?? null };
   recorder = replay ? null : new Recorder(vars.snapshot(), spawn, loop.step);
+  queueBotLap();
 }
 
 // --- replay ----------------------------------------------------------------
@@ -281,7 +364,11 @@ effect(() => {
   void track.value;
   void gameMode.value;
   void gauntlet.value;
+  void raceLaps.value;
   if (!replay) respawn();
+});
+effect(() => {
+  if (rivalBot.value) queueBotLap();
 });
 // keep ?seed= in the address bar on a track, so the URL names it
 effect(() => {
@@ -440,6 +527,7 @@ renderer.setAnimationLoop((now) => {
     stepSim(sim, controls, cfg, step);
     if (race && !replay) {
       const lap = ghostRec.update(race, curr);
+      if (lap) lastLaps.set(bestKey(), lap);
       // a new best lap becomes the ghost for this track
       if (lap && race.bestLap === lap.lap) {
         ghost = lap;
@@ -481,10 +569,26 @@ renderer.setAnimationLoop((now) => {
   amb.intensity = ambient.value;
   field.update(gameMode.value === 'free');
   raceScene.update();
-  const showGhost = ghostOn.value && !!ghost && !!race && race.started;
-  ghostModel.visible = showGhost && sampleGhost(ghost!, race!.lapTime - (1 - alpha) * loop.step, ghostModel.position, ghostModel.quaternion);
-  ghostMat.color.set(ghostColor.value);
-  ghostMat.opacity = ghostOpacity.value;
+  // rivals fly on race time in a race (lapping their one lap), on lap time in practice
+  refreshRivals();
+  const colors: Record<RivalKind, string> = { best: ghostColor.value, last: rivalLastColor.value, bot: rivalBotColor.value };
+  for (const k of Object.keys(rivalModels) as RivalKind[]) {
+    rivalModels[k].model.visible = false;
+    rivalModels[k].mat.color.set(colors[k]);
+    rivalModels[k].mat.opacity = ghostOpacity.value;
+  }
+  const L = track.value.length;
+  const racing = !!race && race.laps > 0;
+  if (race?.started) {
+    const lerp = race.finished ? 0 : (1 - alpha) * loop.step;
+    const t = (racing ? race.raceTime : race.lapTime) - lerp;
+    for (const { kind, rival } of rivals) {
+      const m = rivalModels[kind].model;
+      const gl = rival.ghost.lap;
+      if (racing && t >= race.laps * gl) continue;
+      m.visible = sampleGhost(rival.ghost, racing ? t % gl : t, m.position, m.quaternion);
+    }
+  }
   gauntletScene.update(race ? race.time - (1 - alpha) * loop.step : 0);
   gizmoUi?.update();
 
@@ -519,8 +623,22 @@ renderer.setAnimationLoop((now) => {
     checkpoint: race.splits.length,
     checkpoints: track.value.checkpoints.length,
     seed: seedVar.value,
+    laps: race.laps,
+    raceTime: race.raceTime,
+    finished: race.finished,
+    finishTime: race.finishTime,
+    lapTimes: race.lapTimes,
+    standings: race.started && rivals.length
+      ? racing
+        ? race.finished
+          ? standings(rivals.map((x) => x.rival), race.laps * L, race.finishTime!, L, race.laps)
+          : standings(rivals.map((x) => x.rival), Math.min(raceDistance(race, L), race.laps * L), race.raceTime, L, race.laps)
+        : standings(rivals.map((x) => x.rival), race.along, race.lapTime, L, 1)
+      : null,
+    rivalTimes: racing ? rivals.map((x) => ({ name: x.rival.name, time: x.rival.ghost.lap * race!.laps })) : [],
   };
-  hud.update(view, { assist: assist.value, cam: rig, cruise: inputDebug.cruise, hint, race: raceHud });
+  const again = touchUi.value ? 'tap respawn to race again' : `${keyLabel(respawnKey.value.split(',')[0]?.trim() ?? '')} to race again`;
+  hud.update(view, { assist: assist.value, cam: rig, cruise: inputDebug.cruise, hint, race: raceHud, again });
 
   hudLayout.update({
     camera,
