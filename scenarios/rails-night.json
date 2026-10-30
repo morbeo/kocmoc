@@ -4,6 +4,6 @@
   "mode": "race",
   "seed": 77,
   "spawn": { "trackT": 0, "speed": 60 },
-  "vars": { "gen.race.profile": "rails", "gen.race.height": 300 },
+  "vars": { "gen.race.profile": "rails", "gen.race.height": 500 },
   "presets": ["visual/neon"]
 }

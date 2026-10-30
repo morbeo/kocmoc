@@ -201,6 +201,27 @@ Fixed-timestep simulation with interpolated rendering.
 Out of scope: multiplayer, AI racers, weapons, story, customization, online
 leaderboards, track editor.
 
+## 12. Proving ground (proposed, M6)
+
+Borrowed from the X-Wing (1993) Pilot Proving Ground and the TIE Fighter (1994)
+training simulator: a time-attack where the clock is a resource you earn, and
+precision beats raw speed. Default corridor radius is 40 m so gates and
+pickups have room to sit off the racing line.
+
+- **Gate hoops**: pass-through rings in track space (`passable` + arc crossing).
+  Inside = credit, outside = miss (time penalty, no bounce). Patterns: slalom,
+  spiral (teaches rolling), reverse (credited only when crossed backwards).
+- **Proving rules**: countdown budget; gates and fly-through time beacons placed
+  off the racing line add time, misses cost it; score = time left + gates +
+  beacons. Race keeps the count-up trial.
+- **Ladder**: 8 levels as scenario JSON (shorter budget, tighter gates each
+  level), procedural beyond 8; ship presets (light / balanced / heavy) with a
+  badge per preset in `localStorage`.
+- **Open-space profile**: no wall collision, obstacles are the only solids,
+  leaving the corridor starts an out-of-bounds timer.
+- Turrets that shoot back need weapons, which stay out of scope unless decided
+  otherwise.
+
 ---
 
 ## Architecture
@@ -230,3 +251,4 @@ scenarios/   bundled scenario JSON
 | M3 | Race generator, gizmos, scenarios, seed in URL |
 | M4 | Gauntlet chunks, juice system + presets |
 | M5 | Replay + ghost, autopilot bot, viewports + pop-outs, HUD editor, diff view |
+| M6 | _Proposed_ — proving ground (§12): gate hoops, countdown rules + time beacons, level ladder + ship presets + badges, open-space profile |

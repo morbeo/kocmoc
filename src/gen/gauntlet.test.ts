@@ -124,4 +124,17 @@ describe('generateGauntlet', () => {
       for (const r of rocks) expect(Math.hypot(r.x, r.y) + r.r).toBeLessThanOrEqual(track.radius + 1e-9);
     }
   });
+
+  it('debris keeps its density when the tube grows', () => {
+    const wide = generateTrack({ ...gen, radius: 1000, tubeRadius: 44 });
+    const opts = { ...params, kinds: ['debris' as const], rampStart: 1, rampEnd: 1 };
+    const perChunk = (t: typeof track) => {
+      const gg = generateGauntlet(t, opts);
+      return gg.rocks.length / gg.chunks.length;
+    };
+    // twice the radius, four times the cross-section: roughly four times the rocks
+    const ratio = perChunk(wide) / perChunk(track);
+    expect(ratio).toBeGreaterThan(3);
+    expect(ratio).toBeLessThan(5);
+  });
 });

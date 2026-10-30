@@ -231,7 +231,8 @@ export function generateGauntlet(track: Track, p: GauntletParams): Gauntlet {
         const lr = rand() * R * 0.5;
         const lane = [lr * Math.cos(la), lr * Math.sin(la)];
         lanes.push({ s0, s1, x: lane[0], y: lane[1] });
-        const want = Math.round(lerp(6, 30, d));
+        // density per cross-section area stays the same whatever the tube size (tuned at 22 m)
+        const want = Math.round(lerp(6, 30, d) * Math.max(1, (R / 22) ** 2));
         for (let k = 0, tries = 0; k < want && tries < want * 20; tries++) {
           const r = lerp(1.5, lerp(3, 6, d), rand());
           const a = rand() * TAU;
