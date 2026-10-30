@@ -1,12 +1,14 @@
 import { PerspectiveCamera, Quaternion, Vector3 } from 'three';
 import { vars } from '../core/vars';
 import type { ShipState } from '../sim/ship';
+import { cineEvent, newCineState, placeCinematic, type CineState } from './cinematic';
+import type { RaceEvent } from '../sim/race';
 
 /** Every camera rig. `V` cycles the ones in CAM_MODES; viewports can use any. */
-export const RIGS = ['chase', 'cockpit', 'far', 'lookback', 'top', 'orbit', 'side'] as const;
+export const RIGS = ['chase', 'cockpit', 'far', 'lookback', 'top', 'orbit', 'side', 'cinematic'] as const;
 export type Rig = (typeof RIGS)[number];
-export const CAM_MODES = ['chase', 'cockpit', 'far', 'lookback'] as const;
-export const camMode = vars.enum<Rig>('cam.mode', 'chase', RIGS, { tags: ['cam'], desc: 'V cycles chase, cockpit, far and look-back' });
+export const CAM_MODES = ['chase', 'cockpit', 'far', 'lookback', 'cinematic'] as const;
+export const camMode = vars.enum<Rig>('cam.mode', 'chase', RIGS, { tags: ['cam'], desc: 'V cycles chase, cockpit, far, look-back and cinematic; X toggles cinematic' });
 const tags = ['cam'];
 const fov = vars.num('cam.fov', 70, { min: 20, max: 120, hardMin: 1, hardMax: 179, unit: '°', tags });
 const chaseDistance = vars.num('cam.chase.distance', 9, { min: 2, max: 40, hardMin: 0.5, hardMax: 900, unit: 'm', tags });
@@ -28,15 +30,16 @@ const orbitDistance = vars.num('cam.orbit.distance', 20, { min: 3, max: 200, har
 const orbitSpeed = vars.num('cam.orbit.speed', 0.3, { min: -3, max: 3, unit: 'rad/s', tags });
 const sideDistance = vars.num('cam.side.distance', 40, { min: 5, max: 400, hardMin: 1, unit: 'm', tags, desc: 'track-side cinematic: fixed spot the ship flies past' });
 
-/** Per-camera memory (spring arm, orbit angle, cinematic spot). */
+/** Per-camera memory (spring arm, orbit angle, track-side spot, cinematic director). */
 export interface RigState {
   arm: Quaternion;
   armInit: boolean;
   orbit: number;
   spot: Vector3;
   spotInit: boolean;
+  cine: CineState;
 }
-export const newRigState = (): RigState => ({ arm: new Quaternion(), armInit: false, orbit: 0, spot: new Vector3(), spotInit: false });
+export const newRigState = (): RigState => ({ arm: new Quaternion(), armInit: false, orbit: 0, spot: new Vector3(), spotInit: false, cine: newCineState() });
 
 const _offset = new Vector3();
 const _aim = new Vector3();
@@ -49,8 +52,24 @@ export function cycleCamera(): void {
   camMode.set(CAM_MODES[(i + 1) % CAM_MODES.length]);
 }
 
+let beforeCine: Rig = 'chase';
+/** Switch to the cinematic camera, or back to the rig used before it. */
+export function toggleCinematic(): void {
+  if (camMode.value === 'cinematic') camMode.set(beforeCine);
+  else {
+    beforeCine = camMode.value;
+    camMode.set('cinematic');
+  }
+}
+
 /** Place `camera` for any rig. `dt` is real frame time (cameras are presentation, not sim). */
 export function placeRig(rig: Rig, camera: PerspectiveCamera, ship: ShipState, dt: number, st: RigState, zoom = 1): void {
+  if (rig !== 'cinematic') st.cine.started = false;
+  else {
+    st.armInit = st.spotInit = false;
+    placeCinematic(camera, ship, dt, st.cine, fov.value);
+    return;
+  }
   if (camera.fov !== fov.value) {
     camera.fov = fov.value;
     camera.updateProjectionMatrix();
@@ -114,7 +133,10 @@ export function placeRig(rig: Rig, camera: PerspectiveCamera, ship: ShipState, d
   }
 }
 
-/** The main camera, following `cam.mode`. */
-export function updateCamera(camera: PerspectiveCamera, ship: ShipState, dt: number, zoom = 1): void {
-  placeRig(camMode.value, camera, ship, dt, main, zoom);
+/** Pass a race event to the main camera's director. */
+export const cameraEvent = (type: RaceEvent['type']): void => cineEvent(main.cine, type);
+
+/** The main camera, following `cam.mode` unless given another rig. */
+export function updateCamera(camera: PerspectiveCamera, ship: ShipState, dt: number, zoom = 1, rig: Rig = camMode.value): void {
+  placeRig(rig, camera, ship, dt, main, zoom);
 }

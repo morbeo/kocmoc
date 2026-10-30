@@ -11,9 +11,11 @@ import { GhostRecorder, parseGhost, sampleGhost, type Ghost } from './sim/ghost'
 import { botControls } from './sim/bot';
 import { session } from './core/session';
 import { createReplayBar } from './ui/replayBar';
-import { attachInput, sampleInput, onKey, assistKey, cameraKey, controlsKey, respawnKey, autopilotKey, replayKey, zoom, debug as inputDebug, pointerMode } from './input/input';
+import { attachInput, sampleInput, onKey, assistKey, cameraKey, cinematicKey, controlsKey, respawnKey, autopilotKey, replayKey, zoom, debug as inputDebug, pointerMode } from './input/input';
 import { keyLabel } from './input/bindings';
-import { camMode, cycleCamera, updateCamera } from './cam/rigs';
+import { camMode, cameraEvent, cycleCamera, toggleCinematic, updateCamera } from './cam/rigs';
+import { cineReplay, cineScene } from './cam/cinematic';
+import { createLetterbox } from './ui/letterbox';
 import { createShipModel } from './render/shipModel';
 import { createField } from './world/field';
 import { createHud } from './ui/hud';
@@ -129,6 +131,7 @@ const juice = createJuice(scene, () => vars.get('ship.glow')?.value as string ??
 const hud = createHud();
 const viewports = createViewports(renderer, scene, sky);
 const hudLayout = createHudLayout(hud.elements);
+const letterboxUi = createLetterbox();
 
 function resize(): void {
   renderer.setPixelRatio(Math.min(devicePixelRatio, pixelRatio.value));
@@ -327,6 +330,7 @@ onKey(autopilotKey, () => autopilot.set(!autopilot.value));
 onKey(replayKey, () => (replay ? (replay.playing = !replay.playing) : session.replayRun()));
 onKey(assistKey, () => assist.set(!assist.value));
 onKey(cameraKey, cycleCamera);
+onKey(cinematicKey, toggleCinematic);
 onKey(vizKey, () => inputViz.set(!inputViz.value));
 
 // controls panel (rebinding, invert pitch), lazy-loaded
@@ -461,6 +465,7 @@ renderer.setAnimationLoop((now) => {
     for (const e of race.events) {
       const at = e.type === 'hit' ? (e.what === 'wall' ? (scrape ?? curr.pos) : race.obstacle.point) : undefined;
       juice.event(e, curr, at);
+      cameraEvent(e.type);
     }
     race.events.length = 0;
   }
@@ -485,15 +490,20 @@ renderer.setAnimationLoop((now) => {
 
   shipModel.object.position.copy(view.pos);
   shipModel.object.quaternion.copy(view.quat);
-  shipModel.object.visible = camMode.value !== 'cockpit';
+  // replays are shown through the cinematic director unless turned off
+  const rig = replay && cineReplay.value ? 'cinematic' : camMode.value;
+  shipModel.object.visible = rig !== 'cockpit';
   shipModel.update(view.boosting ? 1 : Math.max(0, controls.thrust));
   const rect = viewports.mainRect();
   if (camera.aspect !== rect.w / rect.h) {
     camera.aspect = rect.w / rect.h;
     camera.updateProjectionMatrix();
   }
-  updateCamera(camera, view, dt, zoom.value);
-  juice.frame({ dt, camera, ship: view, shipModel: shipModel.object, maxSpeed: p.maxSpeed.value, chase: camMode.value === 'chase' || camMode.value === 'far', scrape });
+  cineScene.track = race ? track.value : null;
+  cineScene.near = race?.near ?? null;
+  updateCamera(camera, view, dt, zoom.value, rig);
+  letterboxUi.update(rig === 'cinematic', rect);
+  juice.frame({ dt, camera, ship: view, shipModel: shipModel.object, maxSpeed: p.maxSpeed.value, chase: rig === 'chase' || rig === 'far', scrape });
 
   const hint =
     pointerMode.value === 'stick' && !inputDebug.captured && !touchUi.value
@@ -510,7 +520,7 @@ renderer.setAnimationLoop((now) => {
     checkpoints: track.value.checkpoints.length,
     seed: seedVar.value,
   };
-  hud.update(view, { assist: assist.value, cam: camMode.value, cruise: inputDebug.cruise, hint, race: raceHud });
+  hud.update(view, { assist: assist.value, cam: rig, cruise: inputDebug.cruise, hint, race: raceHud });
 
   hudLayout.update({
     camera,
