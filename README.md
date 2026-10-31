@@ -47,6 +47,11 @@ tight bends. `gen.race.profile` picks the look (tube, halfpipe, rails, gates); e
 with the same invisible corridor. Cross the start line to start the clock. Laps, checkpoint splits and
 a delta to your best are shown at the top, and best laps are saved per track.
 
+Races run `race.laps` laps (default 3; 0 = endless practice) and end with a results card. You race
+ghosts: your best lap, your last lap this session and a lap the autopilot flew from a standing start
+(`race.ghost.enabled`, `race.rival.last`, `race.rival.bot`). Each one flies its lap over and over, and
+the standings widget shows your place and the time gap to each. Try `?scenario=sprint` for one short lap.
+
 - `?seed=42` opens that track; the address bar always shows the current seed.
 - `?scenario=corkscrew-stress` loads a bundled scenario from `scenarios/`. Scenarios set mode, seed,
   spawn point, vars and presets. Load them from the debug table's **scenario** menu or drop a scenario

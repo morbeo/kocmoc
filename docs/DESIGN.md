@@ -189,7 +189,7 @@ Fixed-timestep simulation with interpolated rendering.
 
 ## 10. UI customization
 
-- HUD widgets (speed, timer, boost, checkpoint arrow, splits, minimap):
+- HUD widgets (speed, timer, boost, checkpoint arrow, splits, minimap, standings):
   draggable, scalable, toggleable; layouts are presets.
 - Themes (colours, fonts, scale) are vars.
 - Reduced-motion preset; colourblind-friendly palettes.
@@ -206,7 +206,7 @@ Fixed-timestep simulation with interpolated rendering.
 - Seeded RNG; seed in URL. Time trial with splits; ghost of best run per seed in
   `localStorage`.
 
-Out of scope: multiplayer, AI racers, weapons, story, customization, online
+Out of scope: multiplayer, AI racers (ghosts are the rivals, §13), weapons, story, customization, online
 leaderboards, track editor.
 
 ## 12. Proving ground (proposed, M6)
@@ -229,6 +229,30 @@ pickups have room to sit off the racing line.
   leaving the corridor starts an out-of-bounds timer.
 - Turrets that shoot back need weapons, which stay out of scope unless decided
   otherwise.
+
+## 13. Race (M7)
+
+Taken from Slipstream 5000 (1995): looping 3D tracks with multiple paths and
+shortcuts, scenery that alternates open stretches with tunnels, and a race to a
+finish with positions. AI racers stay out of scope; ghosts are the rivals.
+
+- **M7a, race against ghosts (built)**: `race.laps` (default 3, 0 = endless practice)
+  ends the race on the last line crossing and stops the clock; a results card shows
+  the place, total, laps and the rivals' times. Rivals (`src/sim/rivals.ts`) are
+  ghosts flying their one lap over and over: your best (`race.ghost.enabled`), your
+  last lap this session (`race.rival.last`) and a lap the autopilot flies from a
+  standing start (`race.rival.bot`, recorded in the background, deterministic per
+  track and ship tuning). Each ghost's lap is profiled as distance from the line, so
+  your place and the gaps (time the rival took to reach your distance) are exact;
+  a standings HUD widget shows them. Practice compares lap by lap.
+- **Route graph** (proposed): branch splines that leave and rejoin the main loop
+  (shortcut, long way, split around a divider, hidden, pit lane); progress on a
+  branch maps back to main-track `s`; the bot sweep keeps a fork only if its route
+  times fall within a band.
+- **Scenic biomes** (proposed): the lap cut into sections (canyon, cave, city,
+  orbit) with their own tube radius and profile, palette, scenery and landmarks.
+- Later: pickups and boost pads (shared with §12 beacons), championship (cups as
+  scenario lists, points, unlocks, an upgrade preset layer).
 
 ---
 
@@ -260,3 +284,4 @@ scenarios/   bundled scenario JSON
 | M4 | Gauntlet chunks, juice system + presets |
 | M5 | Replay + ghost, autopilot bot, viewports + pop-outs, HUD editor, diff view |
 | M6 | _Proposed_ — proving ground (§12): gate hoops, countdown rules + time beacons, level ladder + ship presets + badges, open-space profile |
+| M7 | Race (§13). M7a: lap count, finish, results, positions and gaps against ghost rivals (best, last, autopilot). _Proposed_: route graph with shortcuts and pit lane, scenic biomes, pickups and boost pads, championship |

@@ -167,7 +167,7 @@ test('race: seed in URL, scenario, gizmos, lap timer starts', async ({ page }) =
   expect(new URL(page.url()).searchParams.get('seed')).toBe('42');
   await expect(page.locator('#race-hud .time')).toHaveText('cross the line');
   await page.keyboard.down('KeyW');
-  await expect(page.locator('#race-hud .lap')).toHaveText('LAP 1', { timeout: 20000 });
+  await expect(page.locator('#race-hud .lap')).toHaveText('LAP 1/3', { timeout: 20000 });
   await page.keyboard.up('KeyW');
   await page.screenshot({ path: 'test-results/30-race.png' });
 
@@ -202,7 +202,7 @@ test('gauntlet: obstacles, near the end, juice presets', async ({ page }) => {
   await expect(row(page, 'gauntlet.chunks').locator('code')).not.toHaveText('0');
   await page.locator('.count').click(); // leave the search box so keys fly the ship
   await page.keyboard.down('KeyW');
-  await expect(page.locator('#race-hud .lap')).toHaveText('LAP 1', { timeout: 20000 });
+  await expect(page.locator('#race-hud .lap')).toHaveText('LAP 1/3', { timeout: 20000 });
   await page.waitForTimeout(1500);
   await page.keyboard.up('KeyW');
   await page.screenshot({ path: 'test-results/40-gauntlet.png' });
@@ -230,7 +230,7 @@ test('M5: autopilot, replay, viewports, HUD editor, diff', async ({ page }) => {
   await page.goto('/?seed=42');
   // autopilot crosses the line and starts the clock on its own
   await page.keyboard.press('KeyP');
-  await expect(page.locator('#race-hud .lap')).toHaveText('LAP 1', { timeout: 20000 });
+  await expect(page.locator('#race-hud .lap')).toHaveText('LAP 1/3', { timeout: 20000 });
   await page.waitForTimeout(1000);
   await page.screenshot({ path: 'test-results/50-autopilot.png' });
   await page.keyboard.press('KeyP');
@@ -273,5 +273,35 @@ test('M5: autopilot, replay, viewports, HUD editor, diff', async ({ page }) => {
   await presetSelect(page, 'hud').selectOption('hud/racer');
   await page.waitForTimeout(300);
   await page.screenshot({ path: 'test-results/54-racer-hud.png' });
+  expect(errors).toEqual([]);
+});
+
+test('M7a: race the ghosts to the finish', async ({ page }) => {
+  const errors: string[] = [];
+  page.on('pageerror', (e) => errors.push(e.message));
+  page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
+
+  // software GL draws few frames, so the finish is raced on a tiny loop dropped in as a scenario
+  test.setTimeout(240_000);
+  await page.goto('/?scenario=sprint');
+  const tiny = { mode: 'race', seed: 12, spawn: { trackT: 0, speed: 0 }, vars: { 'gen.race.radius': 90, 'gen.race.tubeRadius': 9, 'gen.race.height': 10, 'race.laps': 1 } };
+  await page.evaluate((sc) => {
+    const dt = new DataTransfer();
+    dt.items.add(new File([JSON.stringify(sc)], 'tiny.json', { type: 'application/json' }));
+    dispatchEvent(new DragEvent('drop', { dataTransfer: dt, cancelable: true }));
+  }, tiny);
+  // the autopilot flies, and also gives the autopilot rival
+  await page.keyboard.press('KeyP');
+  await expect(page.locator('#race-hud .lap')).toHaveText('LAP 1/1', { timeout: 20000 });
+  await expect(page.locator('#standings')).toContainText('AUTOPILOT', { timeout: 20000 });
+  await expect(page.locator('#standings .pos')).toHaveText(/^[12]\/2$/);
+  await page.screenshot({ path: 'test-results/60-standings.png' });
+  await expect(page.locator('#results')).toBeVisible({ timeout: 200_000 });
+  await expect(page.locator('#results h2')).toHaveText(/of 2/);
+  await expect(page.locator('#results .again')).toHaveText('R to race again');
+  await page.screenshot({ path: 'test-results/61-results.png' });
+  await page.keyboard.press('KeyP');
+  await page.keyboard.press('KeyR');
+  await expect(page.locator('#results')).toBeHidden();
   expect(errors).toEqual([]);
 });

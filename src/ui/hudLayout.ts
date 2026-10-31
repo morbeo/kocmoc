@@ -8,7 +8,7 @@ import './hudLayout.css';
  * HUD widgets that can be moved, scaled and hidden. Layout lives in vars (`hud.<widget>.*`),
  * so it saves, shares and comes in presets like everything else. `H` toggles edit mode.
  */
-export const WIDGETS = ['speed', 'timer', 'minimap', 'arrow'] as const;
+export const WIDGETS = ['speed', 'timer', 'minimap', 'arrow', 'standings'] as const;
 export type Widget = (typeof WIDGETS)[number];
 
 const tags = ['hud'];
@@ -17,6 +17,7 @@ const DEFAULTS: Record<Widget, { x: number; y: number; scale: number; visible: b
   timer: { x: 0.5, y: 0.07, scale: 1, visible: true, desc: 'lap timer and splits' },
   minimap: { x: 0.9, y: 0.82, scale: 1, visible: true, desc: 'top-down track map' },
   arrow: { x: 0.5, y: 0.2, scale: 1, visible: true, desc: 'points at the next checkpoint' },
+  standings: { x: 0.08, y: 0.32, scale: 1, visible: true, desc: 'your place and the gaps to the ghost rivals' },
 };
 export const editMode = vars.bool('hud.edit', false, { tags, desc: 'drag HUD widgets to move, scroll to resize (H)' });
 export const editKey = vars.str('input.key.hudEdit', 'KeyH', { tags: ['input', 'keys'], desc: 'KeyboardEvent.code, comma-separated' });
@@ -47,7 +48,7 @@ export interface HudFrame {
   nextCp: number | null;
 }
 
-export function createHudLayout(elements: { speed: HTMLElement; timer: HTMLElement }) {
+export function createHudLayout(elements: { speed: HTMLElement; timer: HTMLElement; standings: HTMLElement }) {
   // minimap
   const map = document.createElement('canvas');
   map.id = 'minimap';
@@ -62,7 +63,7 @@ export function createHudLayout(elements: { speed: HTMLElement; timer: HTMLEleme
   const arrowHead = arrow.querySelector('i') as HTMLElement;
   const arrowText = arrow.querySelector('span') as HTMLElement;
 
-  const els: Record<Widget, HTMLElement> = { speed: elements.speed, timer: elements.timer, minimap: map, arrow };
+  const els: Record<Widget, HTMLElement> = { speed: elements.speed, timer: elements.timer, minimap: map, arrow, standings: elements.standings };
   for (const name of WIDGETS) {
     const el = els[name];
     el.classList.add('hud-widget');

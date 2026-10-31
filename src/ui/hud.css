@@ -30,3 +30,31 @@
 #race-hud .small { opacity: 0.85; }
 #race-hud .delta.ahead { color: #5dff9a; }
 #race-hud .delta.behind { color: #ff7a7a; }
+#standings {
+  position: fixed; left: 14px; top: 30%; pointer-events: none; user-select: none;
+  font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8); min-width: 130px;
+}
+#standings .pos { font-size: 14px; opacity: 0.85; }
+#standings .pos b { font-size: 30px; font-weight: 600; }
+#standings ol { list-style: none; margin: 4px 0 0; padding: 0; }
+#standings li { display: flex; justify-content: space-between; gap: 12px; opacity: 0.85; }
+#standings li.you { opacity: 1; font-weight: 600; color: #ff2fa8; }
+#standings i { font-style: normal; }
+#standings i.ahead { color: #ff7a7a; }
+#standings i.behind { color: #5dff9a; }
+#results {
+  position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 40;
+  min-width: 240px; padding: 16px 20px; pointer-events: none; user-select: none;
+  font: 13px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: #1d1b26; background: rgba(255, 255, 255, 0.92);
+  border: 1px solid #dcdae4; border-radius: 8px; box-shadow: 0 6px 24px rgba(0, 0, 0, 0.25);
+}
+#results h2 { margin: 0; font-size: 20px; text-align: center; }
+#results .total { font-size: 26px; font-weight: 600; text-align: center; margin: 2px 0 8px; }
+#results ol { list-style: none; margin: 6px 0; padding: 0; }
+#results li { display: flex; justify-content: space-between; gap: 16px; }
+#results .laps li.best { color: #0a8a5a; font-weight: 600; }
+#results .order { border-top: 1px solid #dcdae4; padding-top: 6px; }
+#results .order li.you { color: #c0157c; font-weight: 600; }
+#results .again { margin: 8px 0 0; text-align: center; opacity: 0.7; }
