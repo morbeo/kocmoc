@@ -1,0 +1,33 @@
+{
+  "name": "proving-4",
+  "desc": "Proving ground level 4: Tighter gates, more beacons",
+  "mode": "proving",
+  "seed": 404,
+  "spawn": {
+    "trackT": 0,
+    "speed": 30
+  },
+  "vars": {
+    "proving.level": 4,
+    "proving.budget": 80,
+    "gen.race.radius": 600,
+    "gen.race.height": 120,
+    "gen.race.points": 10,
+    "gen.race.tubeRadius": 30,
+    "gen.race.checkpoints": 6,
+    "gen.race.profile": "tube",
+    "gen.proving.gateRadius": 8.5,
+    "gen.proving.gateRadiusMin": 6.5,
+    "gen.proving.offsetMin": 0.25,
+    "gen.proving.offsetMax": 0.6,
+    "gen.proving.gates": 4,
+    "gen.proving.beacons": 2,
+    "gen.proving.rampStart": 0,
+    "gen.proving.rampEnd": 0.6,
+    "gen.proving.patterns.slalom": true,
+    "gen.proving.patterns.spiral": true,
+    "gen.proving.patterns.pairs": true,
+    "gen.proving.patterns.reverse": false
+  },
+  "presets": []
+}

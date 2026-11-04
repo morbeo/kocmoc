@@ -22,6 +22,30 @@ export interface RaceHud {
   standings: Standings | null;
   /** each rival's time over the whole race */
   rivalTimes: { name: string; time: number }[];
+  /** open space: seconds left before out of bounds puts you back, null while inside */
+  oob: number | null;
+  /** countdown, gates and score in proving mode */
+  proving: ProvingHud | null;
+}
+
+export interface ProvingHud {
+  level: number;
+  timeLeft: number;
+  gates: number;
+  hits: number;
+  misses: number;
+  beacons: number;
+  collected: number;
+  result: 'clear' | 'timeout' | null;
+  score: number;
+  /** score weights, for the breakdown */
+  weights: { time: number; gate: number; beacon: number };
+  /** stored best score for this level and ship */
+  best: number | null;
+  newBest: boolean;
+  badge: boolean;
+  /** ship preset flown, null = custom tuning (no badge) */
+  ship: string | null;
 }
 
 /** 1.234 → "+1.23", -0.5 → "−0.50" */
@@ -51,6 +75,43 @@ export function formatTime(t: number | null): string {
   return `${m}:${s.toFixed(3).padStart(6, '0')}`;
 }
 
+function raceCard(r: RaceHud): string {
+  const bestI = r.lapTimes.indexOf(Math.min(...r.lapTimes));
+  const laps = r.lapTimes.map((t, i) => `<li${i === bestI ? ' class="best"' : ''}><span>LAP ${i + 1}</span><span>${formatTime(t)}</span></li>`).join('');
+  const order = [{ name: 'YOU', time: r.finishTime ?? 0, you: true }, ...r.rivalTimes.map((x) => ({ ...x, you: false }))].sort((a, b) => a.time - b.time);
+  const place = order.findIndex((x) => x.you) + 1;
+  return `
+    <h2>${order.length > 1 ? `${ordinal(place)} of ${order.length}` : 'Finished'}</h2>
+    <div class="total">${formatTime(r.finishTime)}</div>
+    <ol class="laps">${laps}</ol>
+    ${order.length > 1 ? `<ol class="order">${order.map((x) => `<li${x.you ? ' class="you"' : ''}><span>${esc(x.name)}</span><span>${formatTime(x.time)}</span></li>`).join('')}</ol>` : ''}
+    <p class="again"></p>`;
+}
+
+/** Proving results: cleared or out of time, the score and what it is made of. */
+export function provingCard(p: ProvingHud): string {
+  const clear = p.result === 'clear';
+  const w = p.weights;
+  const left = clear ? p.timeLeft : 0;
+  const line = (label: string, detail: string, pts: number) => `<li><span>${label}</span><span>${detail}</span><b>${Math.round(pts)}</b></li>`;
+  const notes = [
+    p.newBest ? '<li class="best">NEW BEST</li>' : '',
+    p.badge ? `<li class="badge">${esc((p.ship ?? '').toUpperCase())} BADGE EARNED</li>` : '',
+    !p.ship && clear ? '<li>custom ship: no badge</li>' : '',
+  ].join('');
+  return `
+    <h2>${clear ? `Level ${p.level} cleared` : 'Out of time'}</h2>
+    <div class="total">${p.score}</div>
+    <ol class="breakdown">
+      ${line('TIME LEFT', `${left.toFixed(1)} s`, left * w.time)}
+      ${line('GATES', `${p.hits}/${p.gates}`, p.hits * w.gate)}
+      ${line('BEACONS', `${p.collected}/${p.beacons}`, p.collected * w.beacon)}
+    </ol>
+    ${p.misses ? `<p class="missed">${p.misses} gate${p.misses > 1 ? 's' : ''} missed</p>` : ''}
+    ${notes ? `<ol class="notes">${notes}</ol>` : ''}
+    <p class="again"></p>`;
+}
+
 /** Minimal flight readout: speed, boost, flight assist, camera, and a capture hint. */
 export function createHud() {
   const el = document.createElement('div');
@@ -66,7 +127,8 @@ export function createHud() {
   top.innerHTML = `
     <div class="time">0:00.000</div>
     <div class="row small"><span class="lap"></span><span class="cp"></span><span class="delta"></span></div>
-    <div class="row small"><span class="last"></span><span class="best"></span><span class="total"></span><span class="seed"></span></div>`;
+    <div class="row small"><span class="last"></span><span class="best"></span><span class="total"></span><span class="seed"></span></div>
+    <div class="oob" hidden></div>`;
   document.body.appendChild(top);
   // place and gaps to the ghost rivals
   const board = document.createElement('div');
@@ -91,6 +153,7 @@ export function createHud() {
   const best = $t('.best');
   const seedEl = $t('.seed');
   const total = $t('.total');
+  const oob = $t('.oob');
   const $ = (s: string) => el.querySelector(s) as HTMLElement;
   const speed = $('.speed');
   const bar = $('.bar i');
@@ -106,7 +169,21 @@ export function createHud() {
       const r = info.race;
       top.hidden = !r;
       if (!r) resultsFor = null;
-      if (r) {
+      const pv = r?.proving ?? null;
+      if (r && pv) {
+        // proving: the clock counts down; gates and beacons instead of laps and splits
+        time.textContent = !r.started && !pv.result ? 'cross the line' : formatTime(pv.timeLeft);
+        time.classList.toggle('low', r.started && !pv.result && pv.timeLeft < 10);
+        lap.textContent = `LEVEL ${pv.level}`;
+        cp.textContent = `GATES ${pv.hits}/${pv.gates}`;
+        delta.textContent = pv.misses ? `MISSED ${pv.misses}` : '';
+        delta.className = 'delta behind';
+        last.textContent = `BEACONS ${pv.collected}/${pv.beacons}`;
+        best.textContent = pv.best !== null ? `BEST ${pv.best}` : '';
+        seedEl.textContent = pv.ship ? pv.ship.toUpperCase() : 'CUSTOM';
+        total.textContent = '';
+      } else if (r) {
+        time.classList.remove('low');
         time.textContent = r.finished ? formatTime(r.finishTime) : r.started ? formatTime(r.lapTime) : 'cross the line';
         lap.textContent = r.finished ? 'FINISHED' : r.started ? lapLabel(r.lap, r.laps) : '';
         cp.textContent = r.started && !r.finished ? `CP ${r.checkpoint}/${r.checkpoints}` : '';
@@ -117,6 +194,8 @@ export function createHud() {
         seedEl.textContent = `SEED ${r.seed}`;
         total.textContent = r.laps > 0 && r.started && !r.finished ? `TOTAL ${formatTime(r.raceTime)}` : '';
       }
+      oob.hidden = !r || r.oob === null;
+      if (r && r.oob !== null) oob.textContent = `OUT OF BOUNDS ${r.oob.toFixed(1)}`;
       const st = r?.standings ?? null;
       board.hidden = !st;
       if (st) {
@@ -143,16 +222,7 @@ export function createHud() {
       results.hidden = !done;
       if (r && done && resultsFor !== r.finishTime) {
         resultsFor = r.finishTime;
-        const bestI = r.lapTimes.indexOf(Math.min(...r.lapTimes));
-        const laps = r.lapTimes.map((t, i) => `<li${i === bestI ? ' class="best"' : ''}><span>LAP ${i + 1}</span><span>${formatTime(t)}</span></li>`).join('');
-        const order = [{ name: 'YOU', time: r.finishTime ?? 0, you: true }, ...r.rivalTimes.map((x) => ({ ...x, you: false }))].sort((a, b) => a.time - b.time);
-        const place = order.findIndex((x) => x.you) + 1;
-        results.innerHTML = `
-          <h2>${order.length > 1 ? `${ordinal(place)} of ${order.length}` : 'Finished'}</h2>
-          <div class="total">${formatTime(r.finishTime)}</div>
-          <ol class="laps">${laps}</ol>
-          ${order.length > 1 ? `<ol class="order">${order.map((x) => `<li${x.you ? ' class="you"' : ''}><span>${esc(x.name)}</span><span>${formatTime(x.time)}</span></li>`).join('')}</ol>` : ''}
-          <p class="again"></p>`;
+        results.innerHTML = r.proving ? provingCard(r.proving) : raceCard(r);
       }
       if (done) (results.querySelector('.again') as HTMLElement).textContent = info.again;
       speed.textContent = ship.vel.length().toFixed(0);

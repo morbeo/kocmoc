@@ -5,7 +5,7 @@ import { toon } from '../render/toon';
 import { generateTrack, type RaceGenParams, type Track } from '../gen/track';
 import { GAME_MODES } from '../core/scenarios';
 
-export const gameMode = vars.enum('game.mode', 'race', GAME_MODES, { tags: ['game'], desc: 'race: generated track; gauntlet: the track filled with obstacles; free: open rock field' });
+export const gameMode = vars.enum('game.mode', 'race', GAME_MODES, { tags: ['game'], desc: 'race: generated track; gauntlet: the track filled with obstacles; proving: gates against the clock; free: open rock field' });
 /** Race and gauntlet both fly the generated track. */
 export const onTrack = () => gameMode.value !== 'free';
 
@@ -23,7 +23,10 @@ const gen = {
   checkpoints: vars.int('gen.race.checkpoints', 8, { min: 2, max: 32, hardMin: 1, hardMax: 200, tags: g, regen: true }),
 };
 const rtags = ['render', 'track'];
-export const profile = vars.enum('gen.race.profile', 'tube', ['tube', 'halfpipe', 'rails', 'gates'], { tags: rtags, desc: 'look of the corridor; walls collide the same for all' });
+export const profile = vars.enum('gen.race.profile', 'tube', ['tube', 'halfpipe', 'rails', 'gates', 'open'], { tags: rtags, desc: 'look of the corridor; walls collide for all but open (open space: faint guide rings, out-of-bounds timer)' });
+/** Open space: no wall collision, leaving the corridor starts the out-of-bounds timer. */
+export const openSpace = () => profile.value === 'open';
+export const oobTime = vars.num('race.oob.time', 3, { min: 0.5, max: 15, hardMin: 0.05, unit: 's', tags: ['race'], desc: 'open space: seconds outside the corridor before you are put back' });
 const trackColor = vars.color('render.track.color', '#3b2a6b', { tags: rtags });
 const stripeColor = vars.color('render.track.stripe', '#5a3fa0', { tags: rtags });
 const stripeEvery = vars.num('render.track.stripeEvery', 40, { min: 4, max: 200, hardMin: 1, unit: 'm', tags: rtags, desc: 'stripe length, for a sense of speed' });
@@ -127,6 +130,7 @@ export function createRaceScene(scene: THREE.Scene) {
   scene.add(group);
   const wallMat = toon({ vertexColors: true, side: THREE.DoubleSide });
   const gateMat = toon({ side: THREE.DoubleSide });
+  const guideMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.35, depthWrite: false });
   const cpMat = new THREE.MeshBasicMaterial({ vertexColors: false });
   const startMat = new THREE.MeshBasicMaterial();
   const colA = new THREE.Color();
@@ -162,10 +166,10 @@ export function createRaceScene(scene: THREE.Scene) {
       disposables.push(geo);
     }
 
-    if (look === 'gates' || look === 'rails') {
+    if (look === 'gates' || look === 'rails' || look === 'open') {
       const at = range(Math.max(1, Math.floor(t.length / every)), 0, t.length, false);
-      const ringGeo = new THREE.TorusGeometry(R, 1, 6, 40);
-      const gates = new THREE.InstancedMesh(ringGeo, gateMat, at.length);
+      const ringGeo = new THREE.TorusGeometry(R, look === 'open' ? 0.3 : 1, 6, 40);
+      const gates = new THREE.InstancedMesh(ringGeo, look === 'open' ? guideMat : gateMat, at.length);
       ringMatrices(gates, t, at);
       group.add(gates);
       disposables.push(ringGeo, gates);
@@ -186,6 +190,7 @@ export function createRaceScene(scene: THREE.Scene) {
     update() {
       group.visible = onTrack();
       gateMat.color.set(stripeColor.value);
+      guideMat.color.set(stripeColor.value);
       cpMat.color.set(cpColor.value).multiplyScalar(cpGlow.value);
       startMat.color.set(startColor.value).multiplyScalar(cpGlow.value);
     },

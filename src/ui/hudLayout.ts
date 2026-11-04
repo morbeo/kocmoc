@@ -16,7 +16,7 @@ const DEFAULTS: Record<Widget, { x: number; y: number; scale: number; visible: b
   speed: { x: 0.5, y: 0.9, scale: 1, visible: true, desc: 'speed, boost, assist and camera' },
   timer: { x: 0.5, y: 0.07, scale: 1, visible: true, desc: 'lap timer and splits' },
   minimap: { x: 0.9, y: 0.82, scale: 1, visible: true, desc: 'top-down track map' },
-  arrow: { x: 0.5, y: 0.2, scale: 1, visible: true, desc: 'points at the next checkpoint' },
+  arrow: { x: 0.5, y: 0.2, scale: 1, visible: true, desc: 'points at the next checkpoint (the next gate in proving)' },
   standings: { x: 0.08, y: 0.32, scale: 1, visible: true, desc: 'your place and the gaps to the ghost rivals' },
 };
 export const editMode = vars.bool('hud.edit', false, { tags, desc: 'drag HUD widgets to move, scroll to resize (H)' });
@@ -46,6 +46,8 @@ export interface HudFrame {
   track: Track | null;
   /** arc length of the next checkpoint, if racing */
   nextCp: number | null;
+  /** world position to point at instead of the next checkpoint (the next gate in proving) */
+  target?: THREE.Vector3 | null;
 }
 
 export function createHudLayout(elements: { speed: HTMLElement; timer: HTMLElement; standings: HTMLElement }) {
@@ -221,11 +223,11 @@ export function createHudLayout(elements: { speed: HTMLElement; timer: HTMLEleme
       }
 
       // checkpoint arrow: direction to the next checkpoint in the camera's view
-      const showArrow = w.arrow.visible.value && !!f.track && f.nextCp !== null;
+      const showArrow = w.arrow.visible.value && !!f.track && (f.nextCp !== null || !!f.target);
       arrow.hidden = !showArrow && !editMode.value;
-      if (showArrow && f.track && f.nextCp !== null) {
+      if (showArrow && f.track) {
         const t = f.track;
-        const p = t.pos[Math.min(t.pos.length - 1, Math.floor((f.nextCp / t.length) * t.pos.length))];
+        const p = f.target ?? t.pos[Math.min(t.pos.length - 1, Math.floor((f.nextCp! / t.length) * t.pos.length))];
         _v.copy(p).applyMatrix4(f.camera.matrixWorldInverse);
         // 0° = straight up the screen; behind the camera it fades so "turn around" reads
         arrowHead.style.transform = `rotate(${(Math.atan2(_v.x, _v.y) * 180) / Math.PI}deg)`;

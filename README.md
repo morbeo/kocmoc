@@ -31,6 +31,8 @@ npm run build        # static build → dist/
 | `P` | autopilot on/off |
 | `B` | replay the run since the last respawn; in a replay, play/pause |
 | `H` | HUD editor: drag widgets to move, scroll to resize, × to hide |
+| `L` | proving ground levels: pick a ship and a level |
+| `N` | next proving level (after a clear) |
 
 Touchpad (`input.pointer.mode`): **stick** (default) — click the scene to capture the pointer, then move
 your finger to steer; it re-centres on its own, `Esc` releases. Held click = boost. **scroll** —
@@ -40,11 +42,12 @@ toggles for the touchpad/mouse Y axis and for the pitch keys. Every binding, cur
 
 ## Race
 
-`game.mode` is `race` (default), `gauntlet` (the track filled with obstacles) or `free` (open rock field). Race tracks are generated from
+`game.mode` is `race` (default), `gauntlet` (the track filled with obstacles), `proving` (gates against the clock) or `free` (open rock field). Race tracks are generated from
 `gen.race.seed` and the other `gen.race.*` vars: a closed Catmull-Rom loop with rotation-minimising
 frames, optional barrel rolls (`gen.race.twist`) and banking, checked for self-intersection and
-tight bends. `gen.race.profile` picks the look (tube, halfpipe, rails, gates); every profile collides
-with the same invisible corridor. Cross the start line to start the clock. Laps, checkpoint splits and
+tight bends. `gen.race.profile` picks the look (tube, halfpipe, rails, gates, open); every profile but
+`open` collides with the same invisible corridor. `open` is open space: faint guide rings, no walls, and
+leaving the corridor for `race.oob.time` seconds puts you back on the centreline. Cross the start line to start the clock. Laps, checkpoint splits and
 a delta to your best are shown at the top, and best laps are saved per track.
 
 Races run `race.laps` laps (default 3; 0 = endless practice) and end with a results card. You race
@@ -65,6 +68,26 @@ rings, slaloms, crushers, laser grids, turbines and debris fields. Difficulty ra
 is `gen.gauntlet.minClearance` ship radii, and every gap is tested to stay flyable. Turn chunk kinds
 on or off with `gen.gauntlet.kinds.*`. Obstacles bounce you like walls. Try
 `?scenario=gauntlet-ramp` or `?scenario=laser-stress`.
+
+## Proving ground
+
+A time attack after the X-Wing and TIE Fighter training courses: the clock counts down, and you earn
+time by flying well. Press `L` (or **Levels**) to pick a ship and a level.
+
+- **Gates**: hoops in the corridor, in slalom, spiral and pair patterns. Through the opening adds
+  `proving.gateBonus` s; past it outside costs `proving.missPenalty` s (no bounce). Orange gates are
+  reverse gates: they count only when flown through backwards, so flip and come back.
+- **Time beacons** sit off the racing line near the wall and add `proving.beaconBonus` s.
+- The run is one lap. Clear it before the clock hits zero; the score is time left, gates and beacons
+  (`proving.score.*`). The HUD arrow points at the next gate.
+- **Ladder**: levels 1–8 are bundled scenarios (`proving-1` … `proving-8`, open space from level 5,
+  reverse gates from level 6); later levels are generated from level 8 with a shorter clock and tighter
+  gates. Each level opens once the one before is cleared.
+- **Ships**: the light, balanced and heavy presets (`presets/feel/`). Progress, best scores and a badge
+  for clearing level 8 are kept per ship in `localStorage`. A custom-tuned ship can fly but earns nothing.
+
+Gate layout is `gen.proving.*` (gate size and offset ramp with difficulty, as in the gauntlet). A unit
+test has the autopilot clear all 8 levels, with less time to spare at each level.
 
 ## Juice
 

@@ -27,6 +27,8 @@ export const ACTION_LABELS: Record<string, string> = {
   respawn: 'Respawn',
   autopilot: 'Autopilot',
   replay: 'Replay run / play-pause',
+  levels: 'Proving levels',
+  nextLevel: 'Next proving level',
 };
 
 export const actionOf = (path: string) => path.slice(BIND_PREFIX.length);

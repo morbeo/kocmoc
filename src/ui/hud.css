@@ -58,3 +58,14 @@
 #results .order { border-top: 1px solid #dcdae4; padding-top: 6px; }
 #results .order li.you { color: #c0157c; font-weight: 600; }
 #results .again { margin: 8px 0 0; text-align: center; opacity: 0.7; }
+#race-hud .time.low { color: #ff4060; }
+#race-hud .oob {
+  margin-top: 6px; font-size: 16px; font-weight: 600; color: #ffb02e;
+}
+#results .breakdown li { display: grid; grid-template-columns: 1fr auto 4em; gap: 12px; }
+#results .breakdown b { text-align: right; }
+#results .missed { margin: 4px 0 0; text-align: center; color: #c0153f; }
+#results .notes { border-top: 1px solid #dcdae4; padding-top: 6px; text-align: center; }
+#results .notes li { justify-content: center; }
+#results .notes .best { color: #0a8a5a; font-weight: 600; }
+#results .notes .badge { color: #c0157c; font-weight: 600; }

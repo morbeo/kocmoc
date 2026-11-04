@@ -1,7 +1,7 @@
 import { presets, applyPreset, activePreset } from './presets';
 import { LAYERS, type Change, type LayerData, type Registry } from './vars';
 
-export const GAME_MODES = ['race', 'gauntlet', 'free'] as const;
+export const GAME_MODES = ['race', 'gauntlet', 'proving', 'free'] as const;
 export type GameMode = (typeof GAME_MODES)[number];
 const isMode = (m: unknown): m is GameMode => GAME_MODES.includes(m as GameMode);
 

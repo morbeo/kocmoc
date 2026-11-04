@@ -8,11 +8,11 @@ import { newShip, lerpShip, noControls, type ShipParams } from './sim/ship';
 import { newSim, spawnSim, stepSim, type SimConfig, type Spawn } from './sim/world';
 import { Player, Recorder, parseRecording, quantize, type Recording } from './sim/replay';
 import { GhostRecorder, parseGhost, sampleGhost, type Ghost } from './sim/ghost';
-import { botControls } from './sim/bot';
+import { botControls, botTargets } from './sim/bot';
 import { flyBotLap, makeRival, standings, type Rival } from './sim/rivals';
 import { session } from './core/session';
 import { createReplayBar } from './ui/replayBar';
-import { attachInput, sampleInput, onKey, assistKey, cameraKey, cinematicKey, controlsKey, respawnKey, autopilotKey, replayKey, zoom, debug as inputDebug, pointerMode } from './input/input';
+import { attachInput, sampleInput, onKey, assistKey, cameraKey, cinematicKey, controlsKey, respawnKey, autopilotKey, replayKey, levelsKey, nextLevelKey, zoom, debug as inputDebug, pointerMode } from './input/input';
 import { keyLabel } from './input/bindings';
 import { camMode, cameraEvent, cycleCamera, toggleCinematic, updateCamera } from './cam/rigs';
 import { cineReplay, cineScene } from './cam/cinematic';
@@ -25,11 +25,16 @@ import { createSky } from './render/sky';
 import { createPipeline } from './render/pipeline';
 import { createViewports, layout } from './render/viewports';
 import { detectTouch, touchUi } from './input/touch';
-import { createRaceScene, gameMode, genParams, onTrack, seedVar, track } from './world/race';
+import { createRaceScene, gameMode, genParams, onTrack, oobTime, openSpace, seedVar, track } from './world/race';
+import { createProvingScene, nextGatePoint, provingCourse, provingLevel, provingParams, provingRules } from './world/proving';
+import { levelScenario, parseLadder, recordRun, type Ladder, type RunOutcome } from './core/ladder';
+import { createLevels } from './ui/levels';
+import { presets, applyPreset, activePreset } from './core/presets';
 import { createGauntletScene, gauntlet, gauntletParams, nearMissDistance, shipRadius } from './world/gauntlet';
 import { createJuice } from './juice';
 import { raceDistance, splitDelta, type RaceState, type WallParams } from './sim/race';
 import { scenarios, applyScenario, parseScenario, setSpawnHandler, setSpawnSource } from './core/scenarios';
+import type { ProvingHud } from './ui/hud';
 import './ui/hud.css';
 
 // --- vars ------------------------------------------------------------------
@@ -150,6 +155,7 @@ function cloneGhost() {
 const field = createField(scene);
 const raceScene = createRaceScene(scene);
 const gauntletScene = createGauntletScene(scene);
+const provingScene = createProvingScene(scene);
 const juice = createJuice(scene, () => vars.get('ship.glow')?.value as string ?? '#7fe7ff');
 const hud = createHud();
 const viewports = createViewports(renderer, scene, sky);
@@ -178,11 +184,13 @@ effect(() => void (loop.step = 1 / simRate.value));
 
 // --- race ------------------------------------------------------------------
 let race: RaceState | null = null;
-const walls = (): WallParams => ({ shipRadius: shipRadius.value, bounce: wallBounce.value, scrape: wallScrape.value });
+const walls = (): WallParams => ({ shipRadius: shipRadius.value, bounce: wallBounce.value, scrape: wallScrape.value, open: openSpace(), oobTime: oobTime.value });
 const bestKey = () =>
   gameMode.value === 'gauntlet'
     ? `kocmoc.best.gauntlet.${JSON.stringify([genParams.value, gauntletParams.value])}`
-    : `kocmoc.best.${JSON.stringify(genParams.value)}`;
+    : gameMode.value === 'proving'
+      ? `kocmoc.best.proving.${JSON.stringify([genParams.value, provingParams.value])}`
+      : `kocmoc.best.${JSON.stringify(genParams.value)}`;
 const ghostKey = () => bestKey().replace('kocmoc.best.', 'kocmoc.ghost.');
 let savedBest: number | null = null;
 let ghost: Ghost | null = null;
@@ -201,7 +209,8 @@ let rivalsFor = '';
 
 /** Rebuild the rival list if the ghosts or the toggles behind it changed. */
 function refreshRivals(): void {
-  if (!race || !onTrack()) {
+  // proving is scored on time left, gates and beacons: no rivals to race
+  if (!race || !onTrack() || gameMode.value === 'proving') {
     rivals = [];
     rivalsFor = '';
     return;
@@ -220,11 +229,11 @@ function refreshRivals(): void {
 /** Fly the autopilot rival for this track in the background, once, a few ms per frame. */
 function queueBotLap(): void {
   const key = botKey();
-  if (!rivalBot.value || !onTrack() || botLaps.has(key) || botFlying === key) return;
+  if (!rivalBot.value || !onTrack() || gameMode.value === 'proving' || botLaps.has(key) || botFlying === key) return;
   clearTimeout(botPending);
   botFlying = key;
   const cfg = simConfig();
-  const fly = flyBotLap(cfg, cfg.course?.gauntlet ?? null, loop.step);
+  const fly = flyBotLap(cfg, botTargets(cfg.course), loop.step);
   const slice = () => {
     if (key !== botKey()) {
       botFlying = '';
@@ -279,6 +288,7 @@ function respawn(t = spawnT.value, speed = spawnSpeed.value, at?: Spawn): void {
     savedBest = race.bestLap;
   }
   startGhosts = { best: ghost, last: lastLaps.get(bestKey()) ?? null };
+  outcome = null;
   recorder = replay ? null : new Recorder(vars.snapshot(), spawn, loop.step);
   queueBotLap();
 }
@@ -286,13 +296,49 @@ function respawn(t = spawnT.value, speed = spawnSpeed.value, at?: Spawn): void {
 // --- replay ----------------------------------------------------------------
 const simConfig = (): SimConfig => {
   const g = gauntlet.value;
+  const pc = provingCourse.value;
   return {
     ship: params(),
     walls: walls(),
     track: onTrack() ? track.value : null,
-    course: g ? { gauntlet: g, nearMiss: nearMissDistance.value } : undefined,
+    course: g || pc ? { gauntlet: g ?? undefined, proving: pc ? { course: pc, rules: provingRules() } : undefined, nearMiss: nearMissDistance.value } : undefined,
   };
 };
+
+// --- proving ladder ----------------------------------------------------------
+const LADDER_KEY = 'kocmoc.proving.ladder';
+function loadLadder(): Ladder {
+  try {
+    return parseLadder(JSON.parse(localStorage.getItem(LADDER_KEY) ?? 'null'));
+  } catch {
+    return {};
+  }
+}
+let ladder = loadLadder();
+/** the finished proving run, folded into the ladder once */
+let outcome: RunOutcome | null = null;
+const shipPreset = presets.find((x) => x.id === 'feel/balanced');
+/** Ship preset in use (light/balanced/heavy), null when the ship is custom-tuned. */
+function currentShip(): string | null {
+  const snap = vars.snapshot();
+  const active = activePreset(vars, 'preset:feel');
+  const name = active ? active.name : Object.keys(snap['preset:feel'] ?? {}).length === 0 ? 'balanced' : null;
+  const user = snap.user ?? {};
+  if (shipPreset && Object.keys(shipPreset.vars).some((k) => k in user)) return null;
+  return name;
+}
+/** Load ladder level `n` flown in ship preset `ship` (drops your own tuning of the ship's vars). */
+function playLevel(n: number, ship: string): void {
+  const sc = levelScenario(n, scenarios);
+  const preset = presets.find((x) => x.id === `feel/${ship}`);
+  if (!sc || !preset) return;
+  const user = vars.snapshot().user ?? {};
+  const drop = Object.keys(preset.vars).filter((k) => k in user);
+  if (drop.length) vars.change(drop.map((path) => ({ layer: 'user', path, before: user[path], after: undefined })));
+  applyPreset(vars, preset);
+  applyScenario(vars, sc);
+}
+const levels = createLevels({ ladder: () => ladder, ship: currentShip, play: playLevel });
 
 /** Start a recording from its spawn and fast-forward to `tick`. */
 function seekReplay(tick: number): void {
@@ -364,6 +410,7 @@ effect(() => {
   void track.value;
   void gameMode.value;
   void gauntlet.value;
+  void provingCourse.value;
   void raceLaps.value;
   if (!replay) respawn();
 });
@@ -419,6 +466,22 @@ onKey(assistKey, () => assist.set(!assist.value));
 onKey(cameraKey, cycleCamera);
 onKey(cinematicKey, toggleCinematic);
 onKey(vizKey, () => inputViz.set(!inputViz.value));
+onKey(levelsKey, () => levels.toggle());
+onKey(nextLevelKey, () => {
+  if (race?.proving?.result !== 'clear') return;
+  playLevel(provingLevel.value + 1, currentShip() ?? 'balanced');
+});
+const levelsBtn = document.createElement('button');
+levelsBtn.id = 'levels-btn';
+levelsBtn.addEventListener('click', () => {
+  levelsBtn.blur();
+  levels.toggle();
+});
+document.body.appendChild(levelsBtn);
+effect(() => {
+  const codes = levelsKey.value.split(',').filter(Boolean);
+  levelsBtn.textContent = codes.length ? `Levels (${keyLabel(codes[0].trim())})` : 'Levels';
+});
 
 // controls panel (rebinding, invert pitch), lazy-loaded
 let controlsUi: Promise<typeof import('./ui/controls')> | undefined;
@@ -448,6 +511,7 @@ effect(() => {
       camera: cycleCamera,
       assist: () => assist.set(!assist.value),
       debug: () => void openDebug(),
+      levels: () => levels.toggle(),
     });
     m.show(on);
   });
@@ -494,6 +558,9 @@ vars.watch('race.progress', () => (race ? (race.near.s / track.value.length).toF
 vars.watch('race.wallDist', () => (race ? (track.value.radius - race.near.dist).toFixed(1) : '–'), { tags: ['race'], unit: 'm', desc: 'distance to the wall' });
 vars.watch('race.wallHits', () => race?.wallHits ?? 0, { tags: ['race'] });
 vars.watch('race.obstacleHits', () => race?.obstacleHits ?? 0, { tags: ['race', 'gauntlet'] });
+vars.watch('proving.timeLeft', () => (race?.proving ? race.proving.timeLeft.toFixed(1) : '–'), { tags: ['proving'], unit: 's' });
+vars.watch('proving.gates', () => (race?.proving ? `${race.proving.hits} hit, ${race.proving.misses} missed of ${provingCourse.value?.gates.length ?? 0}` : '–'), { tags: ['proving'] });
+vars.watch('race.oobResets', () => race?.oobResets ?? 0, { tags: ['race'], desc: 'times out of bounds put the ship back (open space)' });
 vars.watch('gauntlet.chunks', () => gauntlet.value?.chunks.length ?? 0, { tags: ['gauntlet'] });
 vars.watch('gauntlet.chunk', () => {
   const g = gauntlet.value;
@@ -503,6 +570,31 @@ vars.watch('gauntlet.chunk', () => {
 
 // --- frame -----------------------------------------------------------------
 const _scrape = new THREE.Vector3();
+const _gate = new THREE.Vector3();
+
+function provingHud(r: RaceState): ProvingHud | null {
+  const ps = r.proving;
+  const pc = provingCourse.value;
+  if (!ps || !pc) return null;
+  const rules = provingRules();
+  const ship = currentShip();
+  return {
+    level: provingLevel.value,
+    timeLeft: ps.timeLeft,
+    gates: pc.gates.length,
+    hits: ps.hits,
+    misses: ps.misses,
+    beacons: pc.beacons.length,
+    collected: ps.collected,
+    result: ps.result,
+    score: ps.score,
+    weights: { time: rules.scoreTime, gate: rules.scoreGate, beacon: rules.scoreBeacon },
+    best: ship ? (ladder[ship]?.best[provingLevel.value] ?? null) : null,
+    newBest: !!outcome?.newBest,
+    badge: !!outcome?.badge,
+    ship,
+  };
+}
 let last = performance.now();
 renderer.setAnimationLoop((now) => {
   const dt = Math.min((now - last) / 1000, 0.25);
@@ -511,7 +603,6 @@ renderer.setAnimationLoop((now) => {
   const t0 = performance.now();
 
   const cfg = simConfig();
-  const g = cfg.course?.gauntlet ?? null;
   const warp = juice.timeScale(paused.value ? 0 : dt);
   const playing = !replay || (replay.playing && !replay.player.done);
   const speedX = replay ? replay.speed : 1;
@@ -519,7 +610,7 @@ renderer.setAnimationLoop((now) => {
     if (replay) {
       if (!replay.player.next(controls)) return;
     } else {
-      if (autopilot.value && race) botControls(curr, track.value, race.near, race.time, controls, g);
+      if (autopilot.value && race) botControls(curr, track.value, race.near, race.time, controls, botTargets(cfg.course));
       else sampleInput(controls, step);
       quantize(controls);
       recorder?.push(controls);
@@ -557,6 +648,22 @@ renderer.setAnimationLoop((now) => {
     }
     race.events.length = 0;
   }
+  // a finished proving run counts once on the ladder (not while watching a replay)
+  if (race?.proving?.result && !outcome) {
+    const ship = currentShip();
+    outcome = { ladder, newBest: false, badge: false };
+    if (!replay && ship) {
+      outcome = recordRun(ladder, ship, provingLevel.value, race.proving.score, race.proving.result === 'clear');
+      if (outcome.ladder !== ladder) {
+        ladder = outcome.ladder;
+        try {
+          localStorage.setItem(LADDER_KEY, JSON.stringify(ladder));
+        } catch {
+          /* storage full: progress lasts this session */
+        }
+      }
+    }
+  }
   if (race && !replay && race.bestLap !== null && race.bestLap !== savedBest) {
     savedBest = race.bestLap;
     localStorage.setItem(bestKey(), JSON.stringify({ lap: race.bestLap, splits: race.bestSplits }));
@@ -590,6 +697,7 @@ renderer.setAnimationLoop((now) => {
     }
   }
   gauntletScene.update(race ? race.time - (1 - alpha) * loop.step : 0);
+  provingScene.update(race ? race.time : 0, race?.proving ?? null);
   gizmoUi?.update();
 
   shipModel.object.position.copy(view.pos);
@@ -635,9 +743,18 @@ renderer.setAnimationLoop((now) => {
           : standings(rivals.map((x) => x.rival), Math.min(raceDistance(race, L), race.laps * L), race.raceTime, L, race.laps)
         : standings(rivals.map((x) => x.rival), race.along, race.lapTime, L, 1)
       : null,
-    rivalTimes: racing ? rivals.map((x) => ({ name: x.rival.name, time: x.rival.ghost.lap * race!.laps })) : [],
+    rivalTimes: racing && !race.proving ? rivals.map((x) => ({ name: x.rival.name, time: x.rival.ghost.lap * race!.laps })) : [],
+    oob: race.oob > 0 ? Math.max(0, oobTime.value - race.oob) : null,
+    proving: provingHud(race),
   };
-  const again = touchUi.value ? 'tap respawn to race again' : `${keyLabel(respawnKey.value.split(',')[0]?.trim() ?? '')} to race again`;
+  const keyOf = (k: { value: string }) => keyLabel(k.value.split(',')[0]?.trim() ?? '');
+  const again = race?.proving
+    ? touchUi.value
+      ? 'tap respawn to fly again · LEVELS for the ladder'
+      : `${keyOf(respawnKey)} retry${race.proving.result === 'clear' ? ` · ${keyOf(nextLevelKey)} next level` : ''} · ${keyOf(levelsKey)} levels`
+    : touchUi.value
+      ? 'tap respawn to race again'
+      : `${keyOf(respawnKey)} to race again`;
   hud.update(view, { assist: assist.value, cam: rig, cruise: inputDebug.cruise, hint, race: raceHud, again });
 
   hudLayout.update({
@@ -646,6 +763,7 @@ renderer.setAnimationLoop((now) => {
     shipQuat: view.quat,
     track: onTrack() ? track.value : null,
     nextCp: race?.started ? (race.nextCp === 0 ? 0 : track.value.checkpoints[race.nextCp]) : race ? 0 : null,
+    target: race?.proving && provingCourse.value && !race.proving.result ? nextGatePoint(provingCourse.value, race.proving, _gate) : null,
   });
   sky.update(camera, renderer.getPixelRatio());
   renderer.info.reset();
