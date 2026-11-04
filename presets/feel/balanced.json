@@ -1,0 +1,14 @@
+{
+  "desc": "The default ship: even thrust, speed and turn",
+  "vars": {
+    "ship.thrust.forward": 60,
+    "ship.thrust.reverse": 40,
+    "ship.thrust.strafe": 35,
+    "ship.turn.rate": [1.8, 1.4, 3],
+    "ship.speed.max": 120,
+    "ship.boost.thrust": 160,
+    "ship.boost.speed": 240,
+    "ship.assist.damp": 2.5,
+    "ship.radius": 1.5
+  }
+}

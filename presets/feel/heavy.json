@@ -1,0 +1,14 @@
+{
+  "desc": "Heavy and slow: steady, grippy, a big hull to fit through the gates",
+  "vars": {
+    "ship.thrust.forward": 45,
+    "ship.thrust.reverse": 35,
+    "ship.thrust.strafe": 28,
+    "ship.turn.rate": [1.4, 1.1, 2.4],
+    "ship.speed.max": 95,
+    "ship.boost.thrust": 130,
+    "ship.boost.speed": 190,
+    "ship.assist.damp": 3.5,
+    "ship.radius": 2
+  }
+}

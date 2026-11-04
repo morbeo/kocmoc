@@ -3,6 +3,32 @@ import type { Controls, ShipState } from './ship';
 import type { Nearest, Track } from '../gen/track';
 import { openPoint, passable, pointOnTrack, sampleAt, type Gauntlet, type Plane } from '../gen/gauntlet';
 import { arcDelta } from './gauntlet';
+import type { ProvingCourse } from '../gen/proving';
+
+/** What the autopilot threads: gaps to fly through and clear lanes through debris. */
+export type BotCourse = Pick<Gauntlet, 'planes' | 'lanes'>;
+
+const targetCache = new WeakMap<object, BotCourse>();
+/**
+ * Gauntlet obstacles and proving gates as one list of gaps. A gate is a still hole the size of its
+ * opening; reverse gates are left out (the autopilot doesn't turn round for them).
+ */
+export function botTargets(course: { gauntlet?: Gauntlet; proving?: { course: ProvingCourse } } | undefined): BotCourse | null {
+  if (!course) return null;
+  const g = course.gauntlet;
+  const pc = course.proving?.course;
+  if (!pc) return g ?? null;
+  const key = pc as object;
+  let out = targetCache.get(key);
+  if (!out || (g && out.lanes !== g.lanes)) {
+    const gates: Plane[] = pc.gates
+      .filter((x) => !x.reverse)
+      .map((x) => ({ kind: 'ring', s: x.s, thickness: 0.2, shape: { k: 'hole', r: Math.hypot(x.x, x.y), a0: Math.atan2(x.y, x.x), omega: 0, gap: x.r } }));
+    out = { planes: [...(g?.planes ?? []), ...gates].sort((a, b) => a.s - b.s), lanes: g?.lanes ?? [] };
+    targetCache.set(key, out);
+  }
+  return out;
+}
 
 export interface BotParams {
   /** cruise speed, m/s */
@@ -36,7 +62,7 @@ export function botControls(
   near: Nearest,
   time: number,
   out: Controls,
-  gauntlet: Gauntlet | null = null,
+  gauntlet: BotCourse | null = null,
   p: BotParams = defaultBot,
 ): Controls {
   const L = track.length;

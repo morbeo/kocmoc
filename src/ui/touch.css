@@ -79,7 +79,7 @@
 }
 
 /* the keyboard rebinding button gives way to the touch bar */
-body.touch-ui #controls-btn { display: none; }
+body.touch-ui #controls-btn, body.touch-ui #levels-btn { display: none; }
 /* HUD widgets are placed by the HUD layout (inline left/top), so these nudge with margins:
    clear the home indicator / notch */
 body.touch-ui #hud { margin-top: calc(-1 * env(safe-area-inset-bottom)); }

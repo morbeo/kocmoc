@@ -3,6 +3,7 @@ import type { ShipState } from './ship';
 import { nearestOnTrack, type Nearest, type Track } from '../gen/track';
 import type { Gauntlet } from '../gen/gauntlet';
 import { collideObstacles, newObstacleResult, type ObstacleResult } from './gauntlet';
+import { finishProving, newProving, stepProving, type ProvingEvent, type ProvingSetup, type ProvingState } from './proving';
 
 export interface WallParams {
   /** collision radius of the ship, m */
@@ -11,16 +12,24 @@ export interface WallParams {
   bounce: number;
   /** how fast scraping along the wall bleeds speed, 1/s */
   scrape: number;
+  /** open space: no wall collision; leaving the corridor starts an out-of-bounds timer */
+  open?: boolean;
+  /** seconds out of bounds before the ship is put back on the centreline */
+  oobTime?: number;
 }
 
 /** Things that happened during a step, for effects and sound; drained by the game each frame. */
 export type RaceEvent =
   | { type: 'start' | 'checkpoint' | 'lap' | 'finish' }
   | { type: 'hit'; what: 'wall' | 'obstacle'; impact: number }
-  | { type: 'nearMiss' };
+  | { type: 'nearMiss' }
+  | { type: 'oob' | 'oobReset' }
+  | ProvingEvent;
 
 export interface Course {
-  gauntlet: Gauntlet;
+  gauntlet?: Gauntlet;
+  /** gates, beacons and countdown rules (proving mode) */
+  proving?: ProvingSetup;
   /** extra clearance that still counts as a near miss, m */
   nearMiss: number;
 }
@@ -63,6 +72,11 @@ export interface RaceState {
   events: RaceEvent[];
   /** last obstacle collision, reused */
   obstacle: ObstacleResult;
+  /** countdown, gates and beacons in proving mode (set up on the first step) */
+  proving: ProvingState | null;
+  /** seconds outside the corridor in open space (0 = inside) */
+  oob: number;
+  oobResets: number;
 }
 
 export function newRace(track: Track, ship: ShipState, laps = 0): RaceState {
@@ -90,6 +104,9 @@ export function newRace(track: Track, ship: ShipState, laps = 0): RaceState {
     time: 0,
     events: [],
     obstacle: newObstacleResult(),
+    proving: null,
+    oob: 0,
+    oobResets: 0,
   };
 }
 
@@ -147,14 +164,38 @@ export function collideWalls(ship: ShipState, near: Nearest, radius: number, p: 
 export function stepRace(r: RaceState, ship: ShipState, track: Track, p: WallParams, dt: number, course?: Course): void {
   const prevS = r.near.s;
   r.time += dt;
-  nearestOnTrack(track, ship.pos, r.near.index, 24, r.near);
-  const hit = collideWalls(ship, r.near, track.radius, p, dt, _wall);
-  if (hit && !r.contact) {
-    r.wallHits++;
-    r.events.push({ type: 'hit', what: 'wall', impact: _wall.impact });
+  const prov = course?.proving;
+  if (prov && !r.proving) {
+    r.proving = newProving(prov);
+    r.laps = 1; // a proving run is one lap against the clock
   }
-  r.contact = hit;
-  if (course) {
+  nearestOnTrack(track, ship.pos, r.near.index, 24, r.near);
+  if (p.open) {
+    // open space: no walls, but leaving the corridor for too long puts you back on the line
+    if (r.near.dist > track.radius) {
+      if (r.oob === 0) r.events.push({ type: 'oob' });
+      r.oob += dt;
+      if (r.oob >= (p.oobTime ?? 3)) {
+        const keep = ship.energy;
+        spawnOnTrack(ship, track, r.near.s, Math.max(20, ship.vel.dot(track.tan[r.near.index])));
+        ship.energy = keep;
+        nearestOnTrack(track, ship.pos, r.near.index, 24, r.near);
+        r.oob = 0;
+        r.oobResets++;
+        if (r.proving && r.started && !r.finished) r.proving.timeLeft -= prov!.rules.oobPenalty;
+        r.events.push({ type: 'oobReset' });
+      }
+    } else r.oob = 0;
+    r.contact = false;
+  } else {
+    const hit = collideWalls(ship, r.near, track.radius, p, dt, _wall);
+    if (hit && !r.contact) {
+      r.wallHits++;
+      r.events.push({ type: 'hit', what: 'wall', impact: _wall.impact });
+    }
+    r.contact = hit;
+  }
+  if (course?.gauntlet) {
     const o = collideObstacles(course.gauntlet, ship, track, r.near, prevS, r.time, { ...p, nearMiss: course.nearMiss }, r.obstacle);
     if (o.impact > 0) r.events.push({ type: 'hit', what: 'obstacle', impact: o.impact });
     if (o.contact && !r.obstacleContact) r.obstacleHits++;
@@ -162,6 +203,14 @@ export function stepRace(r: RaceState, ship: ShipState, track: Track, p: WallPar
     if (o.nearMiss) r.events.push({ type: 'nearMiss' });
     // the push-back moved the ship; keep the track position in step
     if (o.contact) nearestOnTrack(track, ship.pos, r.near.index, 24, r.near);
+  }
+  if (prov && r.proving) {
+    const running = r.started && !r.finished;
+    stepProving(r.proving, prov, ship, track, r.near, prevS, p.shipRadius, r.along, dt, running, r.events as ProvingEvent[]);
+    if (r.proving.result === 'timeout' && !r.finished) {
+      r.finished = true;
+      r.finishTime = r.raceTime + dt;
+    }
   }
 
   // progress along the track, unwrapped across the seam
@@ -210,6 +259,7 @@ export function stepRace(r: RaceState, ship: ShipState, track: Track, p: WallPar
       if (r.laps > 0 && r.lap > r.laps) {
         r.finished = true;
         r.finishTime = r.raceTime;
+        if (r.proving && prov) finishProving(r.proving, prov.rules);
         r.events.push({ type: 'finish' });
       }
     } else {

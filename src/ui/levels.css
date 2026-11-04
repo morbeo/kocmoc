@@ -1,0 +1,44 @@
+#levels {
+  --c-bg: #fbfaf7;
+  --c-fg: #1d1b26;
+  --c-dim: #8a879a;
+  --c-line: #dcdae4;
+  --c-accent: #e0217f;
+  --c-ok: #0a8a5a;
+  position: fixed; inset: 0; z-index: 1100;
+  display: flex; align-items: center; justify-content: center; padding: 16px;
+  background: rgba(240, 238, 232, 0.35);
+  font: 13px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: var(--c-fg);
+}
+#levels[hidden] { display: none; }
+#levels * { box-sizing: border-box; }
+.lv-panel {
+  width: min(460px, 100%); max-height: 100%; overflow: auto;
+  background: var(--c-bg); border: 1px solid var(--c-line); border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18); padding: 12px 16px;
+}
+.lv-panel header { display: flex; align-items: center; justify-content: space-between; }
+.lv-panel h2 { margin: 0; font-size: 15px; }
+.lv-help, .lv-note { margin: 6px 0 10px; color: var(--c-dim); }
+.lv-panel button {
+  font: inherit; color: inherit; cursor: pointer;
+  background: #fff; border: 1px solid var(--c-line); border-radius: 4px; padding: 3px 8px;
+}
+.lv-panel button:hover:not(:disabled) { border-color: var(--c-accent); }
+.lv-ships { display: flex; gap: 6px; margin-bottom: 10px; }
+.lv-ships .ship { flex: 1; text-transform: uppercase; }
+.lv-ships .ship.on { border-color: var(--c-accent); color: var(--c-accent); font-weight: 600; }
+.lv-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.lv-grid .level { display: flex; flex-direction: column; align-items: center; padding: 6px 4px; }
+.lv-grid .level b { font-size: 18px; }
+.lv-grid .level span { font-size: 11px; color: var(--c-dim); }
+.lv-grid .level.done { border-color: var(--c-ok); }
+.lv-grid .level.done span { color: var(--c-ok); }
+.lv-grid .level:disabled { opacity: 0.45; cursor: default; }
+#levels-btn {
+  position: fixed; top: 40px; left: 10px; z-index: 50;
+  font: 12px ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: #1d1b26; background: rgba(255, 255, 255, 0.85);
+  border: 1px solid #dcdae4; border-radius: 4px; padding: 4px 8px; cursor: pointer;
+}

@@ -1,8 +1,7 @@
 import { Vector3 } from 'three';
 import { nearestOnTrack, type Track } from '../gen/track';
-import type { Gauntlet } from '../gen/gauntlet';
 import { GhostRecorder, type Ghost } from './ghost';
-import { botControls, type BotParams } from './bot';
+import { botControls, type BotCourse, type BotParams } from './bot';
 import { noControls } from './ship';
 import { newSim, spawnSim, stepSim, type SimConfig } from './world';
 
@@ -123,7 +122,7 @@ export function standings(rivals: readonly Rival[], dist: number, time: number, 
  * Deterministic, so the same track always gives the same rival. Null if it doesn't finish in `limit` s.
  * Yields every `every` steps so a caller can spread the work over frames.
  */
-export function* flyBotLap(cfg: SimConfig, gauntlet: Gauntlet | null, step: number, limit = 600, bot?: BotParams, every = 120): Generator<void, Ghost | null> {
+export function* flyBotLap(cfg: SimConfig, gauntlet: BotCourse | null, step: number, limit = 600, bot?: BotParams, every = 120): Generator<void, Ghost | null> {
   const track = cfg.track;
   if (!track) return null;
   const sim = newSim();
@@ -143,7 +142,7 @@ export function* flyBotLap(cfg: SimConfig, gauntlet: Gauntlet | null, step: numb
 }
 
 /** `flyBotLap` in one go. */
-export function recordBotLap(cfg: SimConfig, gauntlet: Gauntlet | null, step: number, limit = 600, bot?: BotParams): Ghost | null {
+export function recordBotLap(cfg: SimConfig, gauntlet: BotCourse | null, step: number, limit = 600, bot?: BotParams): Ghost | null {
   const it = flyBotLap(cfg, gauntlet, step, limit, bot);
   for (;;) {
     const r = it.next();

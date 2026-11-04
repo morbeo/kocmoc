@@ -209,24 +209,32 @@ Fixed-timestep simulation with interpolated rendering.
 Out of scope: multiplayer, AI racers (ghosts are the rivals, §13), weapons, story, customization, online
 leaderboards, track editor.
 
-## 12. Proving ground (proposed, M6)
+## 12. Proving ground (M6)
 
 Borrowed from the X-Wing (1993) Pilot Proving Ground and the TIE Fighter (1994)
 training simulator: a time-attack where the clock is a resource you earn, and
-precision beats raw speed. Default corridor radius is 40 m so gates and
-pickups have room to sit off the racing line.
+precision beats raw speed. `game.mode = proving`.
 
-- **Gate hoops**: pass-through rings in track space (`passable` + arc crossing).
-  Inside = credit, outside = miss (time penalty, no bounce). Patterns: slalom,
-  spiral (teaches rolling), reverse (credited only when crossed backwards).
-- **Proving rules**: countdown budget; gates and fly-through time beacons placed
-  off the racing line add time, misses cost it; score = time left + gates +
-  beacons. Race keeps the count-up trial.
-- **Ladder**: 8 levels as scenario JSON (shorter budget, tighter gates each
-  level), procedural beyond 8; ship presets (light / balanced / heavy) with a
-  badge per preset in `localStorage`.
-- **Open-space profile**: no wall collision, obstacles are the only solids,
-  leaving the corridor starts an out-of-bounds timer.
+- **Gate hoops** (`src/gen/proving.ts`, `src/sim/proving.ts`): rings in track space
+  (s, x, y, opening r), resolved once on an arc crossing. Inside = credit (+time), outside
+  = miss (−time, no bounce). Patterns per group: slalom, spiral (teaches rolling), pairs,
+  reverse (the group's last gate, centred, credited only when crossed backwards; missed
+  once you are `proving.reverseWindow` m past it). Size and offset ramp with difficulty
+  like the gauntlet's gaps; openings never go below 1.6 ship radii. The autopilot treats
+  gates as still holes (it skips reverse gates).
+- **Proving rules**: countdown from `proving.budget` after the start line; gates, misses and
+  fly-through time beacons (off the racing line, near the wall) move the clock; one lap;
+  timeout ends the run. Score = time left (clears only) + gates + beacons, each weighted.
+  Results card with the breakdown. Race keeps the count-up trial.
+- **Ladder**: `scenarios/proving-1..8.json` (smaller gates further off-centre each level,
+  open space from 5, reverse gates from 6), calibrated so the autopilot clears each with a
+  shrinking share of spare time (a unit test checks it); levels past 8 are generated from 8
+  (`src/core/ladder.ts`). Ship presets light / balanced / heavy (`presets/feel/`); progress,
+  best scores and a badge for level 8 per preset in `localStorage`. Level select panel (`L`),
+  next level (`N`).
+- **Open-space profile** (`gen.race.profile = open`, any track mode): no wall collision,
+  faint guide rings, `race.oob.time` s outside the corridor puts the ship back on the
+  centreline (costs `proving.oobPenalty` s in proving).
 - Turrets that shoot back need weapons, which stay out of scope unless decided
   otherwise.
 
@@ -251,7 +259,7 @@ finish with positions. AI racers stay out of scope; ghosts are the rivals.
   times fall within a band.
 - **Scenic biomes** (proposed): the lap cut into sections (canyon, cave, city,
   orbit) with their own tube radius and profile, palette, scenery and landmarks.
-- Later: pickups and boost pads (shared with §12 beacons), championship (cups as
+- Later: pickups and boost pads (built on §12 beacons), championship (cups as
   scenario lists, points, unlocks, an upgrade preset layer).
 
 ---
@@ -283,5 +291,5 @@ scenarios/   bundled scenario JSON
 | M3 | Race generator, gizmos, scenarios, seed in URL |
 | M4 | Gauntlet chunks, juice system + presets |
 | M5 | Replay + ghost, autopilot bot, viewports + pop-outs, HUD editor, diff view |
-| M6 | _Proposed_ — proving ground (§12): gate hoops, countdown rules + time beacons, level ladder + ship presets + badges, open-space profile |
+| M6 | Proving ground (§12): gate hoops, countdown rules + time beacons, level ladder + ship presets + badges, open-space profile |
 | M7 | Race (§13). M7a: lap count, finish, results, positions and gaps against ghost rivals (best, last, autopilot). _Proposed_: route graph with shortcuts and pit lane, scenic biomes, pickups and boost pads, championship |

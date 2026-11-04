@@ -1,0 +1,14 @@
+{
+  "desc": "Light and fast: quick turns and a small hull, easy to overshoot a gate",
+  "vars": {
+    "ship.thrust.forward": 80,
+    "ship.thrust.reverse": 50,
+    "ship.thrust.strafe": 45,
+    "ship.turn.rate": [2.3, 1.8, 3.8],
+    "ship.speed.max": 150,
+    "ship.boost.thrust": 190,
+    "ship.boost.speed": 290,
+    "ship.assist.damp": 2,
+    "ship.radius": 1.2
+  }
+}

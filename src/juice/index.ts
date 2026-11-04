@@ -197,6 +197,13 @@ export function createJuice(scene: THREE.Scene, glow: () => string) {
         if (kn > 0) warp.slowMo(1 - (1 - nearMissP.scale.value) * Math.min(1, kn), nearMissP.duration.value * Math.min(kn, 2));
         trauma.add(0.08 * k(shake));
         if (k(audio) > 0) sound.whoosh(k(audio));
+      } else if ((e.type === 'gate' && !e.ok) || e.type === 'timeout') {
+        // a missed gate or the clock running out: a jolt, no freeze
+        trauma.add(0.3 * k(shake));
+        pulse = Math.min(1, pulse + 0.4);
+        if (k(audio) > 0) sound.thump(25, k(audio));
+      } else if (e.type === 'oob') {
+        return;
       } else {
         if (k(flash) > 0) {
           flashLeft = flashP.duration.value;

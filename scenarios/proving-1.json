@@ -1,0 +1,33 @@
+{
+  "name": "proving-1",
+  "desc": "Proving ground level 1: First flight: wide slalom gates",
+  "mode": "proving",
+  "seed": 101,
+  "spawn": {
+    "trackT": 0,
+    "speed": 30
+  },
+  "vars": {
+    "proving.level": 1,
+    "proving.budget": 90,
+    "gen.race.radius": 650,
+    "gen.race.height": 120,
+    "gen.race.points": 10,
+    "gen.race.tubeRadius": 30,
+    "gen.race.checkpoints": 6,
+    "gen.race.profile": "tube",
+    "gen.proving.gateRadius": 11,
+    "gen.proving.gateRadiusMin": 9,
+    "gen.proving.offsetMin": 0.1,
+    "gen.proving.offsetMax": 0.3,
+    "gen.proving.gates": 3,
+    "gen.proving.beacons": 1,
+    "gen.proving.rampStart": 0,
+    "gen.proving.rampEnd": 0.3,
+    "gen.proving.patterns.slalom": true,
+    "gen.proving.patterns.spiral": false,
+    "gen.proving.patterns.pairs": false,
+    "gen.proving.patterns.reverse": false
+  },
+  "presets": []
+}

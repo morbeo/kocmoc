@@ -1,0 +1,33 @@
+{
+  "name": "proving-6",
+  "desc": "Proving ground level 6: Reverse gates: flip and fly back through",
+  "mode": "proving",
+  "seed": 606,
+  "spawn": {
+    "trackT": 0,
+    "speed": 30
+  },
+  "vars": {
+    "proving.level": 6,
+    "proving.budget": 110,
+    "gen.race.radius": 550,
+    "gen.race.height": 120,
+    "gen.race.points": 10,
+    "gen.race.tubeRadius": 30,
+    "gen.race.checkpoints": 6,
+    "gen.race.profile": "tube",
+    "gen.proving.gateRadius": 7.5,
+    "gen.proving.gateRadiusMin": 5.5,
+    "gen.proving.offsetMin": 0.35,
+    "gen.proving.offsetMax": 0.7,
+    "gen.proving.gates": 4,
+    "gen.proving.beacons": 2,
+    "gen.proving.rampStart": 0,
+    "gen.proving.rampEnd": 0.8,
+    "gen.proving.patterns.slalom": true,
+    "gen.proving.patterns.spiral": true,
+    "gen.proving.patterns.pairs": true,
+    "gen.proving.patterns.reverse": true
+  },
+  "presets": []
+}
