@@ -4,6 +4,7 @@ import type { Nearest, Track } from '../gen/track';
 import { openPoint, passable, pointOnTrack, sampleAt, type Gauntlet, type Plane } from '../gen/gauntlet';
 import { arcDelta } from './gauntlet';
 import type { ProvingCourse } from '../gen/proving';
+import { courseFrame, type Branch } from '../gen/routes';
 
 /** What the autopilot threads: gaps to fly through and clear lanes through debris. */
 export type BotCourse = Pick<Gauntlet, 'planes' | 'lanes'>;
@@ -37,9 +38,51 @@ export interface BotParams {
   obstacleSpeed: number;
   /** look-ahead time, s (clamped to a distance range) */
   lookAhead: number;
+  /** which branches to take at forks (default: stay on the main loop) */
+  route?: BotRoute;
 }
 
+/**
+ * Route choice at forks: main never leaves the loop; shortcut takes shortcuts and hidden routes;
+ * long takes the long way, splits and the pit lane; random picks per fork (the same every lap).
+ */
+export const BOT_ROUTES = ['main', 'shortcut', 'long', 'random'] as const;
+/** `any` takes every branch (used to measure forks) */
+export type BotRoute = (typeof BOT_ROUTES)[number] | 'any';
+
 export const defaultBot: BotParams = { speed: 110, obstacleSpeed: 55, lookAhead: 0.5 };
+
+/** Whether a bot flying `route` takes fork `k`. */
+export function takesBranch(route: BotRoute, b: Branch, k: number): boolean {
+  switch (route) {
+    case 'main':
+      return false;
+    case 'shortcut':
+      return b.kind === 'shortcut' || b.kind === 'hidden';
+    case 'long':
+      return b.kind === 'long' || b.kind === 'split' || b.kind === 'pit';
+    case 'random':
+      return ((Math.imul(k + 1, 0x9e3779b1) >>> 16) & 1) === 1;
+    case 'any':
+      return true;
+  }
+}
+
+/**
+ * The branch to steer along for a target at main progress `ts`: the one the ship is on, or one it
+ * chose and can still turn into (not yet through the mouth), else -1 (main loop).
+ */
+export function botBranch(track: Track, s: number, ts: number, on: number, route: BotRoute): number {
+  const bs = track.branches;
+  if (!bs?.length) return -1;
+  if (on >= 0) return ts <= bs[on].s1 ? on : -1;
+  for (let k = 0; k < bs.length; k++) {
+    const b = bs[k];
+    if (ts < b.s0 || ts > b.s1 || !takesBranch(route, b, k)) continue;
+    if (s <= b.s0 + (b.open0 / b.length) * (b.s1 - b.s0) * 0.9) return k;
+  }
+  return -1;
+}
 
 const clamp1 = (x: number) => Math.max(-1, Math.min(1, x));
 const _inv = new Quaternion();
@@ -51,6 +94,8 @@ const _aim = new Vector3();
 const _off = new Vector3();
 const _vel = new Vector3();
 const _gap = new Vector3();
+const _tan = new Vector3();
+const _tan2 = new Vector3();
 
 /**
  * Autopilot: steer the nose at a point ahead on the centreline (or through the next obstacle's
@@ -64,6 +109,8 @@ export function botControls(
   out: Controls,
   gauntlet: BotCourse | null = null,
   p: BotParams = defaultBot,
+  /** branch the ship is on (race state `loc.route`), -1 = main loop */
+  on = -1,
 ): Controls {
   const L = track.length;
   const speed = ship.vel.length();
@@ -118,7 +165,10 @@ export function botControls(
   }
 
   // near a gap the nose looks straight down the track (strafe/lift do the lining up)
-  pointOnTrack(track, ts, precise ? sx : tx, precise ? sy : ty, _target);
+  const route = p.route ?? 'main';
+  const via = botBranch(track, near.s, ts, on, route);
+  if (via >= 0) courseFrame(track, ts, via, 0, 0, _target);
+  else pointOnTrack(track, ts, precise ? sx : tx, precise ? sy : ty, _target);
   _inv.copy(ship.quat).invert();
   // steer the *velocity* at the target: lead the nose by the drift between where we're going
   // and where we want to go (flight assist only slowly pulls velocity onto the nose)
@@ -133,7 +183,9 @@ export function botControls(
   out.yaw = clamp1(Math.atan2(_local.x, fwd) * 3);
 
   const i = sampleAt(track, near.s);
-  _up.copy(track.up[i]).applyQuaternion(_inv);
+  if (on >= 0) courseFrame(track, near.s, on, 0, 0, _off, _tan, _up);
+  else _up.copy(track.up[i]);
+  _up.applyQuaternion(_inv);
   out.roll = clamp1(Math.atan2(_up.x, _up.y) * 2);
 
   // no strafe/lift in cruise: any non-zero value switches off flight assist's damping on that axis.
@@ -152,7 +204,12 @@ export function botControls(
 
   // slow for bends: angle between the tangent here and ahead
   const j = sampleAt(track, near.s + look * 1.5);
-  const bend = track.tan[i].angleTo(track.tan[j]);
+  const ahead = botBranch(track, near.s, near.s + look * 1.5, on, route);
+  if (ahead >= 0) courseFrame(track, near.s + look * 1.5, ahead, 0, 0, _off, _tan2);
+  else _tan2.copy(track.tan[j]);
+  if (on >= 0) courseFrame(track, near.s, on, 0, 0, _off, _tan);
+  else _tan.copy(track.tan[i]);
+  const bend = _tan.angleTo(_tan2);
   wantSpeed *= Math.max(0.4, 1 - bend * 0.8);
   // moving backwards counts as negative speed
   const along = speed > 1e-6 ? -_vel.copy(ship.vel).applyQuaternion(_inv).z : 0;

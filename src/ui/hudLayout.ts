@@ -48,6 +48,8 @@ export interface HudFrame {
   nextCp: number | null;
   /** world position to point at instead of the next checkpoint (the next gate in proving) */
   target?: THREE.Vector3 | null;
+  /** minimap colour per branch of the track; null = not shown (a hidden route not found yet) */
+  branchColors?: (string | null)[];
 }
 
 export function createHudLayout(elements: { speed: HTMLElement; timer: HTMLElement; standings: HTMLElement }) {
@@ -176,7 +178,7 @@ export function createHudLayout(elements: { speed: HTMLElement; timer: HTMLEleme
         const t = f.track;
         if (fitFor !== t) {
           let minX = Infinity, maxX = -Infinity, minZ = Infinity, maxZ = -Infinity;
-          for (const p of t.pos) {
+          for (const p of [...t.pos, ...(t.branches ?? []).flatMap((b) => b.pos)]) {
             minX = Math.min(minX, p.x);
             maxX = Math.max(maxX, p.x);
             minZ = Math.min(minZ, p.z);
@@ -202,6 +204,22 @@ export function createHudLayout(elements: { speed: HTMLElement; timer: HTMLEleme
         }
         g.closePath();
         g.stroke();
+        // alternate routes, thinner, in their route's colour
+        g.lineWidth = 2;
+        (t.branches ?? []).forEach((b, k) => {
+          const c = f.branchColors?.[k];
+          if (!c) return;
+          g.strokeStyle = c;
+          g.beginPath();
+          for (let i = 0; i < b.pos.length; i += 4) {
+            const p = b.pos[i];
+            if (i === 0) g.moveTo(px(p.x), pz(p.z));
+            else g.lineTo(px(p.x), pz(p.z));
+          }
+          const e = b.pos[b.pos.length - 1];
+          g.lineTo(px(e.x), pz(e.z));
+          g.stroke();
+        });
         if (f.nextCp !== null) {
           const p = t.pos[Math.min(t.pos.length - 1, Math.floor((f.nextCp / t.length) * t.pos.length))];
           g.fillStyle = '#0aa5c8';

@@ -59,6 +59,9 @@
 #results .order li.you { color: #c0157c; font-weight: 600; }
 #results .again { margin: 8px 0 0; text-align: center; opacity: 0.7; }
 #race-hud .time.low { color: #ff4060; }
+#race-hud .route {
+  margin-top: 4px; font-size: 13px; font-weight: 700; letter-spacing: 0.08em;
+}
 #race-hud .oob {
   margin-top: 6px; font-size: 16px; font-weight: 600; color: #ffb02e;
 }

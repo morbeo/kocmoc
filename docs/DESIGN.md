@@ -253,10 +253,23 @@ finish with positions. AI racers stay out of scope; ghosts are the rivals.
   track and ship tuning). Each ghost's lap is profiled as distance from the line, so
   your place and the gaps (time the rival took to reach your distance) are exact;
   a standings HUD widget shows them. Practice compares lap by lap.
-- **Route graph** (proposed): branch splines that leave and rejoin the main loop
-  (shortcut, long way, split around a divider, hidden, pit lane); progress on a
-  branch maps back to main-track `s`; the bot sweep keeps a fork only if its route
-  times fall within a band.
+- **M7b, route graph (built)**: `src/gen/routes.ts` adds branches to the loop in race mode
+  (`gen.race.forks`, `gen.race.pitLane`); each is its own sampled spline from fork `s0` to merge
+  `s1` with frames matching the loop at both ends. Kinds: shortcut (a Hermite curve across a bend,
+  0.75× tube), long way (a wide bulge, 1.1× tube), split (beside the loop, 0.8× tube, the walls
+  between them a divider), hidden (a narrower unmarked shortcut) and a pit lane before the start line
+  (refills boost, speed limit). The tube radius eases from the loop's at the mouths to the branch's.
+  A candidate is kept if, once clear of the loop's tube, it stays clear until the merge, keeps away
+  from the rest of the loop and other branches, and bends no tighter than 3 tube radii; then the
+  autopilot (`src/sim/forks.ts`, fixed reference ship, so tracks don't change with your tuning) flies
+  the section both ways and keeps the fork only if the time is in its band (`gen.race.route.*`).
+  Checkpoints inside a fork move to its ends. Each step the ship is on the tube it is inside (it keeps
+  its route while inside it, so the overlapping mouth has no lip), walls collide with that tube, and
+  progress on a branch maps to main `s` by fraction, so laps, splits, positions, ghosts and rival
+  profiles work unchanged. The loop's wall is cut where a branch's tube overlaps it (and the other way
+  round). Glowing sign ring per marked route, HUD label for the fork ahead and the route you're on,
+  branches on the minimap (hidden ones once found). `bot.route` / `race.rival.botRoute`: main,
+  shortcut, long, random. Not done: funnels at the mouths, a split-route arrow, see-through sections.
 - **Scenic biomes** (proposed): the lap cut into sections (canyon, cave, city,
   orbit) with their own tube radius and profile, palette, scenery and landmarks.
 - Later: pickups and boost pads (built on §12 beacons), championship (cups as
@@ -292,4 +305,4 @@ scenarios/   bundled scenario JSON
 | M4 | Gauntlet chunks, juice system + presets |
 | M5 | Replay + ghost, autopilot bot, viewports + pop-outs, HUD editor, diff view |
 | M6 | Proving ground (§12): gate hoops, countdown rules + time beacons, level ladder + ship presets + badges, open-space profile |
-| M7 | Race (§13). M7a: lap count, finish, results, positions and gaps against ghost rivals (best, last, autopilot). _Proposed_: route graph with shortcuts and pit lane, scenic biomes, pickups and boost pads, championship |
+| M7 | Race (§13). M7a: lap count, finish, results, positions and gaps against ghost rivals (best, last, autopilot). M7b: route graph (shortcut, long way, split, hidden, pit lane) balanced by the autopilot. _Proposed_: scenic biomes, pickups and boost pads, championship |

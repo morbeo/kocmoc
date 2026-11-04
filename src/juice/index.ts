@@ -204,6 +204,10 @@ export function createJuice(scene: THREE.Scene, glow: () => string) {
         if (k(audio) > 0) sound.thump(25, k(audio));
       } else if (e.type === 'oob') {
         return;
+      } else if (e.type === 'route') {
+        // into a branch: a whoosh, no flash (that's for lines and laps)
+        if (e.kind && k(audio) > 0) sound.whoosh(k(audio));
+        return;
       } else {
         if (k(flash) > 0) {
           flashLeft = flashP.duration.value;

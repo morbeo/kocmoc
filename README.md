@@ -55,6 +55,19 @@ ghosts: your best lap, your last lap this session and a lap the autopilot flew f
 (`race.ghost.enabled`, `race.rival.last`, `race.rival.bot`). Each one flies its lap over and over, and
 the standings widget shows your place and the time gap to each. Try `?scenario=sprint` for one short lap.
 
+Race tracks have alternate routes (`gen.race.forks`, default 3): branches that leave the loop and
+rejoin it. A **shortcut** cuts a corner through a narrower tube, the **long way** swings wide, a
+**split** runs beside the loop with a wall between, a **hidden** route is a shortcut with no sign
+(it shows on the minimap once you've flown it), and the **pit lane** (`gen.race.pitLane`) before the
+start line refills boost (`race.pit.refill`) at a speed limit (`race.pit.speed`). A glowing ring in
+the route's colour marks each way in, the HUD names the fork ahead and the route you're on, and the
+minimap draws the branches. Every fork is flown by the autopilot when the track is generated and kept
+only if its time is in a band: a shortcut saves 3–20% of the time over its section
+(`gen.race.route.saveMin`/`saveMax`), the long way costs at most 30% more (`gen.race.route.costMax`).
+Checkpoints sit only where the routes run together. The autopilot and its rival ghost take
+`bot.route` / `race.rival.botRoute`: main, shortcut (shortcuts and hidden routes), long (long way,
+splits, pit lane) or random. Forks are race mode only; gauntlet and proving keep one line.
+
 - `?seed=42` opens that track; the address bar always shows the current seed.
 - `?scenario=corkscrew-stress` loads a bundled scenario from `scenarios/`. Scenarios set mode, seed,
   spawn point, vars and presets. Load them from the debug table's **scenario** menu or drop a scenario
@@ -113,8 +126,9 @@ in arcade and overkill).
   bit for bit. `B` or **run → replay** plays it with a scrub bar; **save repro** downloads it as a
   bug-repro bundle, and **load repro** (or dropping the file on the page) plays one back.
 - **Ghost**: your best lap on each track is saved and flies alongside you (`race.ghost.*`).
-- **Autopilot** (`P`, `bot.enabled`) flies the track and threads gauntlet gaps. Unit tests use it to
-  check that generated tracks and gauntlets can be completed over a sweep of seeds.
+- **Autopilot** (`P`, `bot.enabled`) flies the track and threads gauntlet gaps, taking branches at
+  forks per `bot.route`. Unit tests use it to check that generated tracks and gauntlets can be
+  completed over a sweep of seeds, and the generator uses it to balance forks.
 - **Viewports**: `view.layout` is single, pip, side or quad; each extra view picks a rig (look-back,
   top-down, orbit, track-side…) and can **pop out** into its own window for another monitor.
 - **HUD layouts**: widget positions, sizes and visibility are `hud.*` vars; presets classic,

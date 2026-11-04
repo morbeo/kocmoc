@@ -8,7 +8,7 @@ import { newShip, lerpShip, noControls, type ShipParams } from './sim/ship';
 import { newSim, spawnSim, stepSim, type SimConfig, type Spawn } from './sim/world';
 import { Player, Recorder, parseRecording, quantize, type Recording } from './sim/replay';
 import { GhostRecorder, parseGhost, sampleGhost, type Ghost } from './sim/ghost';
-import { botControls, botTargets } from './sim/bot';
+import { BOT_ROUTES, botControls, botTargets, defaultBot, type BotRoute } from './sim/bot';
 import { flyBotLap, makeRival, standings, type Rival } from './sim/rivals';
 import { session } from './core/session';
 import { createReplayBar } from './ui/replayBar';
@@ -25,7 +25,8 @@ import { createSky } from './render/sky';
 import { createPipeline } from './render/pipeline';
 import { createViewports, layout } from './render/viewports';
 import { detectTouch, touchUi } from './input/touch';
-import { createRaceScene, gameMode, genParams, onTrack, oobTime, openSpace, seedVar, track } from './world/race';
+import { createRaceScene, gameMode, genParams, onTrack, oobTime, openSpace, routeColors, ROUTE_NAMES, routeParams, routesOn, seedVar, track } from './world/race';
+import { forkAhead } from './gen/routes';
 import { createProvingScene, nextGatePoint, provingCourse, provingLevel, provingParams, provingRules } from './world/proving';
 import { levelScenario, parseLadder, recordRun, type Ladder, type RunOutcome } from './core/ladder';
 import { createLevels } from './ui/levels';
@@ -90,6 +91,9 @@ const wallScrape = vars.num('race.wall.scrape', 0.8, { min: 0, max: 10, hardMin:
 const spawnT = vars.num('race.spawn.t', 0, { min: 0, max: 1, hardMin: 0, hardMax: 1, tags: ['race'], desc: 'spawn position as a fraction of the lap (0 = just behind the start line)' });
 const spawnSpeed = vars.num('race.spawn.speed', 0, { min: 0, max: 400, hardMin: 0, unit: 'm/s', tags: ['race'] });
 const autopilot = vars.bool('bot.enabled', false, { tags: ['bot'], desc: 'autopilot flies the track (P)' });
+const botRoute = vars.enum('bot.route', 'shortcut', BOT_ROUTES, { tags: ['bot', 'route'], desc: 'which branches the autopilot takes at forks: main never leaves the loop; shortcut takes shortcuts and hidden routes; long takes the long way, splits and the pit lane' });
+const pitRefill = vars.num('race.pit.refill', 0.5, { min: 0, max: 5, hardMin: 0, unit: '/s', tags: ['race', 'route'], desc: 'share of full boost the pit lane refills per second' });
+const pitSpeed = vars.num('race.pit.speed', 60, { min: 10, max: 300, hardMin: 1, unit: 'm/s', tags: ['race', 'route'], desc: 'pit lane speed limit (faster bleeds off)' });
 const ghostOn = vars.bool('race.ghost.enabled', true, { tags: ['race', 'ghost'], desc: 'race your best lap on this track' });
 const ghostOpacity = vars.num('race.ghost.opacity', 0.35, { min: 0, max: 1, hardMin: 0, hardMax: 1, tags: ['race', 'ghost'] });
 const ghostColor = vars.color('race.ghost.color', '#7fe7ff', { tags: ['race', 'ghost'] });
@@ -98,6 +102,7 @@ const rivalLast = vars.bool('race.rival.last', true, { tags: ['race', 'ghost'], 
 const rivalLastColor = vars.color('race.rival.lastColor', '#ffd166', { tags: ['race', 'ghost'] });
 const rivalBot = vars.bool('race.rival.bot', true, { tags: ['race', 'ghost'], desc: 'race a lap the autopilot flew from a standing start' });
 const rivalBotColor = vars.color('race.rival.botColor', '#b388ff', { tags: ['race', 'ghost'] });
+const rivalBotRoute = vars.enum('race.rival.botRoute', 'shortcut', BOT_ROUTES, { tags: ['race', 'ghost', 'route'], desc: 'which branches the autopilot rival takes at forks (see bot.route)' });
 const gizmoNames = ['velocity', 'accel', 'collision', 'frames', 'checkpoints', 'nearest'] as const;
 const gizmos = gizmoNames.map((n) => vars.bool(`debug.gizmo.${n}`, false, { tags: ['debug', 'gizmo'] }));
 
@@ -190,7 +195,7 @@ const bestKey = () =>
     ? `kocmoc.best.gauntlet.${JSON.stringify([genParams.value, gauntletParams.value])}`
     : gameMode.value === 'proving'
       ? `kocmoc.best.proving.${JSON.stringify([genParams.value, provingParams.value])}`
-      : `kocmoc.best.${JSON.stringify(genParams.value)}`;
+      : `kocmoc.best.${JSON.stringify(genParams.value)}${routesOn() ? `|routes${JSON.stringify(routeParams.value)}` : ''}`;
 const ghostKey = () => bestKey().replace('kocmoc.best.', 'kocmoc.ghost.');
 let savedBest: number | null = null;
 let ghost: Ghost | null = null;
@@ -198,7 +203,8 @@ let ghost: Ghost | null = null;
 const lastLaps = new Map<string, Ghost>();
 /** autopilot laps, per track and ship tuning (deterministic, so computed once) */
 const botLaps = new Map<string, Ghost | null>();
-const botKey = () => `${bestKey()}|${JSON.stringify(params())}`;
+const botKey = () => `${bestKey()}|${JSON.stringify(params())}${track.value.branches?.length ? `|${rivalBotRoute.value}` : ''}`;
+const botParams = (route: BotRoute) => ({ ...defaultBot, route });
 let botPending: ReturnType<typeof setTimeout> | undefined;
 let botFlying = '';
 /** in a race, your best and last laps as they were at the start, so laps from this race don't join it */
@@ -233,7 +239,7 @@ function queueBotLap(): void {
   clearTimeout(botPending);
   botFlying = key;
   const cfg = simConfig();
-  const fly = flyBotLap(cfg, botTargets(cfg.course), loop.step);
+  const fly = flyBotLap(cfg, botTargets(cfg.course), loop.step, 600, botParams(rivalBotRoute.value));
   const slice = () => {
     if (key !== botKey()) {
       botFlying = '';
@@ -301,7 +307,15 @@ const simConfig = (): SimConfig => {
     ship: params(),
     walls: walls(),
     track: onTrack() ? track.value : null,
-    course: g || pc ? { gauntlet: g ?? undefined, proving: pc ? { course: pc, rules: provingRules() } : undefined, nearMiss: nearMissDistance.value } : undefined,
+    course:
+      g || pc || track.value.branches?.length
+        ? {
+            gauntlet: g ?? undefined,
+            proving: pc ? { course: pc, rules: provingRules() } : undefined,
+            nearMiss: nearMissDistance.value,
+            pit: { refill: pitRefill.value, speed: pitSpeed.value },
+          }
+        : undefined,
   };
 };
 
@@ -555,7 +569,7 @@ vars.watch('ship.pos', () => curr.pos.toArray().map((v) => v.toFixed(0)).join(',
 vars.watch('race.track.length', () => track.value.length.toFixed(0), { tags: ['race'], unit: 'm' });
 vars.watch('race.track.attempts', () => track.value.attempts, { tags: ['race'], desc: 'layouts tried before one passed the checks' });
 vars.watch('race.progress', () => (race ? (race.near.s / track.value.length).toFixed(3) : '–'), { tags: ['race'] });
-vars.watch('race.wallDist', () => (race ? (track.value.radius - race.near.dist).toFixed(1) : '–'), { tags: ['race'], unit: 'm', desc: 'distance to the wall' });
+vars.watch('race.wallDist', () => (race ? (race.loc.radius - race.near.dist).toFixed(1) : '–'), { tags: ['race'], unit: 'm', desc: 'distance to the wall' });
 vars.watch('race.wallHits', () => race?.wallHits ?? 0, { tags: ['race'] });
 vars.watch('race.obstacleHits', () => race?.obstacleHits ?? 0, { tags: ['race', 'gauntlet'] });
 vars.watch('proving.timeLeft', () => (race?.proving ? race.proving.timeLeft.toFixed(1) : '–'), { tags: ['proving'], unit: 's' });
@@ -595,6 +609,25 @@ function provingHud(r: RaceState): ProvingHud | null {
     ship,
   };
 }
+/** hidden routes flown this session (track key # branch), shown on the minimap from then on */
+const foundRoutes = new Set<string>();
+function branchColors(): (string | null)[] {
+  const bs = track.value.branches ?? [];
+  const key = bs.some((b) => b.kind === 'hidden') ? bestKey() : '';
+  return bs.map((b, k) => (b.kind === 'hidden' ? (foundRoutes.has(`${key}#${k}`) ? '#8a7fb0' : null) : routeColors[b.kind].value));
+}
+/** The route you're on, or the marked fork coming up. */
+function routeHud(r: RaceState): { text: string; color: string } | null {
+  const bs = track.value.branches;
+  if (!bs?.length) return null;
+  const color = (k: keyof typeof ROUTE_NAMES) => (k === 'hidden' ? '#ffffff' : routeColors[k].value);
+  if (r.loc.route >= 0) {
+    const k = bs[r.loc.route].kind;
+    return { text: ROUTE_NAMES[k], color: color(k) };
+  }
+  const next = forkAhead(track.value, r.near.s, 450);
+  return next && next.kind !== 'hidden' ? { text: `FORK · ${ROUTE_NAMES[next.kind]}`, color: color(next.kind) } : null;
+}
 let last = performance.now();
 renderer.setAnimationLoop((now) => {
   const dt = Math.min((now - last) / 1000, 0.25);
@@ -610,7 +643,7 @@ renderer.setAnimationLoop((now) => {
     if (replay) {
       if (!replay.player.next(controls)) return;
     } else {
-      if (autopilot.value && race) botControls(curr, track.value, race.near, race.time, controls, botTargets(cfg.course));
+      if (autopilot.value && race) botControls(curr, track.value, race.near, race.time, controls, botTargets(cfg.course), botParams(botRoute.value), race.loc.route);
       else sampleInput(controls, step);
       quantize(controls);
       recorder?.push(controls);
@@ -639,9 +672,10 @@ renderer.setAnimationLoop((now) => {
   });
   // wall contact point (for sparks), and effects for what happened this frame
   let scrape: THREE.Vector3 | null = null;
-  if (race?.contact) scrape = _scrape.subVectors(curr.pos, race.near.point).setLength(track.value.radius).add(race.near.point);
+  if (race?.contact) scrape = _scrape.subVectors(curr.pos, race.near.point).setLength(race.loc.radius).add(race.near.point);
   if (race) {
     for (const e of race.events) {
+      if (e.type === 'route' && e.kind === 'hidden') foundRoutes.add(`${bestKey()}#${e.branch}`);
       const at = e.type === 'hit' ? (e.what === 'wall' ? (scrape ?? curr.pos) : race.obstacle.point) : undefined;
       juice.event(e, curr, at);
       cameraEvent(e.type);
@@ -713,6 +747,7 @@ renderer.setAnimationLoop((now) => {
   }
   cineScene.track = race ? track.value : null;
   cineScene.near = race?.near ?? null;
+  cineScene.route = race?.loc.route ?? -1;
   updateCamera(camera, view, dt, zoom.value, rig);
   letterboxUi.update(rig === 'cinematic', rect);
   juice.frame({ dt, camera, ship: view, shipModel: shipModel.object, maxSpeed: p.maxSpeed.value, chase: rig === 'chase' || rig === 'far', scrape });
@@ -745,6 +780,7 @@ renderer.setAnimationLoop((now) => {
       : null,
     rivalTimes: racing && !race.proving ? rivals.map((x) => ({ name: x.rival.name, time: x.rival.ghost.lap * race!.laps })) : [],
     oob: race.oob > 0 ? Math.max(0, oobTime.value - race.oob) : null,
+    route: routeHud(race),
     proving: provingHud(race),
   };
   const keyOf = (k: { value: string }) => keyLabel(k.value.split(',')[0]?.trim() ?? '');
@@ -764,6 +800,7 @@ renderer.setAnimationLoop((now) => {
     track: onTrack() ? track.value : null,
     nextCp: race?.started ? (race.nextCp === 0 ? 0 : track.value.checkpoints[race.nextCp]) : race ? 0 : null,
     target: race?.proving && provingCourse.value && !race.proving.result ? nextGatePoint(provingCourse.value, race.proving, _gate) : null,
+    branchColors: onTrack() ? branchColors() : [],
   });
   sky.update(camera, renderer.getPixelRatio());
   renderer.info.reset();
