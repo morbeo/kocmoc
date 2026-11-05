@@ -12,7 +12,7 @@ import { BOT_ROUTES, botControls, botTargets, defaultBot, type BotRoute } from '
 import { flyBotLap, makeRival, standings, type Rival } from './sim/rivals';
 import { session } from './core/session';
 import { createReplayBar } from './ui/replayBar';
-import { attachInput, sampleInput, onKey, assistKey, cameraKey, cinematicKey, controlsKey, respawnKey, autopilotKey, replayKey, levelsKey, nextLevelKey, tracksKey, zoom, debug as inputDebug, pointerMode } from './input/input';
+import { attachInput, sampleInput, pollPad, onKey, assistKey, cameraKey, cinematicKey, controlsKey, respawnKey, autopilotKey, replayKey, levelsKey, nextLevelKey, tracksKey, zoom, debug as inputDebug, pointerMode } from './input/input';
 import { keyLabel } from './input/bindings';
 import { camMode, cameraEvent, cycleCamera, toggleCinematic, updateCamera } from './cam/rigs';
 import { cineReplay, cineScene } from './cam/cinematic';
@@ -27,6 +27,7 @@ import { createSky } from './render/sky';
 import { createPipeline } from './render/pipeline';
 import { createViewports, layout } from './render/viewports';
 import { detectTouch, touchUi } from './input/touch';
+import { padName } from './input/pad';
 import { createRaceScene, gameMode, genParams, onTrack, oobTime, openSpace, routeColors, ROUTE_NAMES, routeParams, routesOn, sectionParams, seedVar, track } from './world/race';
 import { forkAhead } from './gen/routes';
 import { createProvingScene, nextGatePoint, provingCourse, provingLevel, provingParams, provingRules } from './world/proving';
@@ -667,6 +668,7 @@ renderer.setAnimationLoop((now) => {
   last = now;
   fps += (1 / Math.max(dt, 1e-4) - fps) * 0.05;
   const t0 = performance.now();
+  pollPad(dt);
 
   const cfg = simConfig();
   const warp = juice.timeScale(paused.value ? 0 : dt);
@@ -787,7 +789,7 @@ renderer.setAnimationLoop((now) => {
   juice.frame({ dt, camera, ship: view, shipModel: shipModel.object, maxSpeed: p.maxSpeed.value, chase: rig === 'chase' || rig === 'far', scrape });
 
   const hint =
-    pointerMode.value === 'stick' && !inputDebug.captured && !touchUi.value
+    pointerMode.value === 'stick' && !inputDebug.captured && !touchUi.value && !padName.value
       ? 'Click to steer with the touchpad · arrows/WASD to fly'
       : '';
   const raceHud = race && {

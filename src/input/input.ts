@@ -4,6 +4,8 @@ import type { Controls } from '../sim/ship';
 import { applyCurve, type Curve } from './curve';
 import { moveStick, recenterStick, stickAxes, ramp, type Stick } from './stick';
 import { touch } from './touch';
+import { bindingValue, isDown, pad, padBind, padCapture, padVars, readPads, PAD_PREFIX } from './pad';
+import { NAV, padMenu } from '../ui/padNav';
 
 export const AXES = ['pitch', 'yaw', 'roll', 'strafe', 'lift', 'thrust'] as const;
 export type Axis = (typeof AXES)[number];
@@ -15,8 +17,13 @@ const zero = (): AxisValues => ({ pitch: 0, yaw: 0, roll: 0, strafe: 0, lift: 0,
 const tags = ['input'];
 const keyTags = ['input', 'keys'];
 // bindings: comma-separated KeyboardEvent.code values
-const bind = (action: string, codes: string) =>
-  vars.str(`input.key.${action}`, codes, { tags: keyTags, desc: 'KeyboardEvent.code, comma-separated' });
+// each key binding has a gamepad twin, input.pad.<action>
+const bind = (action: string, codes: string) => {
+  padBind(action);
+  return vars.str(`input.key.${action}`, codes, { tags: keyTags, desc: 'KeyboardEvent.code, comma-separated' });
+};
+const padOf = (key: { path?: string }) => (key.path ? (vars.get(key.path.replace('input.key.', PAD_PREFIX)) as { value: string } | undefined) : undefined);
+
 const keys = {
   thrust: [bind('forward', 'KeyW'), bind('back', 'KeyS')],
   strafe: [bind('right', 'KeyD'), bind('left', 'KeyA')],
@@ -25,7 +32,9 @@ const keys = {
   pitch: [bind('pitchUp', 'ArrowUp'), bind('pitchDown', 'ArrowDown')],
   yaw: [bind('yawRight', 'ArrowRight'), bind('yawLeft', 'ArrowLeft')],
 } satisfies Record<Axis, unknown>;
+const padKeys = Object.fromEntries(AXES.map((a) => [a, [padOf(keys[a][0])!, padOf(keys[a][1])!]])) as Record<Axis, { value: string }[]>;
 const boostKey = bind('boost', 'ShiftLeft,ShiftRight');
+const boostPad = padOf(boostKey)!;
 export const assistKey = bind('assist', 'KeyF');
 export const cameraKey = bind('camera', 'KeyV');
 export const cinematicKey = bind('cinematic', 'KeyX');
@@ -41,6 +50,7 @@ const keyRamp = vars.num('input.key.ramp', 8, { min: 0, max: 30, hardMin: 0, uni
 export const invert = {
   pointer: vars.bool('input.invert.pointerY', false, { tags, desc: 'touchpad/mouse: moving up pitches the nose down' }),
   keys: vars.bool('input.invert.keyPitch', false, { tags: keyTags, desc: 'swap the pitch up/down keys' }),
+  pad: padVars.invertPitch,
 };
 
 const pointerMode = vars.enum('input.pointer.mode', 'stick', ['stick', 'scroll', 'off'], {
@@ -90,6 +100,8 @@ export const zoom = { value: 1 };
 export const debug = {
   keys: zero(),
   pointer: zero(),
+  pad: zero(),
+  padActive: false,
   raw: zero(),
   curved: zero(),
   boost: false,
@@ -101,10 +113,34 @@ export const debug = {
 const pressed = (v: { value: string }) => v.value.split(',').some((c) => down.has(c.trim()));
 const clamp1 = (x: number) => Math.min(Math.max(x, -1), 1);
 
-/** Edge-triggered key handlers (flight assist toggle, camera cycle, …). */
-const actions: { key: { value: string }; fn: () => void }[] = [];
-export function onKey(key: { value: string }, fn: () => void): void {
-  actions.push({ key, fn });
+/** Edge-triggered key handlers (flight assist toggle, camera cycle, …); the gamepad twin fires them too. */
+const actions: { key: { value: string }; pad?: { value: string }; was: boolean; fn: () => void }[] = [];
+export function onKey(key: { value: string; path?: string }, fn: () => void): void {
+  actions.push({ key, pad: padOf(key), was: false, fn });
+}
+
+const navSources = new Set(Object.values(NAV).flatMap((b) => b.split(',')));
+/** true while a menu or a rebind owns the pad: flight axes read zero */
+let padBlocked = false;
+
+/** Read gamepads, drive menus and fire pad-bound actions. Call once per animation frame, before the sim steps. */
+export function pollPad(dt: number): void {
+  readPads();
+  if (padCapture.on) {
+    padBlocked = true;
+    for (const a of actions) a.was = true; // a press used for binding must not fire on release of the capture
+    return;
+  }
+  const menu = padMenu(pad, dt);
+  padBlocked = menu;
+  for (const a of actions) {
+    if (!a.pad) continue;
+    // in a menu the nav buttons belong to the menu
+    const binding = menu ? a.pad.value.split(',').filter((s) => !navSources.has(s.trim())).join(',') : a.pad.value;
+    const now = isDown(pad, binding);
+    if (now && !a.was) a.fn();
+    a.was = isDown(pad, a.pad.value);
+  }
 }
 
 export function attachInput(canvas: HTMLCanvasElement): void {
@@ -196,13 +232,21 @@ export function sampleInput(prev: Controls, dt: number): Controls {
   if (clickLive && clickAction.value === 'thrust') p.thrust = 1;
   p.thrust = Math.max(p.thrust, cruise);
 
+  const g = debug.pad;
+  for (const axis of AXES) {
+    const [pos, neg] = padKeys[axis];
+    g[axis] = padBlocked ? 0 : bindingValue(pad, pos.value) - bindingValue(pad, neg.value);
+    if (axis === 'pitch' && invert.pad.value) g.pitch = -g.pitch;
+  }
+  debug.padActive = !padBlocked && pad.axes.length + pad.buttons.length > 0;
+
   const out = prev;
   for (const axis of AXES) {
-    debug.raw[axis] = clamp1(k[axis] + p[axis]);
+    debug.raw[axis] = clamp1(k[axis] + p[axis] + g[axis]);
     debug.curved[axis] = applyCurve(debug.raw[axis], curveOf(axis));
     out[axis] = debug.curved[axis];
   }
-  out.boost = pressed(boostKey) || (clickLive && clickAction.value === 'boost') || touch.boost;
+  out.boost = pressed(boostKey) || (clickLive && clickAction.value === 'boost') || touch.boost || (!padBlocked && isDown(pad, boostPad.value));
 
   debug.boost = out.boost;
   debug.captured = captured;

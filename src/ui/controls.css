@@ -15,7 +15,7 @@
   background: rgba(240, 238, 232, 0.35);
 }
 .ctl-panel {
-  width: min(460px, 100%); max-height: 100%; overflow: auto;
+  width: min(540px, 100%); max-height: 100%; overflow: auto;
   background: var(--c-bg); border: 1px solid var(--c-line); border-radius: 8px;
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18);
   padding: 12px 16px;
@@ -36,6 +36,12 @@
 .ctl-panel td { padding: 2px; }
 .ctl-panel td:last-child { width: 24px; }
 .ctl-panel .key { width: 100%; min-width: 72px; }
+.ctl-panel .key.pad { min-width: 84px; }
+.ctl-panel thead th { color: var(--c-dim); font-size: 11px; text-align: center; }
+.ctl-dz output { min-width: 3em; color: var(--c-dim); }
+.ctl-dz input { flex: 1; accent-color: var(--c-accent); }
+.ctl-pad { margin: 0; color: var(--c-dim); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ctl-panel button:focus-visible, .ctl-panel input:focus-visible { outline: 2px solid var(--c-accent); outline-offset: 1px; }
 .ctl-panel .key.empty { color: var(--c-dim); }
 .ctl-panel .key.listening { border-color: var(--c-accent); color: var(--c-accent); }
 .ctl-panel .key.conflict { border-color: var(--c-warn); color: var(--c-warn); }
