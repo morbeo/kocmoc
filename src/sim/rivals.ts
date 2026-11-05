@@ -1,5 +1,6 @@
 import { Vector3 } from 'three';
-import { nearestOnTrack, type Track } from '../gen/track';
+import { nearestOnTrack, type Nearest, type Track } from '../gen/track';
+import { locate, newRouteState } from '../gen/routes';
 import { GhostRecorder, type Ghost } from './ghost';
 import { botControls, type BotCourse, type BotParams } from './bot';
 import { noControls } from './ship';
@@ -27,9 +28,16 @@ export function ghostProfile(g: Ghost, track: Track): Float64Array {
   let hint = -1;
   let prevS = 0;
   let along = 0;
+  // with forks, follow the ghost onto whichever route it took (progress maps back to the loop)
+  const routes = track.branches?.length ? newRouteState(track, _p.fromArray(g.samples, 0)) : null;
+  const at: Nearest = { index: 0, t: 0, s: 0, point: new Vector3(), dist: Infinity };
   for (let i = 0; i < n; i++) {
     _p.fromArray(g.samples, i * STRIDE);
-    const near = nearestOnTrack(track, _p, hint);
+    let near: Nearest;
+    if (routes) {
+      locate(track, _p, routes, at);
+      near = at;
+    } else near = nearestOnTrack(track, _p, hint);
     hint = near.index;
     if (i === 0) along = near.s > L / 2 ? near.s - L : near.s;
     else {
@@ -131,7 +139,7 @@ export function* flyBotLap(cfg: SimConfig, gauntlet: BotCourse | null, step: num
   const c = noControls();
   const race = sim.race!;
   for (let i = 1; i <= limit / step; i++) {
-    botControls(sim.curr, track, race.near, race.time, c, gauntlet, bot);
+    botControls(sim.curr, track, race.near, race.time, c, gauntlet, bot, race.loc.route);
     stepSim(sim, c, cfg, step);
     race.events.length = 0;
     const lap = rec.update(race, sim.curr);

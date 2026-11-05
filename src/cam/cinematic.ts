@@ -4,6 +4,7 @@ import { rng } from '../core/rng';
 import type { ShipState } from '../sim/ship';
 import type { Nearest, Track } from '../gen/track';
 import type { RaceEvent } from '../sim/race';
+import { courseFrame } from '../gen/routes';
 
 /**
  * Cinematic auto-director: cuts (or blends) between broadcast-style shots on a timer.
@@ -24,7 +25,8 @@ export const cineReplay = vars.bool('cam.cine.replay', true, { tags, desc: 'repl
 export const letterbox = vars.num('cam.cine.letterbox', 0.1, { min: 0, max: 0.25, hardMin: 0, hardMax: 0.45, tags, desc: 'black bars, as a share of the screen height (0 = off)' });
 
 /** Track the static shots stand on; set each frame by the game (null in free flight). */
-export const cineScene: { track: Track | null; near: Nearest | null } = { track: null, near: null };
+/** `route`: the branch the ship is on (-1 = main loop), so track-side spots go on that tube. */
+export const cineScene: { track: Track | null; near: Nearest | null; route?: number } = { track: null, near: null, route: -1 };
 
 export interface CineState {
   shot: Shot;
@@ -62,7 +64,7 @@ export const newCineState = (seed = 5000): CineState => ({
 });
 
 /** Shots that show off each race moment; the director cuts to one when it happens. */
-const REACT: Partial<Record<RaceEvent['type'], Shot[]>> = { nearMiss: ['tail', 'flyby'], hit: ['tail', 'drone'], lap: ['trackside', 'hero'] };
+const REACT: Partial<Record<RaceEvent['type'], Shot[]>> = { nearMiss: ['tail', 'flyby'], hit: ['tail', 'drone'], lap: ['trackside', 'hero'], route: ['flyby', 'hero'] };
 /** shortest hold before an event may cut away, s */
 export const REACT_HOLD = 1.5;
 
@@ -150,9 +152,16 @@ function enter(st: CineState, shot: Shot, ship: ShipState): void {
   const ahead = fly ? Math.max(35, speed * 1.2) : Math.max(70, speed * 2.5);
   const { track, near } = cineScene;
   if (track && near) {
-    trackFrame(track, near.s + ahead, _p, _r, _u, _f);
+    // on a branch, the spot goes down the branch's tube while it lasts
+    const route = cineScene.route ?? -1;
+    const b = route >= 0 ? track.branches?.[route] : undefined;
+    let R = track.radius;
+    if (b && near.s + ahead <= b.s1) {
+      courseFrame(track, near.s + ahead, route, 0, 0, _p, _f, _u);
+      _r.crossVectors(_f, _u).normalize();
+      R = b.radius;
+    } else trackFrame(track, near.s + ahead, _p, _r, _u, _f);
     // inside the corridor: off to one side and a little high (trackside), or skimming the line (flyby)
-    const R = track.radius;
     st.spot.copy(_p).addScaledVector(_r, st.side * R * (fly ? 0.25 : 0.65)).addScaledVector(_u, R * (fly ? -0.15 : 0.3));
   } else {
     _f.set(0, 0, -1).applyQuaternion(ship.quat);

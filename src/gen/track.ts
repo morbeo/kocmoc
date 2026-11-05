@@ -1,5 +1,6 @@
 import { CatmullRomCurve3, Vector3 } from 'three';
 import { rng } from '../core/rng';
+import type { Branch } from './routes';
 
 export interface RaceGenParams {
   seed: number;
@@ -39,6 +40,8 @@ export interface Track {
   checkpoints: number[];
   /** generation attempts used (retries happen when a layout self-intersects) */
   attempts: number;
+  /** alternate routes that leave the loop and rejoin it (none unless added by `addRoutes`) */
+  branches?: Branch[];
 }
 
 const WORLD_UP = new Vector3(0, 1, 0);
@@ -46,12 +49,27 @@ const _a = new Vector3();
 const _b = new Vector3();
 
 /** Rotate `v` about unit `axis` by `angle` (Rodrigues). */
-function rotateAbout(v: Vector3, axis: Vector3, angle: number): Vector3 {
+export function rotateAbout(v: Vector3, axis: Vector3, angle: number): Vector3 {
   const c = Math.cos(angle);
   const s = Math.sin(angle);
   _a.crossVectors(axis, v);
   const d = axis.dot(v) * (1 - c);
   return v.multiplyScalar(c).addScaledVector(_a, s).addScaledVector(axis, d);
+}
+
+/**
+ * Carry the across-track vector `r` at sample `i` to sample `j` without twisting it
+ * (one double-reflection step, Wang et al. 2008). Returns a new vector.
+ */
+export function transportFrame(pos: Vector3[], tan: Vector3[], r: Vector3, i: number, j: number): Vector3 {
+  const v1 = _a.subVectors(pos[j], pos[i]);
+  const c1 = v1.dot(v1);
+  if (c1 < 1e-12) return r.clone();
+  const rL = r.clone().addScaledVector(v1, (-2 / c1) * v1.dot(r));
+  const tL = tan[i].clone().addScaledVector(v1, (-2 / c1) * v1.dot(tan[i]));
+  const v2 = _b.subVectors(tan[j], tL);
+  const c2 = v2.dot(v2);
+  return c2 < 1e-12 ? rL : rL.addScaledVector(v2, (-2 / c2) * v2.dot(rL));
 }
 
 /**
@@ -66,16 +84,7 @@ export function parallelTransport(pos: Vector3[], tan: Vector3[]): Vector3[] {
   if (up[0].lengthSq() < 1e-6) up[0].set(1, 0, 0).addScaledVector(tan[0], -tan[0].x);
   up[0].normalize();
 
-  const transport = (r: Vector3, i: number, j: number) => {
-    const v1 = _a.subVectors(pos[j], pos[i]);
-    const c1 = v1.dot(v1);
-    if (c1 < 1e-12) return r.clone();
-    const rL = r.clone().addScaledVector(v1, (-2 / c1) * v1.dot(r));
-    const tL = tan[i].clone().addScaledVector(v1, (-2 / c1) * v1.dot(tan[i]));
-    const v2 = _b.subVectors(tan[j], tL);
-    const c2 = v2.dot(v2);
-    return c2 < 1e-12 ? rL : rL.addScaledVector(v2, (-2 / c2) * v2.dot(rL));
-  };
+  const transport = (r: Vector3, i: number, j: number) => transportFrame(pos, tan, r, i, j);
   for (let i = 1; i < n; i++) up[i] = transport(up[i - 1], i - 1, i).normalize();
 
   // closure: angle between where up[0] would be after going round, and up[0] itself

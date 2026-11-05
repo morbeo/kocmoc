@@ -24,6 +24,8 @@ export interface RaceHud {
   rivalTimes: { name: string; time: number }[];
   /** open space: seconds left before out of bounds puts you back, null while inside */
   oob: number | null;
+  /** the route you're on, or the marked fork ahead (null on a single-line track) */
+  route?: { text: string; color: string } | null;
   /** countdown, gates and score in proving mode */
   proving: ProvingHud | null;
 }
@@ -128,6 +130,7 @@ export function createHud() {
     <div class="time">0:00.000</div>
     <div class="row small"><span class="lap"></span><span class="cp"></span><span class="delta"></span></div>
     <div class="row small"><span class="last"></span><span class="best"></span><span class="total"></span><span class="seed"></span></div>
+    <div class="route" hidden></div>
     <div class="oob" hidden></div>`;
   document.body.appendChild(top);
   // place and gaps to the ghost rivals
@@ -154,6 +157,7 @@ export function createHud() {
   const seedEl = $t('.seed');
   const total = $t('.total');
   const oob = $t('.oob');
+  const route = $t('.route');
   const $ = (s: string) => el.querySelector(s) as HTMLElement;
   const speed = $('.speed');
   const bar = $('.bar i');
@@ -193,6 +197,12 @@ export function createHud() {
         best.textContent = `BEST ${formatTime(r.bestLap)}`;
         seedEl.textContent = `SEED ${r.seed}`;
         total.textContent = r.laps > 0 && r.started && !r.finished ? `TOTAL ${formatTime(r.raceTime)}` : '';
+      }
+      const rt = r && !r.finished ? (r.route ?? null) : null;
+      route.hidden = !rt;
+      if (rt && route.textContent !== rt.text) {
+        route.textContent = rt.text;
+        route.style.color = rt.color;
       }
       oob.hidden = !r || r.oob === null;
       if (r && r.oob !== null) oob.textContent = `OUT OF BOUNDS ${r.oob.toFixed(1)}`;

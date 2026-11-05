@@ -1,6 +1,7 @@
 import { Matrix4, Vector3 } from 'three';
 import type { ShipState } from './ship';
 import { nearestOnTrack, type Nearest, type Track } from '../gen/track';
+import { locate, newRouteState, resetRoute, type RouteKind, type RouteState } from '../gen/routes';
 import type { Gauntlet } from '../gen/gauntlet';
 import { collideObstacles, newObstacleResult, type ObstacleResult } from './gauntlet';
 import { finishProving, newProving, stepProving, type ProvingEvent, type ProvingSetup, type ProvingState } from './proving';
@@ -24,6 +25,8 @@ export type RaceEvent =
   | { type: 'hit'; what: 'wall' | 'obstacle'; impact: number }
   | { type: 'nearMiss' }
   | { type: 'oob' | 'oobReset' }
+  /** entered branch `branch` of kind `kind`, or came back to the main loop (`kind` null, `branch` -1) */
+  | { type: 'route'; kind: RouteKind | null; branch: number }
   | ProvingEvent;
 
 export interface Course {
@@ -32,11 +35,22 @@ export interface Course {
   proving?: ProvingSetup;
   /** extra clearance that still counts as a near miss, m */
   nearMiss: number;
+  /** pit lane: boost refill while in it, and the speed it holds you to */
+  pit?: PitParams;
+}
+
+export interface PitParams {
+  /** boost energy refilled per second, share of full */
+  refill: number;
+  /** speed limit in the lane, m/s (faster bleeds off) */
+  speed: number;
 }
 
 export interface RaceState {
-  /** track position from last step (also the search hint) */
+  /** track position from last step (also the search hint); on a branch, `s` is main-track progress */
   near: Nearest;
+  /** which route the ship is on, and the corridor radius there */
+  loc: RouteState;
   /** distance travelled since the start line, unwrapped; negative before the first crossing */
   along: number;
   /** lap timer running (starts on the first start-line crossing) */
@@ -80,9 +94,11 @@ export interface RaceState {
 }
 
 export function newRace(track: Track, ship: ShipState, laps = 0): RaceState {
-  const near = nearestOnTrack(track, ship.pos);
+  const loc = newRouteState(track, ship.pos);
+  const near = { ...loc.main, point: loc.main.point.clone() };
   return {
     near,
+    loc,
     along: wrapAlong(near.s, track.length),
     started: false,
     lap: 0,
@@ -169,17 +185,24 @@ export function stepRace(r: RaceState, ship: ShipState, track: Track, p: WallPar
     r.proving = newProving(prov);
     r.laps = 1; // a proving run is one lap against the clock
   }
-  nearestOnTrack(track, ship.pos, r.near.index, 24, r.near);
+  const branches = track.branches;
+  const routeWas = r.loc.route;
+  if (branches?.length) locate(track, ship.pos, r.loc, r.near, p.shipRadius);
+  else nearestOnTrack(track, ship.pos, r.near.index, 24, r.near);
+  const radius = r.loc.radius;
   if (p.open) {
     // open space: no walls, but leaving the corridor for too long puts you back on the line
-    if (r.near.dist > track.radius) {
+    if (r.near.dist > radius) {
       if (r.oob === 0) r.events.push({ type: 'oob' });
       r.oob += dt;
       if (r.oob >= (p.oobTime ?? 3)) {
         const keep = ship.energy;
         spawnOnTrack(ship, track, r.near.s, Math.max(20, ship.vel.dot(track.tan[r.near.index])));
         ship.energy = keep;
-        nearestOnTrack(track, ship.pos, r.near.index, 24, r.near);
+        if (branches?.length) {
+          resetRoute(r.loc, track, ship.pos);
+          locate(track, ship.pos, r.loc, r.near, p.shipRadius);
+        } else nearestOnTrack(track, ship.pos, r.near.index, 24, r.near);
         r.oob = 0;
         r.oobResets++;
         if (r.proving && r.started && !r.finished) r.proving.timeLeft -= prov!.rules.oobPenalty;
@@ -188,12 +211,26 @@ export function stepRace(r: RaceState, ship: ShipState, track: Track, p: WallPar
     } else r.oob = 0;
     r.contact = false;
   } else {
-    const hit = collideWalls(ship, r.near, track.radius, p, dt, _wall);
+    const hit = collideWalls(ship, r.near, radius, p, dt, _wall);
     if (hit && !r.contact) {
       r.wallHits++;
       r.events.push({ type: 'hit', what: 'wall', impact: _wall.impact });
     }
     r.contact = hit;
+  }
+  if (branches?.length) {
+    if (r.loc.route !== routeWas) r.events.push({ type: 'route', kind: r.loc.route < 0 ? null : branches[r.loc.route].kind, branch: r.loc.route });
+    const b = r.loc.route >= 0 ? branches[r.loc.route] : null;
+    const pit = course?.pit;
+    if (b?.kind === 'pit' && pit) {
+      // in the lane proper (clear of the mouths): refill boost, hold the speed down
+      const sb = r.loc.branch[r.loc.route].s;
+      if (sb >= b.open0 && sb <= b.open1) {
+        ship.energy = Math.min(1, ship.energy + pit.refill * dt);
+        const v = ship.vel.length();
+        if (v > pit.speed) ship.vel.multiplyScalar(Math.max(pit.speed / v, Math.exp(-2 * dt)));
+      }
+    }
   }
   if (course?.gauntlet) {
     const o = collideObstacles(course.gauntlet, ship, track, r.near, prevS, r.time, { ...p, nearMiss: course.nearMiss }, r.obstacle);
