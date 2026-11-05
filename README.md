@@ -31,6 +31,7 @@ npm run build        # static build → dist/
 | `P` | autopilot on/off |
 | `B` | replay the run since the last respawn; in a replay, play/pause |
 | `H` | HUD editor: drag widgets to move, scroll to resize, × to hide |
+| `T` | race tracks: pick one of ten alien venues |
 | `L` | proving ground levels: pick a ship and a level |
 | `N` | next proving level (after a clear) |
 
@@ -81,6 +82,18 @@ rings, slaloms, crushers, laser grids, turbines and debris fields. Difficulty ra
 is `gen.gauntlet.minClearance` ship radii, and every gap is tested to stay flyable. Turn chunk kinds
 on or off with `gen.gauntlet.kinds.*`. Obstacles bounce you like walls. Try
 `?scenario=gauntlet-ramp` or `?scenario=laser-stress`.
+
+## Race tracks
+
+Press `T` (or **Tracks**) for ten alien venues, each a race scenario (`scenarios/venue-*.json`) with
+its own layout, scenery, sky and palette: a coil above a glassy sea, a trefoil knot under a ringed
+giant, a figure eight among monoliths, a loop on its edge in a girder lattice, peaks hanging from a
+cloud ceiling, and more. The parts are plain vars, so any track can use them:
+
+- `gen.race.shape`: loop, figure8, trefoil, star, coil, upright, clover
+- `world.scenery.kinds`: spires, monoliths, peaks, orbs, ribs, halos, lattice, shards, columns (kept
+  clear of the corridor and every branch); `world.ground`: floor, ceiling or both
+- `render.sky.planet.*`: a banded planet with a ring; `render.sky.moons`
 
 ## Proving ground
 

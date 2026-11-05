@@ -1,0 +1,45 @@
+{
+  "name": "venue-ossuary",
+  "title": "Ossuary Reach",
+  "desc": "Low over a rust plain and under the ribs of something that died here an age ago. Two moons watch.",
+  "mode": "race",
+  "seed": 302,
+  "spawn": {
+    "trackT": 0,
+    "speed": 0
+  },
+  "vars": {
+    "gen.race.radius": 1100,
+    "gen.race.height": 90,
+    "gen.race.wobble": 0.4,
+    "gen.race.tubeRadius": 42,
+    "world.scenery.kinds": "ribs,monoliths",
+    "world.scenery.count": 60,
+    "world.scenery.size": 40,
+    "world.ground": "floor",
+    "world.ground.gap": 120,
+    "world.ground.band": 260,
+    "world.scenery.color": "#f1e7d0",
+    "world.scenery.color2": "#c8b38a",
+    "world.ground.color": "#6b2f22",
+    "world.ground.color2": "#7f3b29",
+    "render.background": "#e0794e",
+    "render.sky.zenith": "#3b0f1f",
+    "render.sky.bands": 7,
+    "render.stars.count": 600,
+    "render.sky.moons": 2,
+    "render.sky.moonColor": "#ffe9d6",
+    "render.track.color": "#3a1a16",
+    "render.track.stripe": "#8a4a2e",
+    "render.light.color": "#ffd9b8",
+    "render.light.dir": [
+      -1,
+      0.6,
+      0.4
+    ],
+    "render.ambient": 0.35,
+    "render.outline.color": "#2a0c10",
+    "gen.race.profile": "halfpipe"
+  },
+  "presets": []
+}

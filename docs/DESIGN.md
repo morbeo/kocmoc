@@ -270,6 +270,21 @@ finish with positions. AI racers stay out of scope; ghosts are the rivals.
   round). Glowing sign ring per marked route, HUD label for the fork ahead and the route you're on,
   branches on the minimap (hidden ones once found). `bot.route` / `race.rival.botRoute`: main,
   shortcut, long, random. Not done: funnels at the mouths, a split-route arrow, see-through sections.
+- **M7c, alien venues (built)**: ten race tracks on other worlds, picked from the track list (`T`,
+  `src/ui/tracks.ts`); each is a scenario `scenarios/venue-*.json` with a `title`. They are built from:
+  - layouts (`gen.race.shape`, `src/gen/track.ts`): the wobbly loop, a figure eight whose lobes pass
+    over and under each other, torus knots (trefoil, a five-lobed star, a coil winding round a ring),
+    an upright loop flown over the top, and a rising and falling clover; wobble and height noise are
+    laid over the base curve and the usual retries keep it clear of itself;
+  - scenery (`src/gen/scenery.ts`, `world.scenery.*`): spires, monoliths, peaks, orbs, ribs (runs of
+    arches over the track), halos (glowing rings it threads), lattice beams, shards and columns; each
+    prop is a set of balls checked against a hashed centreline of the loop and every branch, and is
+    tried elsewhere if it would reach into the corridor; a banded floor and/or ceiling
+    (`world.ground`) a gap from the track, with spires and peaks rooted in them;
+  - sky (`render.sky.planet.*`, `render.sky.moons`): a toon-lit, striped planet with a ring whose
+    near half is drawn over it, and moons;
+  - open profiles (rails, halfpipe, gates) so the scenery is in view, and per-venue palettes.
+  The classic loop leaves the shape out of the track params, so saved bests and ghosts keep their keys.
 - **Scenic biomes** (proposed): the lap cut into sections (canyon, cave, city,
   orbit) with their own tube radius and profile, palette, scenery and landmarks.
 - Later: pickups and boost pads (built on §12 beacons), championship (cups as
@@ -305,4 +320,4 @@ scenarios/   bundled scenario JSON
 | M4 | Gauntlet chunks, juice system + presets |
 | M5 | Replay + ghost, autopilot bot, viewports + pop-outs, HUD editor, diff view |
 | M6 | Proving ground (§12): gate hoops, countdown rules + time beacons, level ladder + ship presets + badges, open-space profile |
-| M7 | Race (§13). M7a: lap count, finish, results, positions and gaps against ghost rivals (best, last, autopilot). M7b: route graph (shortcut, long way, split, hidden, pit lane) balanced by the autopilot. _Proposed_: scenic biomes, pickups and boost pads, championship |
+| M7 | Race (§13). M7a: lap count, finish, results, positions and gaps against ghost rivals (best, last, autopilot). M7b: route graph (shortcut, long way, split, hidden, pit lane) balanced by the autopilot. M7c: ten alien venues (track shapes, scenery, sky planets, track list). _Proposed_: biomes along the lap, pickups and boost pads, championship |

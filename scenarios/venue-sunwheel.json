@@ -1,0 +1,50 @@
+{
+  "name": "venue-sunwheel",
+  "title": "Sunwheel",
+  "desc": "A wheel on its edge before a swollen red sun, ringed by halos and the ribs of a ruined station. It rolls once a lap.",
+  "mode": "race",
+  "seed": 310,
+  "spawn": {
+    "trackT": 0,
+    "speed": 0
+  },
+  "vars": {
+    "gen.race.shape": "upright",
+    "gen.race.radius": 1300,
+    "gen.race.height": 380,
+    "gen.race.twist": 1,
+    "gen.race.tubeRadius": 45,
+    "gen.race.profile": "rails",
+    "world.scenery.kinds": "halos,ribs,shards",
+    "world.scenery.count": 80,
+    "world.scenery.size": 35,
+    "world.scenery.spread": 900,
+    "world.scenery.color": "#3a2020",
+    "world.scenery.color2": "#7a3a2a",
+    "world.scenery.glow": "#ffb000",
+    "render.background": "#2a0505",
+    "render.sky.zenith": "#000000",
+    "render.sky.planet.size": 45,
+    "render.sky.planet.dir": [
+      0,
+      0.1,
+      -1
+    ],
+    "render.sky.planet.color": "#ff5a1f",
+    "render.sky.planet.color2": "#ff8a2a",
+    "render.sky.planet.stripes": 4,
+    "render.sky.planet.ring": 0,
+    "render.light.color": "#ffb38a",
+    "render.light.dir": [
+      0,
+      0.1,
+      -1
+    ],
+    "render.ambient": 0.3,
+    "render.track.color": "#3a1010",
+    "render.track.stripe": "#ffb000",
+    "render.rim.color": "#ff7a3d",
+    "render.rim.strength": 0.9
+  },
+  "presets": []
+}

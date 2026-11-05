@@ -1,0 +1,49 @@
+{
+  "name": "venue-pentacle",
+  "title": "Pentacle Drift",
+  "desc": "A five-lobed knot through a drifting cloud of shards, lit green by a striped giant.",
+  "mode": "race",
+  "seed": 308,
+  "spawn": {
+    "trackT": 0,
+    "speed": 0
+  },
+  "vars": {
+    "gen.race.shape": "star",
+    "gen.race.radius": 800,
+    "gen.race.height": 150,
+    "gen.race.tubeRadius": 38,
+    "gen.race.profile": "gates",
+    "render.track.gateEvery": 80,
+    "world.scenery.kinds": "shards,orbs",
+    "world.scenery.count": 260,
+    "world.scenery.size": 30,
+    "world.scenery.spread": 700,
+    "world.scenery.color": "#2a3d2a",
+    "world.scenery.color2": "#9be36b",
+    "render.background": "#0a1f12",
+    "render.sky.zenith": "#1b0a24",
+    "render.sky.planet.size": 40,
+    "render.sky.planet.dir": [
+      0.2,
+      0.15,
+      -1
+    ],
+    "render.sky.planet.color": "#7bd389",
+    "render.sky.planet.color2": "#2f7a5a",
+    "render.sky.planet.stripes": 14,
+    "render.sky.planet.ring": 0,
+    "render.sky.planet.tilt": -0.6,
+    "render.sky.moons": 5,
+    "render.light.color": "#d8ffd0",
+    "render.light.dir": [
+      0.2,
+      0.3,
+      -1
+    ],
+    "render.track.color": "#1d3a22",
+    "render.track.stripe": "#b6ff6b",
+    "race.laps": 2
+  },
+  "presets": []
+}

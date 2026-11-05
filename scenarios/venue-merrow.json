@@ -1,0 +1,45 @@
+{
+  "name": "venue-merrow",
+  "title": "Hanging Peaks of Merrow",
+  "desc": "Mountains grow downward from a ceiling of cloud here. The track dives and climbs between their tips.",
+  "mode": "race",
+  "seed": 304,
+  "spawn": {
+    "trackT": 0,
+    "speed": 0
+  },
+  "vars": {
+    "gen.race.radius": 1200,
+    "gen.race.height": 450,
+    "gen.race.wobble": 0.3,
+    "gen.race.points": 14,
+    "gen.race.tubeRadius": 45,
+    "world.scenery.kinds": "peaks,shards",
+    "world.scenery.count": 110,
+    "world.scenery.size": 70,
+    "world.scenery.spread": 800,
+    "world.ground": "ceiling",
+    "world.ground.gap": 60,
+    "world.ground.band": 600,
+    "world.scenery.color": "#a4683f",
+    "world.scenery.color2": "#e3b27a",
+    "world.ground.color": "#f5e6c8",
+    "world.ground.color2": "#ecd3a8",
+    "render.background": "#ffcf8a",
+    "render.sky.zenith": "#ff8a5c",
+    "render.stars.enabled": false,
+    "render.track.color": "#5a3218",
+    "render.track.stripe": "#c97a3a",
+    "render.light.color": "#fff1d6",
+    "render.light.dir": [
+      0.4,
+      -0.3,
+      1
+    ],
+    "render.ambient": 0.55,
+    "render.toon.floor": 0.35,
+    "render.outline.color": "#4a2410",
+    "gen.race.profile": "gates"
+  },
+  "presets": []
+}

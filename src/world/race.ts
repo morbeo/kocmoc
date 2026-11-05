@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { computed, effect } from '@preact/signals-core';
 import { vars } from '../core/vars';
 import { toon } from '../render/toon';
-import { generateTrack, nearestOnTrack, type Nearest, type RaceGenParams, type Track } from '../gen/track';
+import { generateTrack, nearestOnTrack, TRACK_SHAPES, type Nearest, type RaceGenParams, type Track } from '../gen/track';
 import { addRoutes, nearestOnPath, radAt, routeS, type Branch, type RouteKind, type RouteParams } from '../gen/routes';
 import { botJudge } from '../sim/forks';
 import { GAME_MODES } from '../core/scenarios';
@@ -22,6 +22,7 @@ const gen = {
   twistNoise: vars.num('gen.race.twistNoise', 0.5, { min: 0, max: 3, hardMin: 0, unit: 'rad', tags: g, regen: true, desc: 'random banking per control point' }),
   tube: vars.num('gen.race.tubeRadius', 40, { min: 10, max: 120, hardMin: 3, unit: 'm', tags: g, regen: true, desc: 'corridor radius; keep the loop radius ~25× this for varied layouts' }),
   spacing: vars.num('gen.race.spacing', 4, { min: 1, max: 20, hardMin: 0.5, unit: 'm', tags: g, regen: true, desc: 'centreline sample spacing' }),
+  shape: vars.enum('gen.race.shape', 'loop', TRACK_SHAPES, { tags: g, regen: true, desc: 'layout: loop (wobbly ring), figure8, trefoil / star / coil (knots), upright (a loop on its edge), clover' }),
   checkpoints: vars.int('gen.race.checkpoints', 8, { min: 2, max: 32, hardMin: 1, hardMax: 200, tags: g, regen: true }),
 };
 const routes = {
@@ -64,6 +65,8 @@ export const genParams = computed<RaceGenParams>(() => ({
   tubeRadius: gen.tube.value,
   spacing: gen.spacing.value,
   checkpoints: gen.checkpoints.value,
+  // left out for the classic loop so its saved best laps and ghosts keep their keys
+  ...(gen.shape.value !== 'loop' ? { shape: gen.shape.value } : {}),
 }));
 /** Forks only in race mode: gauntlet obstacles, proving gates and their calibrated ladder stay on one line. */
 export const routeParams = computed<RouteParams>(() => {

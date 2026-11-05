@@ -1,0 +1,38 @@
+{
+  "name": "venue-lattice",
+  "title": "Brine Lattice",
+  "desc": "A loop stood on its edge inside an endless lattice of girders, between a sea floor and a sea ceiling.",
+  "mode": "race",
+  "seed": 306,
+  "spawn": {
+    "trackT": 0,
+    "speed": 0
+  },
+  "vars": {
+    "gen.race.shape": "upright",
+    "gen.race.radius": 1000,
+    "gen.race.height": 300,
+    "gen.race.tubeRadius": 40,
+    "gen.race.profile": "halfpipe",
+    "world.scenery.kinds": "lattice,columns",
+    "world.scenery.count": 160,
+    "world.scenery.size": 22,
+    "world.scenery.spread": 900,
+    "world.ground": "both",
+    "world.ground.gap": 150,
+    "world.ground.band": 300,
+    "world.scenery.color": "#1c5a52",
+    "world.scenery.color2": "#58b09c",
+    "world.ground.color": "#0c2f33",
+    "world.ground.color2": "#12403f",
+    "render.background": "#2c8a7e",
+    "render.sky.zenith": "#0b2a33",
+    "render.stars.enabled": false,
+    "render.track.color": "#123c3a",
+    "render.track.stripe": "#8ef0c8",
+    "render.light.color": "#d8fff2",
+    "render.ambient": 0.45,
+    "render.outline.color": "#04191a"
+  },
+  "presets": []
+}

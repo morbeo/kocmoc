@@ -12,6 +12,7 @@ export interface TouchActions {
   debug(): void;
   /** proving ground level select */
   levels(): void;
+  tracks(): void;
 }
 
 interface Thumb {
@@ -238,6 +239,7 @@ export function mount(actions: TouchActions): void {
   button(bar, '', 'CAM', actions.camera);
   button(bar, '', 'ASSIST', actions.assist);
   button(bar, '', '↺', actions.respawn).title = 'respawn';
+  button(bar2, '', 'TRACKS', actions.tracks).title = 'race tracks';
   button(bar2, '', 'LEVELS', actions.levels).title = 'proving ground levels';
   const tiltBtn = button(bar2, 'tilt', 'TILT', () => void toggleTilt());
   if (document.fullscreenEnabled) button(bar2, '', '⛶', () => void toggleFullscreen()).title = 'fullscreen';

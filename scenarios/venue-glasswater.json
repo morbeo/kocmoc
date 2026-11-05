@@ -1,0 +1,50 @@
+{
+  "name": "venue-glasswater",
+  "title": "Glasswater Coil",
+  "desc": "A ribbon that coils round and round a ring above a glassy sea, through a forest of crystal needles.",
+  "mode": "race",
+  "seed": 301,
+  "spawn": {
+    "trackT": 0,
+    "speed": 0
+  },
+  "vars": {
+    "gen.race.shape": "coil",
+    "gen.race.radius": 1100,
+    "gen.race.tubeRadius": 45,
+    "gen.race.height": 120,
+    "gen.race.wobble": 0.2,
+    "world.scenery.kinds": "spires",
+    "world.scenery.count": 220,
+    "world.scenery.size": 45,
+    "world.scenery.spread": 900,
+    "world.ground": "floor",
+    "world.ground.gap": 220,
+    "world.scenery.color": "#bff7ff",
+    "world.scenery.color2": "#5fc4dc",
+    "world.ground.color": "#1f6f7a",
+    "world.ground.color2": "#278592",
+    "render.background": "#9fe3d6",
+    "render.sky.zenith": "#1d4a7a",
+    "render.stars.enabled": false,
+    "render.sky.planet.size": 16,
+    "render.sky.planet.dir": [
+      0.5,
+      0.45,
+      -0.75
+    ],
+    "render.sky.planet.color": "#f2f8ff",
+    "render.sky.planet.color2": "#c6d8ee",
+    "render.sky.planet.stripes": 3,
+    "render.sky.planet.ring": 0,
+    "render.track.color": "#0e3a4a",
+    "render.track.stripe": "#2a7f96",
+    "render.light.color": "#f4fffd",
+    "render.ambient": 0.5,
+    "render.toon.floor": 0.4,
+    "render.outline.color": "#0b2e3a",
+    "race.laps": 2,
+    "gen.race.profile": "rails"
+  },
+  "presets": []
+}
