@@ -1,0 +1,51 @@
+{
+  "name": "venue-knotwork",
+  "title": "Knotwork of Vey",
+  "desc": "A trefoil knot tied in open space, threaded with glowing halos beneath a ringed giant.",
+  "mode": "race",
+  "seed": 303,
+  "spawn": {
+    "trackT": 0,
+    "speed": 0
+  },
+  "vars": {
+    "gen.race.shape": "trefoil",
+    "gen.race.radius": 1000,
+    "gen.race.tubeRadius": 40,
+    "gen.race.height": 150,
+    "gen.race.profile": "rails",
+    "gen.race.twistNoise": 0.9,
+    "world.scenery.kinds": "halos,orbs",
+    "world.scenery.count": 90,
+    "world.scenery.size": 40,
+    "world.scenery.spread": 1200,
+    "world.scenery.color": "#4b2a8a",
+    "world.scenery.color2": "#9a6cff",
+    "world.scenery.glow": "#ff7ad9",
+    "render.background": "#12052e",
+    "render.sky.zenith": "#3a1170",
+    "render.sky.planet.size": 32,
+    "render.sky.planet.dir": [
+      -0.55,
+      0.3,
+      -0.8
+    ],
+    "render.sky.planet.color": "#ffb36b",
+    "render.sky.planet.color2": "#d9577a",
+    "render.sky.planet.stripes": 9,
+    "render.sky.planet.ring": 2.3,
+    "render.sky.planet.ringColor": "#ffe2b8",
+    "render.sky.planet.tilt": 0.45,
+    "render.track.color": "#2b1650",
+    "render.track.stripe": "#ff7ad9",
+    "race.laps": 2,
+    "gen.race.sections": 4,
+    "gen.race.sectionKinds": "open,star,octagon",
+    "gen.race.sectionMin": 500,
+    "gen.race.sectionMax": 1000,
+    "gen.race.hazards": 3,
+    "gen.race.hazardKinds": "iris,laser",
+    "world.screens.count": 4
+  },
+  "presets": []
+}

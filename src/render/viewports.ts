@@ -63,7 +63,7 @@ interface Popout {
  */
 export function createViewports(renderer: THREE.WebGLRenderer, scene: THREE.Scene, sky: { update(c: THREE.Camera, pr: number): void }) {
   const cams = rigVars.map(() => {
-    const c = new THREE.PerspectiveCamera(70, 1, 0.1, 5000);
+    const c = new THREE.PerspectiveCamera(70, 1, 0.1, 12000);
     c.layers.enable(SKY_LAYER);
     return c;
   });

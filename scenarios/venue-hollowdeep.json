@@ -1,0 +1,47 @@
+{
+  "name": "venue-hollowdeep",
+  "title": "Hollowdeep Mine",
+  "desc": "Down the shafts of a mine that was never finished: square galleries, rock chambers, slot drifts and blast doors, all of it underground.",
+  "mode": "race",
+  "seed": 311,
+  "spawn": {
+    "trackT": 0,
+    "speed": 0
+  },
+  "vars": {
+    "gen.race.shape": "tangle",
+    "gen.race.radius": 800,
+    "gen.race.height": 200,
+    "gen.race.tubeRadius": 36,
+    "gen.race.profile": "tube",
+    "gen.race.twistNoise": 1.2,
+    "gen.race.sections": 9,
+    "gen.race.sectionKinds": "square,cavern,rect,irregular,octagon",
+    "gen.race.sectionMin": 200,
+    "gen.race.sectionMax": 600,
+    "gen.race.hazards": 5,
+    "gen.race.hazardKinds": "shutter,iris,turbine",
+    "gen.race.hazardDifficulty": 0.6,
+    "render.background": "#0a0705",
+    "render.sky.zenith": "#000000",
+    "render.stars.enabled": false,
+    "render.track.color": "#3a2a1c",
+    "render.track.stripe": "#6b4a2a",
+    "render.track.stripeEvery": 24,
+    "render.light.color": "#ffb36b",
+    "render.light.dir": [
+      0.2,
+      1,
+      0.3
+    ],
+    "render.ambient": 0.35,
+    "render.toon.floor": 0.3,
+    "render.outline.color": "#000000",
+    "render.rim.color": "#ffcf5a",
+    "render.rim.strength": 0.6,
+    "render.gauntlet.color": "#ffcf5a",
+    "render.gauntlet.trim": "#2a1a10",
+    "race.checkpoint.color": "#ff8a3d"
+  },
+  "presets": []
+}

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { effect } from '@preact/signals-core';
-import { vars } from './core/vars';
+import { vars, valueEquals } from './core/vars';
 import { initPersistence } from './core/persist';
 import { isTyping } from './core/dom';
 import { FixedLoop } from './core/loop';
@@ -12,29 +12,32 @@ import { BOT_ROUTES, botControls, botTargets, defaultBot, type BotRoute } from '
 import { flyBotLap, makeRival, standings, type Rival } from './sim/rivals';
 import { session } from './core/session';
 import { createReplayBar } from './ui/replayBar';
-import { attachInput, sampleInput, onKey, assistKey, cameraKey, cinematicKey, controlsKey, respawnKey, autopilotKey, replayKey, levelsKey, nextLevelKey, zoom, debug as inputDebug, pointerMode } from './input/input';
+import { attachInput, sampleInput, onKey, assistKey, cameraKey, cinematicKey, controlsKey, respawnKey, autopilotKey, replayKey, levelsKey, nextLevelKey, tracksKey, zoom, debug as inputDebug, pointerMode } from './input/input';
 import { keyLabel } from './input/bindings';
 import { camMode, cameraEvent, cycleCamera, toggleCinematic, updateCamera } from './cam/rigs';
 import { cineReplay, cineScene } from './cam/cinematic';
 import { createLetterbox } from './ui/letterbox';
 import { createShipModel } from './render/shipModel';
 import { createField } from './world/field';
+import { createScenery } from './world/scenery';
+import { createScreens } from './world/screens';
 import { createHud } from './ui/hud';
 import { createHudLayout, editKey as hudEditKey, editMode as hudEdit } from './ui/hudLayout';
 import { createSky } from './render/sky';
 import { createPipeline } from './render/pipeline';
 import { createViewports, layout } from './render/viewports';
 import { detectTouch, touchUi } from './input/touch';
-import { createRaceScene, gameMode, genParams, onTrack, oobTime, openSpace, routeColors, ROUTE_NAMES, routeParams, routesOn, seedVar, track } from './world/race';
+import { createRaceScene, gameMode, genParams, onTrack, oobTime, openSpace, routeColors, ROUTE_NAMES, routeParams, routesOn, sectionParams, seedVar, track } from './world/race';
 import { forkAhead } from './gen/routes';
 import { createProvingScene, nextGatePoint, provingCourse, provingLevel, provingParams, provingRules } from './world/proving';
 import { levelScenario, parseLadder, recordRun, type Ladder, type RunOutcome } from './core/ladder';
 import { createLevels } from './ui/levels';
+import { createTracks } from './ui/tracks';
 import { presets, applyPreset, activePreset } from './core/presets';
-import { createGauntletScene, gauntlet, gauntletParams, nearMissDistance, shipRadius } from './world/gauntlet';
+import { createGauntletScene, gauntlet, gauntletParams, hazardParams, nearMissDistance, shipRadius } from './world/gauntlet';
 import { createJuice } from './juice';
 import { raceDistance, splitDelta, type RaceState, type WallParams } from './sim/race';
-import { scenarios, applyScenario, parseScenario, setSpawnHandler, setSpawnSource } from './core/scenarios';
+import { scenarios, applyScenario, parseScenario, scenarioLayer, setSpawnHandler, setSpawnSource, venues } from './core/scenarios';
 import type { ProvingHud } from './ui/hud';
 import './ui/hud.css';
 
@@ -125,7 +128,8 @@ const pipeline = createPipeline(renderer);
 
 const scene = new THREE.Scene();
 const sky = createSky(scene);
-const camera = new THREE.PerspectiveCamera(70, 1, 0.1, 5000);
+// far enough for venue floors and scenery a few kilometres off
+const camera = new THREE.PerspectiveCamera(70, 1, 0.1, 12000);
 const sun = new THREE.DirectionalLight();
 const amb = new THREE.AmbientLight(0x8899ff);
 scene.add(sun, amb);
@@ -159,6 +163,8 @@ function cloneGhost() {
 }
 const field = createField(scene);
 const raceScene = createRaceScene(scene);
+const sceneryScene = createScenery(scene);
+const screensScene = createScreens(scene);
 const gauntletScene = createGauntletScene(scene);
 const provingScene = createProvingScene(scene);
 const juice = createJuice(scene, () => vars.get('ship.glow')?.value as string ?? '#7fe7ff');
@@ -195,7 +201,7 @@ const bestKey = () =>
     ? `kocmoc.best.gauntlet.${JSON.stringify([genParams.value, gauntletParams.value])}`
     : gameMode.value === 'proving'
       ? `kocmoc.best.proving.${JSON.stringify([genParams.value, provingParams.value])}`
-      : `kocmoc.best.${JSON.stringify(genParams.value)}${routesOn() ? `|routes${JSON.stringify(routeParams.value)}` : ''}`;
+      : `kocmoc.best.${JSON.stringify(genParams.value)}${routesOn() ? `|routes${JSON.stringify(routeParams.value)}` : ''}${sectionParams.value.count > 0 ? `|sections${JSON.stringify(sectionParams.value)}` : ''}${hazardParams.value.count > 0 ? `|hazards${JSON.stringify(hazardParams.value)}` : ''}`;
 const ghostKey = () => bestKey().replace('kocmoc.best.', 'kocmoc.ghost.');
 let savedBest: number | null = null;
 let ghost: Ghost | null = null;
@@ -354,6 +360,19 @@ function playLevel(n: number, ship: string): void {
 }
 const levels = createLevels({ ladder: () => ladder, ship: currentShip, play: playLevel });
 
+// --- race tracks -------------------------------------------------------------
+/** The venue whose scenario is loaded as it ships (none once you've loaded something else). */
+function currentVenue(): string | null {
+  const layer = vars.snapshot().scenario ?? {};
+  const keys = Object.keys(layer);
+  const hit = venues().find((sc) => {
+    const data = scenarioLayer(sc);
+    return keys.length === Object.keys(data).length && keys.every((k) => valueEquals(layer[k], data[k]));
+  });
+  return hit?.name ?? null;
+}
+const tracks = createTracks({ venues: () => venues(), current: currentVenue, play: (sc) => applyScenario(vars, sc) });
+
 /** Start a recording from its spawn and fast-forward to `tick`. */
 function seekReplay(tick: number): void {
   if (!replay) return;
@@ -481,6 +500,7 @@ onKey(cameraKey, cycleCamera);
 onKey(cinematicKey, toggleCinematic);
 onKey(vizKey, () => inputViz.set(!inputViz.value));
 onKey(levelsKey, () => levels.toggle());
+onKey(tracksKey, () => tracks.toggle());
 onKey(nextLevelKey, () => {
   if (race?.proving?.result !== 'clear') return;
   playLevel(provingLevel.value + 1, currentShip() ?? 'balanced');
@@ -495,6 +515,18 @@ document.body.appendChild(levelsBtn);
 effect(() => {
   const codes = levelsKey.value.split(',').filter(Boolean);
   levelsBtn.textContent = codes.length ? `Levels (${keyLabel(codes[0].trim())})` : 'Levels';
+});
+
+const tracksBtn = document.createElement('button');
+tracksBtn.id = 'tracks-btn';
+tracksBtn.addEventListener('click', () => {
+  tracksBtn.blur();
+  tracks.toggle();
+});
+document.body.appendChild(tracksBtn);
+effect(() => {
+  const codes = tracksKey.value.split(',').filter(Boolean);
+  tracksBtn.textContent = codes.length ? `Tracks (${keyLabel(codes[0].trim())})` : 'Tracks';
 });
 
 // controls panel (rebinding, invert pitch), lazy-loaded
@@ -526,6 +558,7 @@ effect(() => {
       assist: () => assist.set(!assist.value),
       debug: () => void openDebug(),
       levels: () => levels.toggle(),
+      tracks: () => tracks.toggle(),
     });
     m.show(on);
   });
@@ -710,6 +743,7 @@ renderer.setAnimationLoop((now) => {
   amb.intensity = ambient.value;
   field.update(gameMode.value === 'free');
   raceScene.update();
+  sceneryScene.update();
   // rivals fly on race time in a race (lapping their one lap), on lap time in practice
   refreshRivals();
   const colors: Record<RivalKind, string> = { best: ghostColor.value, last: rivalLastColor.value, bot: rivalBotColor.value };
@@ -802,6 +836,7 @@ renderer.setAnimationLoop((now) => {
     target: race?.proving && provingCourse.value && !race.proving.result ? nextGatePoint(provingCourse.value, race.proving, _gate) : null,
     branchColors: onTrack() ? branchColors() : [],
   });
+  screensScene.update(renderer, view, dt, sky, camera);
   sky.update(camera, renderer.getPixelRatio());
   renderer.info.reset();
   pipeline.render(scene, camera, layout.value === 'single' ? undefined : rect);

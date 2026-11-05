@@ -274,6 +274,44 @@ finish with positions. AI racers stay out of scope; ghosts are the rivals.
   round). Glowing sign ring per marked route, HUD label for the fork ahead and the route you're on,
   branches on the minimap (hidden ones once found). `bot.route` / `race.rival.botRoute`: main,
   shortcut, long, random. Not done: funnels at the mouths, a split-route arrow, see-through sections.
+- **M7c, alien venues (built)**: twelve race tracks on other worlds (two underground, enclosed like Descent's mines), picked from the track list (`T`,
+  `src/ui/tracks.ts`); each is a scenario `scenarios/venue-*.json` with a `title`. They are built from:
+  - layouts (`gen.race.shape`, `src/gen/track.ts`): the wobbly loop, a figure eight whose lobes pass
+    over and under each other, torus knots (trefoil, a five-lobed star, a coil winding round a ring),
+    an upright loop flown over the top, a rising and falling clover, a tangle of steep climbs and dives,
+    and a stunt ring with two loop-the-loops (the first steps sideways so its exit clears its entry,
+    the second steps back) and two corkscrews, each given a tenth of the curve's parameter so it is
+    sampled finely enough; wobble and height noise are
+    laid over the base curve and the usual retries keep it clear of itself;
+  - scenery (`src/gen/scenery.ts`, `world.scenery.*`): spires, monoliths, peaks, orbs, ribs (runs of
+    arches over the track), halos (glowing rings it threads), lattice beams, shards and columns; each
+    prop is a set of balls checked against a hashed centreline of the loop and every branch, and is
+    tried elsewhere if it would reach into the corridor; a banded floor and/or ceiling
+    (`world.ground`) a gap from the track, with spires and peaks rooted in them;
+  - sky (`render.sky.planet.*`, `render.sky.moons`): a toon-lit, striped planet with a ring whose
+    near half is drawn over it, and moons;
+  - sections (`src/gen/sections.ts`, `gen.race.sections` / `sectionKinds` / `sectionMin` / `sectionMax`,
+    race mode only): stretches of the loop with their own cross-section. Polygons (hex, square,
+    octagon, triangle, rect, diamond, five-pointed star) as corner lists, the wall distance at an angle
+    found by casting a ray to their edge; ellipse; irregular and cavern as a few harmonics whose phases
+    drift along the section. Every wall is at least one tube radius out, so the autopilot, ghosts and
+    fork balance are unchanged; open sections have no walls and an out-of-bounds limit 3.5 tube radii
+    out. The shape eases in from the round tube at each end. Sections keep clear of forks, the pit lane
+    and the start line, and of any other part of the loop their widest wall could reach; the main tube
+    is cut there and the section draws its own faceted walls (corners on vertices). Collision pushes
+    out along the face normal (`collideSection`); scenery keeps clear of each section's reach;
+  - hazards (`generateHazards` in `src/gen/gauntlet.ts`, `gen.race.hazards` / `hazardKinds` /
+    `hazardDifficulty`, race mode only): single gauntlet-style plane obstacles round the lap, clear of
+    the start, forks and shaped sections: iris apertures (an opening that dwells open and shut) and
+    shutter gates (two or four doors), plus turbines, crushers, lasers and moving rings. Shut, an iris
+    or shutter still leaves `gen.gauntlet.minClearance` ship radii in the middle; the autopilot aims
+    there. They join the best-lap key;
+  - giant screens (`src/gen/screens.ts`, `src/world/screens.ts`, `world.screens.*`, race mode): 16:9
+    panels beside the track, clear of every corridor and out of shaped tunnels, turned to face the
+    ship coming at them; a second camera with its own cinematic director state renders into a texture
+    `world.screens.fps` times a second;
+  - open profiles (rails, halfpipe, gates) so the scenery is in view, and per-venue palettes.
+  The classic loop leaves the shape out of the track params, so saved bests and ghosts keep their keys.
 - **Scenic biomes** (proposed): the lap cut into sections (canyon, cave, city,
   orbit) with their own tube radius and profile, palette, scenery and landmarks.
 - Later: pickups and boost pads (built on §12 beacons), championship (cups as
@@ -309,4 +347,4 @@ scenarios/   bundled scenario JSON
 | M4 | Gauntlet chunks, juice system + presets |
 | M5 | Replay + ghost, autopilot bot, viewports + pop-outs, HUD editor, diff view |
 | M6 | Proving ground (§12): gate hoops, countdown rules + time beacons, level ladder + ship presets + badges, open-space profile |
-| M7 | Race (§13). M7a: lap count, finish, results, positions and gaps against ghost rivals (best, last, autopilot). M7b: route graph (shortcut, long way, split, hidden, pit lane) balanced by the autopilot. _Proposed_: scenic biomes, pickups and boost pads, championship |
+| M7 | Race (§13). M7a: lap count, finish, results, positions and gaps against ghost rivals (best, last, autopilot). M7b: route graph (shortcut, long way, split, hidden, pit lane) balanced by the autopilot. M7c: twelve alien venues (track shapes incl. loops and corkscrews, shaped tunnel sections and open air, iris and shutter hazards, giant screens, scenery, sky planets, track list). _Proposed_: biomes along the lap, pickups and boost pads, championship |

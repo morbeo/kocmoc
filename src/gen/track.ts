@@ -1,6 +1,7 @@
 import { CatmullRomCurve3, Vector3 } from 'three';
 import { rng } from '../core/rng';
 import type { Branch } from './routes';
+import type { Section } from './sections';
 
 export interface RaceGenParams {
   seed: number;
@@ -21,6 +22,117 @@ export interface RaceGenParams {
   /** distance between samples, m */
   spacing: number;
   checkpoints: number;
+  /** overall layout; omitted (or 'loop') is the classic wobbly ring */
+  shape?: TrackShape;
+}
+
+/**
+ * Track layouts. `loop` is a wobbly ring; the rest are closed curves the wobble and height
+ * noise are laid over: a figure eight crossing over itself, torus knots (trefoil, a five-lobed
+ * star, a coil that winds round a ring), an upright loop you fly over the top of, a
+ * three-lobed clover that rises and falls, a tangle that climbs and dives steeply all the way
+ * round, and a stunt ring with two loop-the-loops and two corkscrews.
+ */
+export const TRACK_SHAPES = ['loop', 'figure8', 'trefoil', 'star', 'coil', 'upright', 'clover', 'tangle', 'stunt'] as const;
+export type TrackShape = (typeof TRACK_SHAPES)[number];
+
+/** Fewest control points that still trace each shape. */
+const MIN_POINTS: Record<TrackShape, number> = { loop: 4, figure8: 12, trefoil: 24, star: 30, coil: 40, upright: 10, clover: 18, tangle: 30, stunt: 180 };
+
+/**
+ * Point on a shape's base curve at `t` in [0, 2π), radius `R`; `sep` is the height that keeps
+ * crossings apart (figure eight).
+ */
+export function shapePoint(shape: TrackShape, t: number, R: number, sep: number, out = new Vector3()): Vector3 {
+  const knot = (p: number, q: number, minor: number) => {
+    const r = R * minor;
+    const w = R * (1 - minor) + r * Math.cos(q * t);
+    return out.set(w * Math.cos(p * t), r * Math.sin(q * t), w * Math.sin(p * t));
+  };
+  switch (shape) {
+    case 'figure8':
+      // lemniscate of Gerono, the two lobes passing over and under each other at the middle
+      return out.set(R * Math.cos(t), sep * Math.sin(t), R * 0.75 * Math.sin(2 * t));
+    case 'trefoil':
+      return knot(2, 3, 0.42);
+    case 'star':
+      return knot(2, 5, 0.36);
+    case 'coil':
+      return knot(1, 5, 0.3);
+    case 'upright':
+      // stood on its edge, drifting sideways twice a lap so it isn't a flat wheel
+      return out.set(R * Math.cos(t), R * 0.75 * Math.sin(t), sep * Math.sin(2 * t));
+    case 'clover': {
+      const r = R * (0.62 + 0.38 * Math.cos(3 * t));
+      return out.set(r * Math.cos(t), sep * Math.sin(3 * t + 0.6), r * Math.sin(t));
+    }
+    case 'tangle': {
+      const r = R * (1 + 0.22 * Math.sin(3 * t + 0.4));
+      return out.set(r * Math.cos(t), sep * 1.4 * (0.7 * Math.sin(2 * t + 1) + 0.5 * Math.sin(5 * t)), r * Math.sin(t));
+    }
+    case 'stunt':
+      return stuntPoint(t / (Math.PI * 2), R, sep, out);
+    default:
+      return out.set(R * Math.cos(t), 0, R * Math.sin(t));
+  }
+}
+
+const STUNTS = 4;
+const STUNT_SPAN = 0.1;
+
+/**
+ * A ring with four stunts spaced round it: loop-the-loop, corkscrew, loop-the-loop, corkscrew.
+ * `u` in [0, 1) is reparametrised so each stunt gets a tenth of it (they are short on the ring but
+ * long to fly). The first loop steps the track sideways by `w` so its exit passes beside its entry;
+ * the second steps it back.
+ */
+function stuntPoint(u: number, R: number, sep: number, out: Vector3): Vector3 {
+  const rho = sep * 0.8; // loop radius
+  const w = sep * 0.6; // sideways step, so a loop's exit clears its entry
+  // ring angle each stunt spans: a loop short enough that it really loops, a corkscrew long enough to roll
+  const span = (k: number) => (k % 2 === 0 ? 0.8 * rho : 4 * rho) / R;
+  let total = 0;
+  for (let k = 0; k < STUNTS; k++) total += span(k);
+  const rest = (Math.PI * 2 - total) / (1 - STUNTS * STUNT_SPAN);
+  u = ((u % 1) + 1) % 1;
+  const smooth = (x: number) => x * x * (3 - 2 * x);
+  let theta = 0;
+  let fo = 0;
+  let yo = 0;
+  let so = 0;
+  let prevEnd = 0;
+  for (let k = 0; k <= STUNTS; k++) {
+    const start = k < STUNTS ? (k + 0.5) / STUNTS - STUNT_SPAN / 2 : 1;
+    if (u < start) {
+      theta += (u - prevEnd) * rest;
+      so = k === 1 || k === 2 ? w : 0; // between the first and second loops the track runs stepped out
+      break;
+    }
+    theta += (start - prevEnd) * rest;
+    if (k === STUNTS) break;
+    const v = Math.min(1, (u - start) / STUNT_SPAN);
+    theta += v * span(k);
+    if (u < start + STUNT_SPAN) {
+      const a = Math.PI * 2 * v;
+      if (k % 2 === 0) {
+        // loop-the-loop: up and over, stepping sideways on the first and back on the second
+        fo = rho * Math.sin(a);
+        yo = rho * (1 - Math.cos(a));
+        so = k === 0 ? w * smooth(v) : w * (1 - smooth(v));
+      } else {
+        // corkscrew: one roll round the line, swelling out and back in so it leaves the line smoothly
+        const r = rho * 0.7 * Math.sin(Math.PI * v) ** 2;
+        so = (k === 1 ? w : 0) + r * Math.sin(a);
+        yo = r * (1 - Math.cos(a));
+      }
+      break;
+    }
+    prevEnd = start + STUNT_SPAN;
+  }
+  const c = Math.cos(theta);
+  const sn = Math.sin(theta);
+  // ring point, forward (-sin, 0, cos), outward (cos, 0, sin), up
+  return out.set(R * c - fo * sn + so * c, yo, R * sn + fo * c + so * sn);
 }
 
 export interface Track {
@@ -42,6 +154,8 @@ export interface Track {
   attempts: number;
   /** alternate routes that leave the loop and rejoin it (none unless added by `addRoutes`) */
   branches?: Branch[];
+  /** stretches of the loop with their own cross-section (none unless added by `addSections`) */
+  sections?: Section[];
 }
 
 const WORLD_UP = new Vector3(0, 1, 0);
@@ -131,14 +245,29 @@ export function generateTrack(p: RaceGenParams): Track {
   let wobble = p.wobble;
   let height = p.height;
   let last: Track | undefined;
+  const shape = p.shape ?? 'loop';
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    const n = Math.max(4, Math.round(p.points));
+    const n = Math.max(MIN_POINTS[shape] ?? 4, Math.round(p.points));
     const ctrl: Vector3[] = [];
     const rolls: number[] = [];
     for (let i = 0; i < n; i++) {
-      const a = ((i + (rand() - 0.5) * 0.6) / n) * Math.PI * 2;
-      const r = p.radius * (1 + wobble * (rand() * 2 - 1));
-      ctrl.push(new Vector3(Math.cos(a) * r, height * (rand() * 2 - 1), Math.sin(a) * r));
+      if (shape === 'loop') {
+        const a = ((i + (rand() - 0.5) * 0.6) / n) * Math.PI * 2;
+        const r = p.radius * (1 + wobble * (rand() * 2 - 1));
+        ctrl.push(new Vector3(Math.cos(a) * r, height * (rand() * 2 - 1), Math.sin(a) * r));
+      } else {
+        // the shape's own curve with gentler noise on top (its crossings must stay apart)
+        const a = ((i + (rand() - 0.5) * 0.3) / n) * Math.PI * 2;
+        const sep = Math.max(height, p.tubeRadius * 6);
+        const v = shapePoint(shape, a, p.radius, sep);
+        // stunts are tight next to the ring: noise would kink them (its seed still varies the banking)
+        const calm = shape === 'stunt' ? 0 : 1;
+        const k = wobble * p.radius * 0.12 * calm;
+        v.x += k * (rand() * 2 - 1);
+        v.z += k * (rand() * 2 - 1);
+        v.y += height * 0.3 * calm * (rand() * 2 - 1);
+        ctrl.push(v);
+      }
       rolls.push((rand() * 2 - 1) * p.twistNoise);
     }
     const curve = new CatmullRomCurve3(ctrl, true, 'centripetal');

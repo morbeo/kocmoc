@@ -8,6 +8,8 @@ const isMode = (m: unknown): m is GameMode => GAME_MODES.includes(m as GameMode)
 /** A complete test situation: mode, seed, spawn point, var overrides and presets. */
 export interface Scenario {
   name: string;
+  /** display name for scenarios offered in a menu (the track select lists those with one) */
+  title?: string;
   desc?: string;
   mode?: GameMode;
   seed?: number;
@@ -22,6 +24,8 @@ export const scenarios: Scenario[] = Object.entries(files).map(([file, data]) =>
   ...data,
   name: data.name ?? file.replace(/^\/scenarios\//, '').replace(/\.json$/, ''),
 }));
+/** The race venues (`scenarios/venue-*.json`), in file order. */
+export const venues = (all: readonly Scenario[] = scenarios): Scenario[] => all.filter((s) => s.name.startsWith('venue-') && s.title);
 
 /** Validate untrusted JSON (file drop, import) into a Scenario. */
 export function parseScenario(raw: unknown): Scenario | undefined {
@@ -30,6 +34,7 @@ export function parseScenario(raw: unknown): Scenario | undefined {
   const looksLike = ['mode', 'seed', 'spawn', 'vars', 'presets'].some((k) => k in r);
   if (!looksLike) return undefined;
   const out: Scenario = { name: typeof r.name === 'string' ? r.name : 'dropped' };
+  if (typeof r.title === 'string') out.title = r.title;
   if (typeof r.desc === 'string') out.desc = r.desc;
   if (isMode(r.mode)) out.mode = r.mode;
   if (typeof r.seed === 'number' && Number.isFinite(r.seed)) out.seed = Math.round(r.seed);
