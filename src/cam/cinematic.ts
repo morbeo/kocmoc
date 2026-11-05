@@ -7,9 +7,10 @@ import type { RaceEvent } from '../sim/race';
 import { courseFrame } from '../gen/routes';
 
 /**
- * Cinematic auto-director: cuts (or blends) between broadcast-style shots on a timer.
- * Static shots (trackside, flyby) stand on the track ahead and pan to follow; moving shots
- * (hero, drone, orbit, tail) ride a lagged arm around the ship.
+ * Cinematic auto-director: cuts (or blends) between broadcast-style shots.
+ * Static shots (flyby, trackside) stand still on the path ahead, pan as the ship rushes past,
+ * and cut a beat after it has gone by; they make up most of the edit (`cam.cine.flyby`).
+ * Moving shots (hero, drone, orbit, tail) ride a lagged arm around the ship on a timer.
  */
 export const SHOTS = ['trackside', 'flyby', 'hero', 'drone', 'orbit', 'tail'] as const;
 export type Shot = (typeof SHOTS)[number];
@@ -21,12 +22,21 @@ const blend = vars.num('cam.cine.blend', 0, { min: 0, max: 4, hardMin: 0, unit: 
 const shotList = vars.str('cam.cine.shots', SHOTS.join(','), { tags, desc: `shots the director picks from: ${SHOTS.join(', ')}` });
 const aimLag = vars.num('cam.cine.aim', 5, { min: 0.5, max: 30, hardMin: 0.01, unit: '/s', tags, desc: 'how fast static cameras pan after the ship; lower = lazier operator' });
 const frameSize = vars.num('cam.cine.frame', 14, { min: 2, max: 100, hardMin: 0.1, unit: 'm', tags, desc: 'width kept in frame by the telephoto trackside lens' });
+const flybyShare = vars.num('cam.cine.flyby', 0.75, { min: 0, max: 1, tags, desc: 'share of shots that stand still on the path and let the ship fly past' });
+const leadTime = vars.num('cam.cine.lead', 2.5, { min: 0.5, max: 10, hardMin: 0.1, unit: 's', tags, desc: 'how long until the ship reaches a fly-by camera when the shot starts' });
+const afterTime = vars.num('cam.cine.after', 1, { min: 0, max: 5, hardMin: 0, unit: 's', tags, desc: 'how long a fly-by camera watches the ship leave before cutting' });
 export const cineReplay = vars.bool('cam.cine.replay', true, { tags, desc: 'replays use the cinematic camera' });
 export const letterbox = vars.num('cam.cine.letterbox', 0.1, { min: 0, max: 0.25, hardMin: 0, hardMax: 0.45, tags, desc: 'black bars, as a share of the screen height (0 = off)' });
 
 /** Track the static shots stand on; set each frame by the game (null in free flight). */
 /** `route`: the branch the ship is on (-1 = main loop), so track-side spots go on that tube. */
-export const cineScene: { track: Track | null; near: Nearest | null; route?: number } = { track: null, near: null, route: -1 };
+export interface CineScene {
+  track: Track | null;
+  near: Nearest | null;
+  route?: number;
+}
+/** The main view's scene; another camera (a trackside screen, say) can pass its own to placeCinematic. */
+export const cineScene: CineScene = { track: null, near: null, route: -1 };
 
 export interface CineState {
   shot: Shot;
@@ -38,6 +48,11 @@ export interface CineState {
   /** which side of the track / ship this shot favours, ±1 */
   side: number;
   spot: Vector3;
+  /** path direction and up at a static spot (the ship passes along `dir`) */
+  dir: Vector3;
+  up: Vector3;
+  /** time the ship went past a static spot, s; -1 = not yet */
+  passT: number;
   aim: Vector3;
   arm: Quaternion;
   orbit: number;
@@ -55,6 +70,9 @@ export const newCineState = (seed = 5000): CineState => ({
   rand: rng(seed),
   side: 1,
   spot: new Vector3(),
+  dir: new Vector3(0, 0, -1),
+  up: new Vector3(0, 1, 0),
+  passT: -1,
   aim: new Vector3(),
   arm: new Quaternion(),
   orbit: 0,
@@ -89,6 +107,17 @@ export function nextShot(prev: Shot | null, allowed: readonly Shot[], r: () => n
   return pool[Math.min(pool.length - 1, Math.floor(r() * pool.length))];
 }
 
+export const isStatic = (s: Shot): boolean => s === 'flyby' || s === 'trackside';
+
+/** Pick the next shot: a static pass-by with chance `share` (when both kinds are allowed), never the same twice in a row. */
+export function pickShot(prev: Shot | null, allowed: readonly Shot[], r: () => number, share: number): Shot {
+  const still = allowed.filter(isStatic);
+  const moving = allowed.filter((s) => !isStatic(s));
+  if (!still.length || !moving.length) return nextShot(prev, allowed, r);
+  const pool = r() < share ? still : moving;
+  return nextShot(prev, pool.length > 1 || pool[0] !== prev ? pool : allowed, r);
+}
+
 /** Vertical FOV (degrees) that keeps `frame` metres in view at `dist`, clamped to [lo, hi]. */
 export function telephotoFov(dist: number, frame: number, lo: number, hi: number): number {
   const f = (2 * Math.atan(frame / 2 / Math.max(dist, 1e-3)) * 180) / Math.PI;
@@ -101,11 +130,8 @@ export const ease = (x: number): number => {
   return t * t * (3 - 2 * t);
 };
 
-/** A static shot is over once the ship is `pass` metres beyond it, or far away from it. */
-export function staticShotDone(spot: Vector3, ship: Vector3, fwd: Vector3, pass: number, far: number): boolean {
-  const ahead = _d.subVectors(ship, spot).dot(fwd);
-  return ahead > pass || spot.distanceTo(ship) > far;
-}
+/** Has the ship gone past `spot`, travelling along `dir`? */
+export const shipPassed = (spot: Vector3, ship: Vector3, dir: Vector3): boolean => _d.subVectors(ship, spot).dot(dir) > 0;
 
 /** Point and frame on the track `s` metres along it (wraps around the lap). */
 export function trackFrame(track: Track, s: number, pos: Vector3, right: Vector3, up: Vector3, fwd: Vector3): void {
@@ -136,8 +162,8 @@ const _f = new Vector3();
 const _o = new Vector3();
 const _q = new Quaternion();
 
-/** Begin `shot`: place static cameras ahead of the ship. */
-function enter(st: CineState, shot: Shot, ship: ShipState): void {
+/** Begin `shot`: static cameras stand on the path ahead, where the ship will be in `cam.cine.lead` s. */
+function enter(st: CineState, shot: Shot, ship: ShipState, scene: CineScene): void {
   st.shot = shot;
   st.t = 0;
   st.len = shotMin.value + st.rand() * Math.max(0, shotMax.value - shotMin.value);
@@ -145,15 +171,19 @@ function enter(st: CineState, shot: Shot, ship: ShipState): void {
   st.arm.copy(ship.quat);
   st.orbit = st.rand() * Math.PI * 2;
   st.aim.copy(ship.pos);
-  if (shot !== 'trackside' && shot !== 'flyby') return;
+  st.passT = -1;
+  if (!isStatic(shot)) return;
 
   const speed = ship.vel.length();
   const fly = shot === 'flyby';
-  const ahead = fly ? Math.max(35, speed * 1.2) : Math.max(70, speed * 2.5);
-  const { track, near } = cineScene;
+  // trackside stands further off so its long lens can follow the approach
+  const ahead = Math.max(fly ? 30 : 60, speed * leadTime.value * (fly ? 1 : 1.6));
+  // a static shot that waits too long (ship slow or turned away) gives up
+  st.len = ahead / Math.max(speed, 1) + afterTime.value + shotMin.value;
+  const { track, near } = scene;
   if (track && near) {
     // on a branch, the spot goes down the branch's tube while it lasts
-    const route = cineScene.route ?? -1;
+    const route = scene.route ?? -1;
     const b = route >= 0 ? track.branches?.[route] : undefined;
     let R = track.radius;
     if (b && near.s + ahead <= b.s1) {
@@ -161,33 +191,46 @@ function enter(st: CineState, shot: Shot, ship: ShipState): void {
       _r.crossVectors(_f, _u).normalize();
       R = b.radius;
     } else trackFrame(track, near.s + ahead, _p, _r, _u, _f);
-    // inside the corridor: off to one side and a little high (trackside), or skimming the line (flyby)
-    st.spot.copy(_p).addScaledVector(_r, st.side * R * (fly ? 0.25 : 0.65)).addScaledVector(_u, R * (fly ? -0.15 : 0.3));
+    // inside the walls (under half the radius, so even a narrow shaped section holds it):
+    // flyby beside the racing line so the ship whips past; trackside wider and higher
+    st.spot.copy(_p).addScaledVector(_r, st.side * R * (fly ? 0.42 : 0.45)).addScaledVector(_u, R * (fly ? -0.12 : 0.2));
   } else {
-    _f.set(0, 0, -1).applyQuaternion(ship.quat);
+    // free flight: stand where the ship is heading, off to one side
+    if (speed > 2) _f.copy(ship.vel).divideScalar(speed);
+    else _f.set(0, 0, -1).applyQuaternion(ship.quat);
     _u.set(0, 1, 0).applyQuaternion(ship.quat);
     _r.crossVectors(_f, _u);
-    st.spot.copy(ship.pos).addScaledVector(_f, ahead).addScaledVector(_r, st.side * (fly ? 8 : 30)).addScaledVector(_u, fly ? -2 : 10);
+    if (_r.lengthSq() < 1e-6) _r.set(1, 0, 0).applyQuaternion(ship.quat);
+    _r.normalize();
+    _u.crossVectors(_r, _f);
+    st.spot.copy(ship.pos).addScaledVector(_f, ahead).addScaledVector(_r, st.side * (fly ? 7 : 25)).addScaledVector(_u, fly ? -1.5 : 8);
   }
+  st.dir.copy(_f);
+  st.up.copy(_u);
 }
 
-/** Place `camera` for the current shot, cutting to the next when it is over. */
-export function placeCinematic(camera: PerspectiveCamera, ship: ShipState, dt: number, st: CineState, baseFov: number): void {
+/**
+ * Place `camera` for the current shot, cutting to the next when it is over. Each camera keeps its
+ * own `st`, and `scene` says which track (and where on it) `ship` is, so several can run at once.
+ */
+export function placeCinematic(camera: PerspectiveCamera, ship: ShipState, dt: number, st: CineState, baseFov: number, scene: CineScene = cineScene): void {
   const allowed = parseShots(shotList.value);
   if (!st.started || !allowed.includes(st.shot)) {
-    enter(st, nextShot(null, allowed, st.rand), ship);
+    // open on a fly-by when there is one: it says "cinematic" straight away
+    enter(st, allowed.includes('flyby') && flybyShare.value > 0 ? 'flyby' : pickShot(null, allowed, st.rand, flybyShare.value), ship, scene);
     st.started = true;
   }
   st.t += dt;
-  _f.set(0, 0, -1).applyQuaternion(ship.quat);
-  const isStatic = st.shot === 'trackside' || st.shot === 'flyby';
-  const passed = isStatic && staticShotDone(st.spot, ship.pos, _f, st.shot === 'flyby' ? 40 : 60, 1500);
+  const still = isStatic(st.shot);
+  if (still && st.passT < 0 && shipPassed(st.spot, ship.pos, st.dir)) st.passT = st.t;
+  // a pass-by ends a beat after the ship has gone, or if it wanders off
+  const passed = still && ((st.passT >= 0 && st.t - st.passT >= afterTime.value) || st.spot.distanceTo(ship.pos) > 1500);
   const react = st.want !== null && st.t >= REACT_HOLD;
   if (st.t >= st.len || passed || react) {
     st.from = blend.value > 0 && !passed ? { pos: camera.position.clone(), quat: camera.quaternion.clone(), fov: camera.fov } : null;
-    const next = react && allowed.includes(st.want!) ? st.want! : nextShot(st.shot, allowed, st.rand);
+    const next = react && allowed.includes(st.want!) ? st.want! : pickShot(st.shot, allowed, st.rand, flybyShare.value);
     st.want = null;
-    enter(st, next, ship);
+    enter(st, next, ship, scene);
   }
 
   let fovWant = baseFov;
@@ -198,8 +241,7 @@ export function placeCinematic(camera: PerspectiveCamera, ship: ShipState, dt: n
       // an operator on a tripod: pans after the ship with a little lag
       st.aim.lerp(ship.pos, k(aimLag.value * (st.shot === 'flyby' ? 3 : 1)));
       camera.position.copy(st.spot);
-      const { track, near } = cineScene;
-      camera.up.copy(track && near ? track.up[near.index] : _u.set(0, 1, 0));
+      camera.up.copy(st.up);
       camera.lookAt(st.aim);
       fovWant = st.shot === 'trackside' ? telephotoFov(st.spot.distanceTo(ship.pos), frameSize.value, 8, baseFov) : baseFov + 10;
       break;

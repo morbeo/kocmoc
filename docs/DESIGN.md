@@ -163,10 +163,14 @@ Fixed-timestep simulation with interpolated rendering.
   (spring arm), far chase, look-back, track-side cinematic, top-down tactical,
   free debug, orbit.
 - **Cinematic director** (`cinematic` rig, `X` toggles, `cam.cine.*` vars):
-  cuts between track-side (telephoto, panning operator), low fly-by, hero
-  (ahead, looking back), drone, orbit and low tail shots every 4–8 s, never the
-  same twice. Static shots stand inside the corridor ahead on the spline and
-  cut early once the ship is past. Near misses, hits and laps request a
+  opens on and mostly shows pass-bys (`cam.cine.flyby`, 75%): a fly-by or
+  track-side (telephoto) camera stands still on the path where the ship will be
+  in `cam.cine.lead` s, pans as it rushes past and cuts `cam.cine.after` s
+  later. Spots sit within half the tube radius (safe in narrow shaped
+  sections) and follow the branch the ship is on; in free flight they go along
+  the velocity. Moving shots (hero, drone, orbit, low tail) fill in for 4–8 s,
+  never the same shot twice. `placeCinematic` takes its own state and scene,
+  so extra cameras (trackside screens) can run their own director. Near misses, hits and laps request a
   reaction shot after a 1.5 s minimum hold. Hard cuts by default
   (`cam.cine.blend` glides), letterbox bars, and replays play through it
   (`cam.cine.replay`).

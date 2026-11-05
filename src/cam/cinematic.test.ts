@@ -5,7 +5,7 @@ import { rng } from '../core/rng';
 import { vars } from '../core/vars';
 import { newShip } from '../sim/ship';
 import { spawnOnTrack } from '../sim/race';
-import { REACT_HOLD, SHOTS, cineEvent, cineScene, ease, newCineState, nextShot, parseShots, placeCinematic, staticShotDone, telephotoFov, trackFrame, type Shot } from './cinematic';
+import { REACT_HOLD, SHOTS, cineEvent, cineScene, ease, isStatic, newCineState, nextShot, parseShots, pickShot, placeCinematic, shipPassed, telephotoFov, trackFrame, type Shot } from './cinematic';
 import { newRigState, placeRig } from './rigs';
 
 const gen: RaceGenParams = {
@@ -43,6 +43,22 @@ describe('shot picking', () => {
     expect(seen.size).toBe(SHOTS.length);
   });
 
+  it('favours pass-by shots by the flyby share, still never repeating', () => {
+    const r = rng(4);
+    let prev: Shot | null = null;
+    let still = 0;
+    for (let i = 0; i < 1000; i++) {
+      const s = pickShot(prev, SHOTS, r, 0.75);
+      expect(s).not.toBe(prev);
+      if (isStatic(s)) still++;
+      prev = s;
+    }
+    expect(still / 1000).toBeGreaterThan(0.65);
+    expect(still / 1000).toBeLessThan(0.85);
+    expect(isStatic(pickShot(null, SHOTS, rng(1), 0))).toBe(false);
+    expect(pickShot('flyby', ['flyby', 'hero'], rng(1), 1)).toBe('hero');
+  });
+
   it('keeps the only allowed shot', () => {
     expect(nextShot('hero', ['hero'], rng(2))).toBe('hero');
   });
@@ -65,12 +81,11 @@ describe('lens and timing helpers', () => {
     expect(ease(2)).toBe(1);
   });
 
-  it('ends a static shot once the ship is past or far away', () => {
-    const fwd = new Vector3(0, 0, -1);
-    const spot = new Vector3(0, 0, -100);
-    expect(staticShotDone(spot, new Vector3(0, 0, -50), fwd, 40, 1000)).toBe(false);
-    expect(staticShotDone(spot, new Vector3(0, 0, -150), fwd, 40, 1000)).toBe(true);
-    expect(staticShotDone(spot, new Vector3(2000, 0, -50), fwd, 40, 1000)).toBe(true);
+  it('tells when the ship has gone past a spot', () => {
+    const dir = new Vector3(0, 0, -1);
+    const spot = new Vector3(5, 0, -100);
+    expect(shipPassed(spot, new Vector3(0, 0, -50), dir)).toBe(false);
+    expect(shipPassed(spot, new Vector3(0, 0, -101), dir)).toBe(true);
   });
 
   it('samples the track frame anywhere on the lap, wrapping around', () => {
@@ -97,6 +112,10 @@ describe('director', () => {
     const shots: Shot[] = [];
     let maxStep = 0;
     let maxDist = 0;
+    /** per fly-by: closest the ship came, and how far the camera drifted */
+    const flybys: { closest: number; drift: number; wall: number; passed: boolean }[] = [];
+    let start = new Vector3();
+    let prevT = 0;
     for (let t = 0; t < seconds; t += dt) {
       // fly the centreline at constant speed
       near = nearestOnTrack(track, ship.pos, near.index);
@@ -107,13 +126,25 @@ describe('director', () => {
       cineScene.near = near;
       const before = cam.position.clone();
       placeCinematic(cam, ship, dt, st, 70);
+      if (st.shot === 'flyby') {
+        if (shots.at(-1) !== 'flyby' || st.t < prevT) {
+          start = cam.position.clone();
+          flybys.push({ closest: Infinity, drift: 0, wall: 0, passed: false });
+        }
+        const f = flybys.at(-1)!;
+        f.closest = Math.min(f.closest, cam.position.distanceTo(ship.pos));
+        f.drift = Math.max(f.drift, cam.position.distanceTo(start));
+        f.wall = Math.max(f.wall, nearestOnTrack(track, cam.position).dist / track.radius);
+        f.passed ||= st.passT >= 0;
+      }
+      prevT = st.t;
       if (shots.at(-1) !== st.shot) shots.push(st.shot);
       else maxStep = Math.max(maxStep, before.distanceTo(cam.position));
       maxDist = Math.max(maxDist, cam.position.distanceTo(ship.pos));
       expect(Number.isFinite(cam.position.x) && Number.isFinite(cam.fov)).toBe(true);
     }
     cineScene.track = cineScene.near = null;
-    return { shots, maxStep, maxDist, cam };
+    return { shots, maxStep, maxDist, cam, flybys };
   };
 
   it('cuts between different shots on a timer', () => {
@@ -128,6 +159,46 @@ describe('director', () => {
     // at 80 m/s the ship moves 1.3 m a frame; a camera should never jump far more than that
     expect(maxStep).toBeLessThan(15);
     expect(maxDist).toBeLessThan(800);
+  });
+
+  it('opens on a fly-by: the camera stands still inside the tube and the ship passes close', () => {
+    const { shots, flybys } = fly();
+    expect(shots[0]).toBe('flyby');
+    expect(flybys.length).toBeGreaterThanOrEqual(3);
+    // every fly-by but a possibly unfinished last one saw the ship go past
+    for (const f of flybys.slice(0, -1)) {
+      expect(f.passed).toBe(true);
+      expect(f.drift).toBeLessThan(1e-6);
+      expect(f.closest).toBeLessThan(track.radius);
+      expect(f.wall).toBeLessThan(0.6);
+    }
+  });
+
+  it('spends most of the time on pass-by shots', () => {
+    const { shots } = fly(newCineState(), 120);
+    expect(shots.filter(isStatic).length / shots.length).toBeGreaterThan(0.55);
+  });
+
+  it('flies past in free flight too', () => {
+    const st = newCineState();
+    const ship = newShip();
+    ship.vel.set(0, 0, -60);
+    const cam = new PerspectiveCamera(70, 1, 0.1, 5000);
+    const dt = 1 / 60;
+    let closest = Infinity;
+    placeCinematic(cam, ship, dt, st, 70);
+    const spot = cam.position.clone();
+    expect(st.shot).toBe('flyby');
+    while (st.shot === 'flyby' && st.t < 10) {
+      ship.pos.addScaledVector(ship.vel, dt);
+      placeCinematic(cam, ship, dt, st, 70);
+      if (st.shot === 'flyby') {
+        expect(cam.position.distanceTo(spot)).toBeLessThan(1e-6);
+        closest = Math.min(closest, cam.position.distanceTo(ship.pos));
+      }
+    }
+    expect(closest).toBeLessThan(10);
+    expect(st.shot).not.toBe('flyby');
   });
 
   it('is deterministic for a seed', () => {
@@ -148,13 +219,20 @@ describe('director', () => {
     const cut = newCineState();
     fly(cut, 30);
     expect(cut.from).toBeNull();
+    // pass-bys always hard-cut, so glide between moving shots
     set('cam.cine.blend', 4);
+    set('cam.cine.shots', 'hero,drone,orbit,tail');
     try {
       const glide = newCineState();
-      fly(glide, 30);
-      expect(glide.from).not.toBeNull();
+      let glided = false;
+      for (let i = 0; i < 30 && !glided; i++) {
+        fly(glide, 1);
+        glided = glide.from !== null;
+      }
+      expect(glided).toBe(true);
     } finally {
       set('cam.cine.blend', 0);
+      set('cam.cine.shots', SHOTS.join(','));
     }
   });
 
