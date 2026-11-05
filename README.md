@@ -38,8 +38,13 @@ npm run build        # static build → dist/
 Touchpad (`input.pointer.mode`): **stick** (default) — click the scene to capture the pointer, then move
 your finger to steer; it re-centres on its own, `Esc` releases. Held click = boost. **scroll** —
 two-finger scroll steers. Pinch sets a cruise throttle (or camera zoom, `input.pinch.action`).
-Keys can be rebound in the controls panel (`K` or the **Controls** button), which also has invert-pitch
-toggles for the touchpad/mouse Y axis and for the pitch keys. Every binding, curve (deadzone / expo / sensitivity) and flight parameter is a var in the debug table.
+Gamepad (standard mapping, `input.pad.*`): left stick pitch / yaw, right stick strafe / lift, `RT` / `LT`
+thrust / reverse, `LB` / `RB` roll, `A` or `L3` boost, `B` assist, `X` camera, `Y` respawn, `Back` levels,
+`Start` tracks, D-pad cinematic / replay / autopilot / next level. In menus the D-pad or left stick moves
+between buttons, `A` picks and `B` closes.
+
+Keys and gamepad can be rebound in the controls panel (`K` or the **Controls** button), which also has invert-pitch
+toggles for the touchpad/mouse Y axis, the pitch keys and the gamepad, and the gamepad stick deadzone. Every binding, curve (deadzone / expo / sensitivity) and flight parameter is a var in the debug table.
 
 ## Race
 

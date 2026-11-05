@@ -126,7 +126,7 @@ Screen shake (trauma), FOV kick, speed lines, hit-stop, near-miss slow-mo, camer
 lag/overshoot, exaggerated banking, engine trails, wall-scrape sparks, checkpoint
 flash + HUD pop, chromatic aberration / vignette, audio pitch & doppler.
 
-## 6. Input — keyboard + touchpad
+## 6. Input — keyboard, touchpad, gamepad
 
 Devices → actions/axes → response curves (deadzone, exponent, sensitivity). All
 bindings and curve params are vars; rebinding panel (`K`, `src/ui/controls.tsx`)
@@ -149,6 +149,15 @@ pointer Y (`input.invert.pointerY`) and the pitch keys (`input.invert.keyPitch`)
   a bar with tuning table, camera, assist, respawn, tilt and fullscreen.
   *Tilt* (`input.tilt.*`) steers from gravity in screen space, calibrated to how the
   device is held when switched on. `render.pixelRatio` defaults lower on touch devices.
+- **Gamepad** (`src/input/pad.ts`, Gamepad API, polled once per frame, all pads merged):
+  every `input.key.<action>` has an `input.pad.<action>` twin holding comma-separated
+  sources, `b<n>` (button, analog triggers 0..1) or `-a<n>`/`+a<n>` (one half of an
+  axis), so axes are positive minus negative action just like keys and rebinding is
+  "press the button or push the stick" in the panel's Pad column. Sticks get a radial
+  deadzone (`input.pad.deadzone`) before the per-axis curves; `input.invert.padPitch`.
+  While a dialog is open (`src/ui/padNav.ts`) the D-pad / left stick move focus to the
+  nearest button in that direction, `A` clicks, `B` sends Escape, and the flight axes
+  read zero.
 
 ## 7. Flight model
 
