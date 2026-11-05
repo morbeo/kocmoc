@@ -21,6 +21,7 @@ import { createShipModel } from './render/shipModel';
 import { createField } from './world/field';
 import { createScenery } from './world/scenery';
 import { createScreens } from './world/screens';
+import { createPadScene, moverParams, movers, padEffect, padLanes, padParams, pads } from './world/pads';
 import { createHud } from './ui/hud';
 import { createHudLayout, editKey as hudEditKey, editMode as hudEdit } from './ui/hudLayout';
 import { createSky } from './render/sky';
@@ -166,6 +167,7 @@ const raceScene = createRaceScene(scene);
 const sceneryScene = createScenery(scene);
 const screensScene = createScreens(scene);
 const gauntletScene = createGauntletScene(scene);
+const padScene = createPadScene(scene);
 const provingScene = createProvingScene(scene);
 const juice = createJuice(scene, () => vars.get('ship.glow')?.value as string ?? '#7fe7ff');
 const hud = createHud();
@@ -201,7 +203,7 @@ const bestKey = () =>
     ? `kocmoc.best.gauntlet.${JSON.stringify([genParams.value, gauntletParams.value])}`
     : gameMode.value === 'proving'
       ? `kocmoc.best.proving.${JSON.stringify([genParams.value, provingParams.value])}`
-      : `kocmoc.best.${JSON.stringify(genParams.value)}${routesOn() ? `|routes${JSON.stringify(routeParams.value)}` : ''}${sectionParams.value.count > 0 ? `|sections${JSON.stringify(sectionParams.value)}` : ''}${hazardParams.value.count > 0 ? `|hazards${JSON.stringify(hazardParams.value)}` : ''}`;
+      : `kocmoc.best.${JSON.stringify(genParams.value)}${routesOn() ? `|routes${JSON.stringify(routeParams.value)}` : ''}${sectionParams.value.count > 0 ? `|sections${JSON.stringify(sectionParams.value)}` : ''}${hazardParams.value.count > 0 ? `|hazards${JSON.stringify(hazardParams.value)}` : ''}${pads.value.length ? `|pads${JSON.stringify([padParams.value, padEffect()])}` : ''}${movers.value.length ? `|movers${JSON.stringify(moverParams.value)}` : ''}`;
 const ghostKey = () => bestKey().replace('kocmoc.best.', 'kocmoc.ghost.');
 let savedBest: number | null = null;
 let ghost: Ghost | null = null;
@@ -309,17 +311,21 @@ function respawn(t = spawnT.value, speed = spawnSpeed.value, at?: Spawn): void {
 const simConfig = (): SimConfig => {
   const g = gauntlet.value;
   const pc = provingCourse.value;
+  const pl = pads.value;
+  const mv = movers.value;
   return {
     ship: params(),
     walls: walls(),
     track: onTrack() ? track.value : null,
     course:
-      g || pc || track.value.branches?.length
+      g || pc || track.value.branches?.length || pl.length || mv.length
         ? {
             gauntlet: g ?? undefined,
             proving: pc ? { course: pc, rules: provingRules() } : undefined,
             nearMiss: nearMissDistance.value,
             pit: { refill: pitRefill.value, speed: pitSpeed.value },
+            pads: pl.length ? { list: pl, fx: padEffect(), lanes: padLanes.value } : undefined,
+            movers: mv.length ? mv : undefined,
           }
         : undefined,
   };
@@ -443,6 +449,8 @@ effect(() => {
   void track.value;
   void gameMode.value;
   void gauntlet.value;
+  void pads.value;
+  void movers.value;
   void provingCourse.value;
   void raceLaps.value;
   if (!replay) respawn();
@@ -765,6 +773,7 @@ renderer.setAnimationLoop((now) => {
     }
   }
   gauntletScene.update(race ? race.time - (1 - alpha) * loop.step : 0);
+  padScene.update(race ? race.time - (1 - alpha) * loop.step : 0);
   provingScene.update(race ? race.time : 0, race?.proving ?? null);
   gizmoUi?.update();
 
@@ -836,7 +845,7 @@ renderer.setAnimationLoop((now) => {
     target: race?.proving && provingCourse.value && !race.proving.result ? nextGatePoint(provingCourse.value, race.proving, _gate) : null,
     branchColors: onTrack() ? branchColors() : [],
   });
-  screensScene.update(renderer, view, dt, sky, camera);
+  screensScene.update(renderer, view, dt, sky, camera, raceHud || null);
   sky.update(camera, renderer.getPixelRatio());
   renderer.info.reset();
   pipeline.render(scene, camera, layout.value === 'single' ? undefined : rect);

@@ -62,7 +62,7 @@ export function createTracks(host: TracksHost) {
     root.innerHTML = `
       <div class="tk-panel" role="dialog" aria-label="Race tracks">
         <header><h2>Race tracks</h2><button class="tk-close" title="close (Esc)">×</button></header>
-        <p class="tk-help">Twelve worlds to race, two of them underground. Each has its own shortcuts, tunnels and hazards, and your ghosts are kept per track.</p>
+        <p class="tk-help">Fifteen worlds to race, five of them underground. Each has its own shortcuts, tunnels and hazards, and your ghosts are kept per track.</p>
         <div class="tk-list">${items}</div>
       </div>`;
   }

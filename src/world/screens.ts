@@ -7,6 +7,8 @@ import { newCineState, placeCinematic } from '../cam/cinematic';
 import { SKY_LAYER } from '../render/sky';
 import type { ShipState } from '../sim/ship';
 import { gameMode, onTrack, seedVar, track } from './race';
+import { broadcast, drawBroadcast } from '../ui/broadcast';
+import type { RaceHud } from '../ui/hud';
 
 const g = ['world', 'screens'];
 const sv = {
@@ -17,6 +19,8 @@ const res = vars.int('world.screens.res', 320, { min: 64, max: 1024, hardMin: 16
 const fps = vars.num('world.screens.fps', 15, { min: 1, max: 60, hardMin: 0.5, unit: 'Hz', tags: [...g, 'perf'], desc: 'how often the picture updates' });
 const bright = vars.num('world.screens.brightness', 1.15, { min: 0, max: 3, hardMin: 0, tags: g, desc: 'above the bloom threshold the screens glow' });
 const frameColor = vars.color('world.screens.frame', '#1d1b26', { tags: [...g, 'render'] });
+const overlayOn = vars.bool('world.screens.overlay', true, { tags: g, desc: 'place, lap, gap and clock along the bottom of the picture' });
+const accent = vars.color('world.screens.accent', '#e2304a', { tags: [...g, 'render'], desc: 'colour behind the place on the overlay' });
 
 /** Screens only in race mode, where there is a race to show. */
 export const screens = computed<Screen[]>(() =>
@@ -40,35 +44,51 @@ export function createScreens(scene: THREE.Scene) {
   const cine = newCineState(7331);
   const disposables: { dispose(): void }[] = [];
   let since = Infinity;
+  // the broadcast lower third: drawn on a canvas, laid just in front of every picture
+  const canvas = document.createElement('canvas');
+  canvas.width = 640;
+  canvas.height = 360;
+  const ctx = canvas.getContext('2d');
+  const overlayTex = new THREE.CanvasTexture(canvas);
+  overlayTex.colorSpace = THREE.SRGBColorSpace;
+  const overlayMat = new THREE.MeshBasicMaterial({ map: overlayTex, transparent: true, toneMapped: false, depthWrite: false });
+  let overlay: THREE.InstancedMesh | null = null;
+  let shown = '';
 
   effect(() => {
     const list = screens.value;
     for (const d of disposables.splice(0)) d.dispose();
     group.clear();
+    overlay = null;
     if (!list.length) return;
     const pic = new THREE.PlaneGeometry(1, 1);
     const box = new THREE.BoxGeometry(1, 1, 1);
     const pics = new THREE.InstancedMesh(pic, picMat, list.length);
     const frames = new THREE.InstancedMesh(box, frameMat, list.length);
+    overlay = new THREE.InstancedMesh(pic, overlayMat, list.length);
+    overlay.renderOrder = 3;
     const m = new THREE.Matrix4();
     const back = new THREE.Vector3();
+    const front = new THREE.Vector3();
     list.forEach((sc, i) => {
       pics.setMatrixAt(i, m.compose(sc.pos, sc.quat, new THREE.Vector3(sc.width, sc.height, 1)));
+      front.set(0, 0, sc.height * 0.01).applyQuaternion(sc.quat).add(sc.pos);
+      overlay!.setMatrixAt(i, m.compose(front, sc.quat, new THREE.Vector3(sc.width, sc.height, 1)));
       // a slab behind the picture with a border round it
       back.set(0, 0, -sc.height * 0.04).applyQuaternion(sc.quat).add(sc.pos);
       frames.setMatrixAt(i, m.compose(back, sc.quat, new THREE.Vector3(sc.width * 1.06, sc.height * 1.1, sc.height * 0.06)));
     });
-    group.add(pics, frames);
-    disposables.push(pic, box, pics, frames);
+    group.add(pics, frames, overlay);
+    disposables.push(pic, box, pics, frames, overlay);
   });
 
   return {
     group,
     /**
      * Film the ship for the screens (call before the main render). `sky.update` re-centres the sky
-     * on whichever camera renders next.
+     * on whichever camera renders next. `race` feeds the overlay.
      */
-    update(renderer: THREE.WebGLRenderer, ship: ShipState, dt: number, sky: { update(c: THREE.Camera, pr: number): void }, main: THREE.Camera) {
+    update(renderer: THREE.WebGLRenderer, ship: ShipState, dt: number, sky: { update(c: THREE.Camera, pr: number): void }, main: THREE.Camera, race: RaceHud | null = null) {
       const on = onTrack() && screens.value.length > 0;
       group.visible = on;
       frameMat.color.set(frameColor.value);
@@ -79,6 +99,15 @@ export function createScreens(scene: THREE.Scene) {
       placeCinematic(cam, ship, dt, cine, 50);
       if (since < 1 / fps.value) return;
       since = 0;
+      // the lower third, redrawn only when its text changes (and kept out of the picture it films)
+      const b = overlayOn.value ? broadcast(race) : null;
+      const key = b ? `${b.tag}|${b.lap}|${b.gap}|${b.time}|${accent.value}` : '';
+      if (key !== shown && ctx) {
+        shown = key;
+        drawBroadcast(ctx, b, accent.value);
+        overlayTex.needsUpdate = true;
+      }
+      if (overlay) overlay.visible = false;
       const w = Math.max(16, Math.round(res.value));
       const h = Math.round((w * 9) / 16);
       if (!rt || rt.width !== w) {
@@ -94,6 +123,7 @@ export function createScreens(scene: THREE.Scene) {
       renderer.setRenderTarget(rt);
       renderer.render(group.parent as THREE.Scene, cam);
       renderer.setRenderTarget(prev);
+      if (overlay) overlay.visible = !!b;
       sky.update(main, renderer.getPixelRatio());
     },
   };

@@ -14,9 +14,10 @@ const targetCache = new WeakMap<object, BotCourse>();
  * Gauntlet obstacles and proving gates as one list of gaps. A gate is a still hole the size of its
  * opening; reverse gates are left out (the autopilot doesn't turn round for them).
  */
-export function botTargets(course: { gauntlet?: Gauntlet; proving?: { course: ProvingCourse } } | undefined): BotCourse | null {
+export function botTargets(course: { gauntlet?: Gauntlet; proving?: { course: ProvingCourse }; pads?: { lanes: Gauntlet['lanes'] } } | undefined): BotCourse | null {
   if (!course) return null;
-  const g = course.gauntlet;
+  const pl = course.pads?.lanes;
+  const g = pl?.length ? withLanes(course.gauntlet, pl) : course.gauntlet;
   const pc = course.proving?.course;
   if (!pc) return g ?? null;
   const key = pc as object;
@@ -27,6 +28,20 @@ export function botTargets(course: { gauntlet?: Gauntlet; proving?: { course: Pr
       .map((x) => ({ kind: 'ring', s: x.s, thickness: 0.2, shape: { k: 'hole', r: Math.hypot(x.x, x.y), a0: Math.atan2(x.y, x.x), omega: 0, gap: x.r } }));
     out = { planes: [...(g?.planes ?? []), ...gates].sort((a, b) => a.s - b.s), lanes: g?.lanes ?? [] };
     targetCache.set(key, out);
+  }
+  return out;
+}
+
+const laneCache = new WeakMap<object, WeakMap<object, BotCourse>>();
+/** The gauntlet's gaps plus the pads' lanes (cached per pair, so the result is stable). */
+function withLanes(g: Gauntlet | undefined, lanes: Gauntlet['lanes']): BotCourse {
+  const key = (g ?? laneCache) as object;
+  let inner = laneCache.get(key);
+  if (!inner) laneCache.set(key, (inner = new WeakMap()));
+  let out = inner.get(lanes);
+  if (!out) {
+    out = { planes: g?.planes ?? [], lanes: [...(g?.lanes ?? []), ...lanes].sort((a, b) => a.s0 - b.s0) };
+    inner.set(lanes, out);
   }
   return out;
 }
@@ -159,7 +174,7 @@ export function botControls(
       if (lane) {
         tx = lane.x;
         ty = lane.y;
-        wantSpeed = Math.min(wantSpeed, p.obstacleSpeed);
+        if (!lane.fast) wantSpeed = Math.min(wantSpeed, p.obstacleSpeed);
       }
     }
   }
@@ -214,6 +229,8 @@ export function botControls(
   // moving backwards counts as negative speed
   const along = speed > 1e-6 ? -_vel.copy(ship.vel).applyQuaternion(_inv).z : 0;
   out.thrust = backOff ? clamp1((-8 - along) * 0.3) : clamp1((wantSpeed - along) * 0.2);
+  // off a boost strip: coast on the extra speed instead of braking it away (unless a bend needs it)
+  if (out.thrust < 0 && !backOff && bend < 0.15 && gauntlet?.lanes.some((l) => l.fast && arcDelta(near.s, l.s0, L) > 0 && arcDelta(near.s, l.s1, L) < 300)) out.thrust = 0;
   out.boost = false;
   return out;
 }
