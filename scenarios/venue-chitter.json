@@ -1,0 +1,53 @@
+{
+  "name": "venue-chitter",
+  "title": "The Chitter Hive",
+  "desc": "Through the comb of something enormous and still awake: hexagonal cells, star-shaped vents, sticky resin pools and chambers full of drifting brood plates.",
+  "mode": "race",
+  "seed": 323,
+  "spawn": {
+    "trackT": 0,
+    "speed": 0
+  },
+  "vars": {
+    "gen.race.shape": "clover",
+    "gen.race.radius": 900,
+    "gen.race.height": 220,
+    "gen.race.tubeRadius": 38,
+    "gen.race.profile": "tube",
+    "gen.race.twistNoise": 1,
+    "gen.race.sections": 8,
+    "gen.race.sectionKinds": "hex,cavern,triangle,star",
+    "gen.race.sectionMin": 200,
+    "gen.race.sectionMax": 600,
+    "gen.race.hazards": 5,
+    "gen.race.hazardKinds": "iris,laser,turbine",
+    "gen.race.hazardDifficulty": 0.55,
+    "gen.race.boostPads": 3,
+    "gen.race.slowFields": 2,
+    "render.background": "#0a0f02",
+    "render.sky.zenith": "#000000",
+    "render.stars.enabled": false,
+    "render.track.color": "#2e3a0c",
+    "render.track.stripe": "#d4ff3a",
+    "render.track.stripeEvery": 22,
+    "render.light.color": "#e8ff9a",
+    "render.light.dir": [
+      0.3,
+      1,
+      -0.2
+    ],
+    "render.ambient": 0.4,
+    "render.outline.color": "#030500",
+    "render.rim.color": "#ffb020",
+    "render.rim.strength": 0.8,
+    "render.gauntlet.color": "#ffb020",
+    "render.gauntlet.trim": "#3a2a04",
+    "render.pad.boost": "#d4ff3a",
+    "render.pad.slow": "#c88a10",
+    "render.pad.slowOpacity": 0.55,
+    "render.mover.slab": "#8a6a1a",
+    "render.mover.rock": "#5a7a1a",
+    "race.checkpoint.color": "#d4ff3a"
+  },
+  "presets": []
+}

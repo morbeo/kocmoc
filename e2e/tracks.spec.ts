@@ -11,7 +11,7 @@ test('race tracks: T opens the venues, picking one loads its world', async ({ pa
   await expect(page.locator('#tracks-btn')).toHaveText('Tracks (T)');
   await page.keyboard.press('KeyT');
   const venues = page.locator('#tracks [data-venue]');
-  await expect(venues).toHaveCount(12);
+  await expect(venues).toHaveCount(15);
   await page.screenshot({ path: 'test-results/90-tracks.png' });
 
   await page.locator('[data-venue="venue-obsidian"]').click();
