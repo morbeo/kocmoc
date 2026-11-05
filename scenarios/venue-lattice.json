@@ -36,7 +36,10 @@
     "gen.race.sections": 4,
     "gen.race.sectionKinds": "square,rect,open",
     "gen.race.sectionMin": 300,
-    "gen.race.sectionMax": 700
+    "gen.race.sectionMax": 700,
+    "gen.race.hazards": 4,
+    "gen.race.hazardKinds": "shutter,crusher",
+    "world.screens.count": 4
   },
   "presets": []
 }

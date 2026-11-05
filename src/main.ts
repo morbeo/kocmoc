@@ -20,6 +20,7 @@ import { createLetterbox } from './ui/letterbox';
 import { createShipModel } from './render/shipModel';
 import { createField } from './world/field';
 import { createScenery } from './world/scenery';
+import { createScreens } from './world/screens';
 import { createHud } from './ui/hud';
 import { createHudLayout, editKey as hudEditKey, editMode as hudEdit } from './ui/hudLayout';
 import { createSky } from './render/sky';
@@ -33,7 +34,7 @@ import { levelScenario, parseLadder, recordRun, type Ladder, type RunOutcome } f
 import { createLevels } from './ui/levels';
 import { createTracks } from './ui/tracks';
 import { presets, applyPreset, activePreset } from './core/presets';
-import { createGauntletScene, gauntlet, gauntletParams, nearMissDistance, shipRadius } from './world/gauntlet';
+import { createGauntletScene, gauntlet, gauntletParams, hazardParams, nearMissDistance, shipRadius } from './world/gauntlet';
 import { createJuice } from './juice';
 import { raceDistance, splitDelta, type RaceState, type WallParams } from './sim/race';
 import { scenarios, applyScenario, parseScenario, scenarioLayer, setSpawnHandler, setSpawnSource, venues } from './core/scenarios';
@@ -163,6 +164,7 @@ function cloneGhost() {
 const field = createField(scene);
 const raceScene = createRaceScene(scene);
 const sceneryScene = createScenery(scene);
+const screensScene = createScreens(scene);
 const gauntletScene = createGauntletScene(scene);
 const provingScene = createProvingScene(scene);
 const juice = createJuice(scene, () => vars.get('ship.glow')?.value as string ?? '#7fe7ff');
@@ -199,7 +201,7 @@ const bestKey = () =>
     ? `kocmoc.best.gauntlet.${JSON.stringify([genParams.value, gauntletParams.value])}`
     : gameMode.value === 'proving'
       ? `kocmoc.best.proving.${JSON.stringify([genParams.value, provingParams.value])}`
-      : `kocmoc.best.${JSON.stringify(genParams.value)}${routesOn() ? `|routes${JSON.stringify(routeParams.value)}` : ''}${sectionParams.value.count > 0 ? `|sections${JSON.stringify(sectionParams.value)}` : ''}`;
+      : `kocmoc.best.${JSON.stringify(genParams.value)}${routesOn() ? `|routes${JSON.stringify(routeParams.value)}` : ''}${sectionParams.value.count > 0 ? `|sections${JSON.stringify(sectionParams.value)}` : ''}${hazardParams.value.count > 0 ? `|hazards${JSON.stringify(hazardParams.value)}` : ''}`;
 const ghostKey = () => bestKey().replace('kocmoc.best.', 'kocmoc.ghost.');
 let savedBest: number | null = null;
 let ghost: Ghost | null = null;
@@ -834,6 +836,7 @@ renderer.setAnimationLoop((now) => {
     target: race?.proving && provingCourse.value && !race.proving.result ? nextGatePoint(provingCourse.value, race.proving, _gate) : null,
     branchColors: onTrack() ? branchColors() : [],
   });
+  screensScene.update(renderer, view, dt, sky, camera);
   sky.update(camera, renderer.getPixelRatio());
   renderer.info.reset();
   pipeline.render(scene, camera, layout.value === 'single' ? undefined : rect);

@@ -1,0 +1,46 @@
+{
+  "name": "venue-ixal",
+  "title": "Veins of Ixal",
+  "desc": "Inside a living crystal: a stunt run of loops and corkscrews through hexagon bores, diamond seams and glowing geodes.",
+  "mode": "race",
+  "seed": 312,
+  "spawn": {
+    "trackT": 0,
+    "speed": 0
+  },
+  "vars": {
+    "gen.race.shape": "stunt",
+    "gen.race.radius": 900,
+    "gen.race.height": 220,
+    "gen.race.tubeRadius": 38,
+    "gen.race.profile": "tube",
+    "gen.race.sections": 8,
+    "gen.race.sectionKinds": "hex,cavern,diamond,star,irregular",
+    "gen.race.sectionMin": 200,
+    "gen.race.sectionMax": 600,
+    "gen.race.hazards": 4,
+    "gen.race.hazardKinds": "iris,laser",
+    "gen.race.hazardDifficulty": 0.55,
+    "render.background": "#0b0418",
+    "render.sky.zenith": "#000000",
+    "render.stars.enabled": false,
+    "render.track.color": "#2a1050",
+    "render.track.stripe": "#5ee6ff",
+    "render.track.stripeEvery": 30,
+    "render.light.color": "#d8b8ff",
+    "render.light.dir": [
+      -0.4,
+      1,
+      0.2
+    ],
+    "render.ambient": 0.45,
+    "render.outline.color": "#05010a",
+    "render.rim.color": "#5ee6ff",
+    "render.rim.strength": 0.9,
+    "render.gauntlet.color": "#c77dff",
+    "render.gauntlet.trim": "#5ee6ff",
+    "race.checkpoint.color": "#5ee6ff",
+    "race.laps": 2
+  },
+  "presets": []
+}

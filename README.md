@@ -31,7 +31,7 @@ npm run build        # static build → dist/
 | `P` | autopilot on/off |
 | `B` | replay the run since the last respawn; in a replay, play/pause |
 | `H` | HUD editor: drag widgets to move, scroll to resize, × to hide |
-| `T` | race tracks: pick one of ten alien venues |
+| `T` | race tracks: pick one of twelve alien venues |
 | `L` | proving ground levels: pick a ship and a level |
 | `N` | next proving level (after a clear) |
 
@@ -85,12 +85,13 @@ on or off with `gen.gauntlet.kinds.*`. Obstacles bounce you like walls. Try
 
 ## Race tracks
 
-Press `T` (or **Tracks**) for ten alien venues, each a race scenario (`scenarios/venue-*.json`) with
+Press `T` (or **Tracks**) for twelve alien venues (two of them underground mines and caves), each a race scenario (`scenarios/venue-*.json`) with
 its own layout, scenery, sky and palette: a coil above a glassy sea, a trefoil knot under a ringed
 giant, a figure eight among monoliths, a loop on its edge in a girder lattice, peaks hanging from a
 cloud ceiling, and more. The parts are plain vars, so any track can use them:
 
-- `gen.race.shape`: loop, figure8, trefoil, star, coil, upright, clover
+- `gen.race.shape`: loop, figure8, trefoil, star, coil, upright, clover, tangle (steep climbs and
+  dives), stunt (loop-the-loops and corkscrews)
 - `gen.race.sections` (race mode): stretches with their own cross-section from `gen.race.sectionKinds`:
   hex, square, octagon, triangle, rect (letterbox or slot), diamond, ellipse, star, irregular (a
   lumpy bore that drifts as you fly), cavern (a wide chamber) and open (no walls, out of bounds
@@ -98,6 +99,10 @@ cloud ceiling, and more. The parts are plain vars, so any track can use them:
 - `world.scenery.kinds`: spires, monoliths, peaks, orbs, ribs, halos, lattice, shards, columns (kept
   clear of the corridor and every branch); `world.ground`: floor, ceiling or both
 - `render.sky.planet.*`: a banded planet with a ring; `render.sky.moons`
+- `gen.race.hazards` (race mode): obstacles from `gen.race.hazardKinds`: iris apertures and shutter
+  gates that open and shut (shut, they still leave a tight gap), turbines, crushers, lasers, moving
+  rings; solid, so a mistimed pass bounces you
+- `world.screens.count`: giant screens beside the track showing a broadcast view of your ship
 
 ## Proving ground
 

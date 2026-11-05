@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { computed, effect } from '@preact/signals-core';
 import { vars } from '../core/vars';
 import { toon } from '../render/toon';
-import { CHUNK_KINDS, generateGauntlet, pointOnTrack, sampleAt, slotWidth, type Gauntlet, type GauntletParams, type Plane } from '../gen/gauntlet';
+import { CHUNK_KINDS, HAZARD_KINDS, generateGauntlet, generateHazards, irisRadius, pointOnTrack, sampleAt, slotWidth, type Gauntlet, type GauntletParams, type HazardKind, type HazardParams, type Plane } from '../gen/gauntlet';
 import { gameMode, seedVar, track } from './race';
 
 export const shipRadius = vars.num('ship.radius', 1.5, { min: 0.2, max: 6, hardMin: 0.05, unit: 'm', tags: ['ship', 'race'], desc: 'collision sphere' });
@@ -43,7 +43,33 @@ export const gauntletParams = computed<GauntletParams>(() => ({
   kinds: kinds.filter(([, v]) => v.value).map(([k]) => k),
 }));
 /** The obstacle layout in gauntlet mode, null otherwise. */
-export const gauntlet = computed<Gauntlet | null>(() => (gameMode.value === 'gauntlet' ? generateGauntlet(track.value, gauntletParams.value) : null));
+const hz = ['gen', 'race', 'hazard'];
+const hazardVars = {
+  count: vars.int('gen.race.hazards', 0, { min: 0, max: 16, hardMin: 0, hardMax: 64, tags: hz, regen: true, desc: 'race mode: obstacles round the lap (apertures, shutters...) clear of forks and shaped sections' }),
+  kinds: vars.str('gen.race.hazardKinds', 'iris,shutter', { tags: hz, regen: true, desc: `comma-separated, used in turn: ${HAZARD_KINDS.join(', ')}` }),
+  difficulty: vars.num('gen.race.hazardDifficulty', 0.5, { min: 0, max: 1, hardMin: 0, hardMax: 1, tags: hz, regen: true, desc: 'how tight the gaps get and how fast hazards move' }),
+};
+/** Race hazards; a closed one still leaves `gen.gauntlet.minClearance` ship radii to spare. */
+export const hazardParams = computed<HazardParams>(() => ({
+  seed: seedVar.value,
+  count: gameMode.value === 'race' ? hazardVars.count.value : 0,
+  kinds: hazardVars.kinds.value
+    .split(',')
+    .map((k) => k.trim())
+    .filter((k): k is HazardKind => (HAZARD_KINDS as readonly string[]).includes(k)),
+  difficulty: hazardVars.difficulty.value,
+  minClearance: gp.minClearance.value,
+  shipRadius: shipRadius.value,
+}));
+/** The obstacle layout: the gauntlet in gauntlet mode, race hazards in race mode (if any), else null. */
+export const gauntlet = computed<Gauntlet | null>(() => {
+  if (gameMode.value === 'gauntlet') return generateGauntlet(track.value, gauntletParams.value);
+  if (hazardParams.value.count > 0 && gameMode.value === 'race') {
+    const h = generateHazards(track.value, hazardParams.value);
+    return h.planes.length ? h : null;
+  }
+  return null;
+});
 
 const TAU = Math.PI * 2;
 
@@ -77,6 +103,35 @@ function planeMesh(pl: Plane, R: number, solid: THREE.Material, trim: THREE.Mate
       const w = slotWidth(sh, t);
       jaws[0].position.x = sh.u0 - w / 2 - R / 2;
       jaws[1].position.x = sh.u0 + w / 2 + R / 2;
+    };
+  } else if (sh.k === 'iris') {
+    // petals round the opening, alternating colours; their inner edges swing round as it shuts
+    const seg = 6;
+    const petals: THREE.BufferAttribute[] = [];
+    for (let k = 0; k < sh.petals; k++) {
+      const geo = new THREE.BufferGeometry();
+      const pos = new THREE.BufferAttribute(new Float32Array((seg + 1) * 2 * 3), 3);
+      geo.setAttribute('position', pos);
+      geo.setAttribute('normal', new THREE.BufferAttribute(new Float32Array((seg + 1) * 2 * 3).map((_, q) => (q % 3 === 2 ? 1 : 0)), 3));
+      const index: number[] = [];
+      for (let j = 0; j < seg; j++) index.push(j * 2, j * 2 + 1, j * 2 + 2, j * 2 + 1, j * 2 + 3, j * 2 + 2);
+      geo.setIndex(index);
+      add(geo, k % 2 ? trim : solid).frustumCulled = false; // its vertices move every frame
+      petals.push(pos);
+    }
+    add(new THREE.TorusGeometry(R * 1.02, 0.8, 6, 48), trim);
+    update = (t) => {
+      const r = irisRadius(sh, t);
+      const shut = 1 - (r - sh.min) / Math.max(1e-6, sh.max - sh.min);
+      const twist = 0.25 + 0.5 * shut;
+      petals.forEach((pos, k) => {
+        for (let j = 0; j <= seg; j++) {
+          const a = ((k + j / seg) * TAU) / sh.petals;
+          pos.setXYZ(j * 2, Math.cos(a + twist) * r, Math.sin(a + twist) * r, 0);
+          pos.setXYZ(j * 2 + 1, Math.cos(a) * R * 1.03, Math.sin(a) * R * 1.03, 0);
+        }
+        pos.needsUpdate = true;
+      });
     };
   } else if (sh.k === 'beams') {
     for (let set = 0; set < (sh.crossed ? 2 : 1); set++) {
@@ -158,7 +213,7 @@ export function createGauntletScene(scene: THREE.Scene) {
     group,
     /** `time`: sim seconds since spawn, interpolated */
     update(time: number) {
-      group.visible = gameMode.value === 'gauntlet';
+      group.visible = gauntlet.value !== null;
       solid.color.set(solidColor.value);
       trim.color.set(trimColor.value);
       rockMat.color.set(rockColor.value);

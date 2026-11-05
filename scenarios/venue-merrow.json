@@ -43,7 +43,11 @@
     "gen.race.sections": 4,
     "gen.race.sectionKinds": "cavern,open,diamond",
     "gen.race.sectionMin": 300,
-    "gen.race.sectionMax": 1000
+    "gen.race.sectionMax": 1000,
+    "gen.race.hazards": 4,
+    "gen.race.hazardKinds": "iris,turbine,shutter",
+    "world.screens.count": 4,
+    "gen.race.shape": "tangle"
   },
   "presets": []
 }

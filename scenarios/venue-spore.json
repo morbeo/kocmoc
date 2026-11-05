@@ -39,7 +39,10 @@
     "gen.race.sections": 4,
     "gen.race.sectionKinds": "cavern,irregular,ellipse",
     "gen.race.sectionMin": 250,
-    "gen.race.sectionMax": 800
+    "gen.race.sectionMax": 800,
+    "gen.race.hazards": 3,
+    "gen.race.hazardKinds": "iris,ring",
+    "world.screens.count": 4
   },
   "presets": []
 }
