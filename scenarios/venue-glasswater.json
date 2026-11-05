@@ -44,7 +44,11 @@
     "render.toon.floor": 0.4,
     "render.outline.color": "#0b2e3a",
     "race.laps": 2,
-    "gen.race.profile": "rails"
+    "gen.race.profile": "rails",
+    "gen.race.sections": 4,
+    "gen.race.sectionKinds": "hex,ellipse,open",
+    "gen.race.sectionMin": 400,
+    "gen.race.sectionMax": 900
   },
   "presets": []
 }

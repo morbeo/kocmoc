@@ -35,7 +35,11 @@
     "render.ambient": 0.65,
     "render.toon.floor": 0.55,
     "render.outline.color": "#6b3a5a",
-    "render.outline.thickness": 1.5
+    "render.outline.thickness": 1.5,
+    "gen.race.sections": 4,
+    "gen.race.sectionKinds": "cavern,irregular,ellipse",
+    "gen.race.sectionMin": 250,
+    "gen.race.sectionMax": 800
   },
   "presets": []
 }

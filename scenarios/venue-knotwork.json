@@ -38,7 +38,11 @@
     "render.sky.planet.tilt": 0.45,
     "render.track.color": "#2b1650",
     "render.track.stripe": "#ff7ad9",
-    "race.laps": 2
+    "race.laps": 2,
+    "gen.race.sections": 4,
+    "gen.race.sectionKinds": "open,star,octagon",
+    "gen.race.sectionMin": 500,
+    "gen.race.sectionMax": 1000
   },
   "presets": []
 }

@@ -39,7 +39,11 @@
     ],
     "render.ambient": 0.35,
     "render.outline.color": "#2a0c10",
-    "gen.race.profile": "halfpipe"
+    "gen.race.profile": "halfpipe",
+    "gen.race.sections": 4,
+    "gen.race.sectionKinds": "cavern,irregular,triangle",
+    "gen.race.sectionMin": 250,
+    "gen.race.sectionMax": 700
   },
   "presets": []
 }

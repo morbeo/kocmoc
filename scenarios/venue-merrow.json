@@ -39,7 +39,11 @@
     "render.ambient": 0.55,
     "render.toon.floor": 0.35,
     "render.outline.color": "#4a2410",
-    "gen.race.profile": "gates"
+    "gen.race.profile": "gates",
+    "gen.race.sections": 4,
+    "gen.race.sectionKinds": "cavern,open,diamond",
+    "gen.race.sectionMin": 300,
+    "gen.race.sectionMax": 1000
   },
   "presets": []
 }

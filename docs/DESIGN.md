@@ -283,6 +283,16 @@ finish with positions. AI racers stay out of scope; ghosts are the rivals.
     (`world.ground`) a gap from the track, with spires and peaks rooted in them;
   - sky (`render.sky.planet.*`, `render.sky.moons`): a toon-lit, striped planet with a ring whose
     near half is drawn over it, and moons;
+  - sections (`src/gen/sections.ts`, `gen.race.sections` / `sectionKinds` / `sectionMin` / `sectionMax`,
+    race mode only): stretches of the loop with their own cross-section. Polygons (hex, square,
+    octagon, triangle, rect, diamond, five-pointed star) as corner lists, the wall distance at an angle
+    found by casting a ray to their edge; ellipse; irregular and cavern as a few harmonics whose phases
+    drift along the section. Every wall is at least one tube radius out, so the autopilot, ghosts and
+    fork balance are unchanged; open sections have no walls and an out-of-bounds limit 3.5 tube radii
+    out. The shape eases in from the round tube at each end. Sections keep clear of forks, the pit lane
+    and the start line, and of any other part of the loop their widest wall could reach; the main tube
+    is cut there and the section draws its own faceted walls (corners on vertices). Collision pushes
+    out along the face normal (`collideSection`); scenery keeps clear of each section's reach;
   - open profiles (rails, halfpipe, gates) so the scenery is in view, and per-venue palettes.
   The classic loop leaves the shape out of the track params, so saved bests and ghosts keep their keys.
 - **Scenic biomes** (proposed): the lap cut into sections (canyon, cave, city,
@@ -320,4 +330,4 @@ scenarios/   bundled scenario JSON
 | M4 | Gauntlet chunks, juice system + presets |
 | M5 | Replay + ghost, autopilot bot, viewports + pop-outs, HUD editor, diff view |
 | M6 | Proving ground (§12): gate hoops, countdown rules + time beacons, level ladder + ship presets + badges, open-space profile |
-| M7 | Race (§13). M7a: lap count, finish, results, positions and gaps against ghost rivals (best, last, autopilot). M7b: route graph (shortcut, long way, split, hidden, pit lane) balanced by the autopilot. M7c: ten alien venues (track shapes, scenery, sky planets, track list). _Proposed_: biomes along the lap, pickups and boost pads, championship |
+| M7 | Race (§13). M7a: lap count, finish, results, positions and gaps against ghost rivals (best, last, autopilot). M7b: route graph (shortcut, long way, split, hidden, pit lane) balanced by the autopilot. M7c: ten alien venues (track shapes, shaped tunnel sections and open air, scenery, sky planets, track list). _Proposed_: biomes along the lap, pickups and boost pads, championship |

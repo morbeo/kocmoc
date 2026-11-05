@@ -44,7 +44,11 @@
     "render.track.color": "#3a1010",
     "render.track.stripe": "#ffb000",
     "render.rim.color": "#ff7a3d",
-    "render.rim.strength": 0.9
+    "render.rim.strength": 0.9,
+    "gen.race.sections": 4,
+    "gen.race.sectionKinds": "open,octagon,diamond",
+    "gen.race.sectionMin": 500,
+    "gen.race.sectionMax": 1000
   },
   "presets": []
 }

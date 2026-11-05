@@ -32,7 +32,11 @@
     "render.track.stripe": "#8ef0c8",
     "render.light.color": "#d8fff2",
     "render.ambient": 0.45,
-    "render.outline.color": "#04191a"
+    "render.outline.color": "#04191a",
+    "gen.race.sections": 4,
+    "gen.race.sectionKinds": "square,rect,open",
+    "gen.race.sectionMin": 300,
+    "gen.race.sectionMax": 700
   },
   "presets": []
 }

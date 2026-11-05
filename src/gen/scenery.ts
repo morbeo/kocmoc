@@ -1,6 +1,7 @@
 import { Matrix4, Quaternion, Vector3 } from 'three';
 import { rng } from '../core/rng';
 import type { Track } from './track';
+import { reachAt } from './sections';
 
 /**
  * Scenery around a race track: props that never reach into the flyable corridor (main loop or any
@@ -91,7 +92,8 @@ export class Corridor {
         }
       });
     };
-    add(track.pos, () => track.radius);
+    // shaped sections reach further than the tube (caverns, open air)
+    add(track.pos, (i) => reachAt(track, track.s[i]));
     for (const b of track.branches ?? []) add(b.pos, (i) => b.rad[i]);
     this.maxRad = all.reduce((m, x) => Math.max(m, x.rad), 0);
     this.cell = Math.max(50, this.maxRad * 4);

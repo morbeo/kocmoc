@@ -91,6 +91,10 @@ giant, a figure eight among monoliths, a loop on its edge in a girder lattice, p
 cloud ceiling, and more. The parts are plain vars, so any track can use them:
 
 - `gen.race.shape`: loop, figure8, trefoil, star, coil, upright, clover
+- `gen.race.sections` (race mode): stretches with their own cross-section from `gen.race.sectionKinds`:
+  hex, square, octagon, triangle, rect (letterbox or slot), diamond, ellipse, star, irregular (a
+  lumpy bore that drifts as you fly), cavern (a wide chamber) and open (no walls, out of bounds
+  well outside the tube). Shaped sections draw their own walls whatever the profile
 - `world.scenery.kinds`: spires, monoliths, peaks, orbs, ribs, halos, lattice, shards, columns (kept
   clear of the corridor and every branch); `world.ground`: floor, ceiling or both
 - `render.sky.planet.*`: a banded planet with a ring; `render.sky.moons`

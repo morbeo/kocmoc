@@ -43,7 +43,11 @@
     ],
     "render.track.color": "#1d3a22",
     "render.track.stripe": "#b6ff6b",
-    "race.laps": 2
+    "race.laps": 2,
+    "gen.race.sections": 4,
+    "gen.race.sectionKinds": "star,open,diamond",
+    "gen.race.sectionMin": 500,
+    "gen.race.sectionMax": 1000
   },
   "presets": []
 }

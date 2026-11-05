@@ -3,6 +3,7 @@ import type { ShipState } from './ship';
 import { nearestOnTrack, type Nearest, type Track } from '../gen/track';
 import { locate, newRouteState, resetRoute, type RouteKind, type RouteState } from '../gen/routes';
 import type { Gauntlet } from '../gen/gauntlet';
+import { polar, sectionAt, wallAt, wallNormal, type Wall } from '../gen/sections';
 import { collideObstacles, newObstacleResult, type ObstacleResult } from './gauntlet';
 import { finishProving, newProving, stepProving, type ProvingEvent, type ProvingSetup, type ProvingState } from './proving';
 
@@ -176,6 +177,35 @@ export function collideWalls(ship: ShipState, near: Nearest, radius: number, p: 
   return true;
 }
 
+const _wl: Wall = { rho: 0, open: false, oob: 0 };
+const _p = new Vector3();
+
+/**
+ * Walls of a shaped section (hexagonal, square, irregular, cavern): push the ship back out of the
+ * face it went through, along that face's normal; bounce and scrape as on the round tube.
+ */
+export function collideSection(ship: ShipState, near: Nearest, track: Track, p: WallParams, dt: number, out?: { impact: number }): boolean {
+  if (out) out.impact = 0;
+  const i = near.index;
+  const { theta } = polar(track, i, near.point, ship.pos);
+  const rho = wallAt(track, near.s, theta, _wl).rho;
+  if (!Number.isFinite(rho)) return false;
+  const [nx, ny] = wallNormal(track, near.s, theta);
+  _n.copy(track.right[i]).multiplyScalar(nx).addScaledVector(track.up[i], ny);
+  // the wall point at this angle, and how far past it (towards the wall) the ship's skin reaches
+  _p.copy(near.point).addScaledVector(track.right[i], rho * Math.cos(theta)).addScaledVector(track.up[i], rho * Math.sin(theta));
+  const pen = _z.subVectors(ship.pos, _p).dot(_n) + p.shipRadius;
+  if (pen <= 0) return false;
+  ship.pos.addScaledVector(_n, -pen);
+  const vn = ship.vel.dot(_n);
+  if (vn > 0) {
+    ship.vel.addScaledVector(_n, -(1 + p.bounce) * vn);
+    if (out) out.impact = vn;
+  }
+  ship.vel.multiplyScalar(Math.exp(-p.scrape * dt));
+  return true;
+}
+
 /** One fixed step of race rules after the ship has moved: walls, progress, checkpoints, laps. */
 export function stepRace(r: RaceState, ship: ShipState, track: Track, p: WallParams, dt: number, course?: Course): void {
   const prevS = r.near.s;
@@ -189,8 +219,11 @@ export function stepRace(r: RaceState, ship: ShipState, track: Track, p: WallPar
   const routeWas = r.loc.route;
   if (branches?.length) locate(track, ship.pos, r.loc, r.near, p.shipRadius);
   else nearestOnTrack(track, ship.pos, r.near.index, 24, r.near);
-  const radius = r.loc.radius;
-  if (p.open) {
+  // a shaped section of the main loop: its own walls, or none in open air
+  const sec = (!branches?.length || r.loc.route < 0) && track.sections ? sectionAt(track, r.near.s) : null;
+  const wall = sec ? wallAt(track, r.near.s, polar(track, r.near.index, r.near.point, ship.pos).theta, _wl) : null;
+  const radius = wall ? wall.oob : r.loc.radius;
+  if (p.open || wall?.open) {
     // open space: no walls, but leaving the corridor for too long puts you back on the line
     if (r.near.dist > radius) {
       if (r.oob === 0) r.events.push({ type: 'oob' });
@@ -211,7 +244,7 @@ export function stepRace(r: RaceState, ship: ShipState, track: Track, p: WallPar
     } else r.oob = 0;
     r.contact = false;
   } else {
-    const hit = collideWalls(ship, r.near, radius, p, dt, _wall);
+    const hit = sec ? collideSection(ship, r.near, track, p, dt, _wall) : collideWalls(ship, r.near, radius, p, dt, _wall);
     if (hit && !r.contact) {
       r.wallHits++;
       r.events.push({ type: 'hit', what: 'wall', impact: _wall.impact });

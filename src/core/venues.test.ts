@@ -3,9 +3,30 @@ import { scenarios, venues } from './scenarios';
 import { generateTrack, TRACK_SHAPES, type RaceGenParams, type TrackShape } from '../gen/track';
 import { generateScenery, SCENERY_KINDS, GROUND_MODES, type SceneryKind } from '../gen/scenery';
 import { venueTags } from '../ui/tracks';
+import { addSections, SECTION_KINDS, type SectionKind } from '../gen/sections';
+import type { Scenario } from './scenarios';
 
 // every source file, to check that venue vars name real vars
 const sources = Object.values(import.meta.glob<string>('/src/**/*.{ts,tsx}', { eager: true, query: '?raw', import: 'default' })).join('\n');
+
+/** A venue's track params, as its vars set them over the defaults. */
+function params(v: Scenario): RaceGenParams {
+  const x = v.vars ?? {};
+  const num = (k: string, d: number) => (typeof x[k] === 'number' ? (x[k] as number) : d);
+  return {
+    seed: v.seed ?? 1,
+    points: num('gen.race.points', 12),
+    radius: num('gen.race.radius', 1000),
+    wobble: num('gen.race.wobble', 0.35),
+    height: num('gen.race.height', 250),
+    twist: num('gen.race.twist', 0),
+    twistNoise: num('gen.race.twistNoise', 0.5),
+    tubeRadius: num('gen.race.tubeRadius', 40),
+    spacing: 4,
+    checkpoints: 8,
+    shape: (x['gen.race.shape'] as TrackShape | undefined) ?? 'loop',
+  };
+}
 
 describe('race venues', () => {
   const list = venues();
@@ -32,6 +53,24 @@ describe('race venues', () => {
     expect(shapes.size).toBeGreaterThanOrEqual(6);
     const kinds = new Set(list.flatMap((v) => String(v.vars?.['world.scenery.kinds'] ?? '').split(',')));
     for (const k of SCENERY_KINDS) expect(kinds, k).toContain(k);
+    const sections = new Set(list.flatMap((v) => String(v.vars?.['gen.race.sectionKinds'] ?? '').split(',')));
+    for (const k of SECTION_KINDS) expect(sections, k).toContain(k);
+  });
+
+  it('place most of the sections they ask for', () => {
+    let want = 0;
+    let got = 0;
+    for (const v of list) {
+      const x = v.vars ?? {};
+      const t = generateTrack(params(v));
+      const kinds = String(x['gen.race.sectionKinds']).split(',') as SectionKind[];
+      const count = x['gen.race.sections'] as number;
+      const placed = addSections(t, { seed: v.seed ?? 1, count, kinds, minLength: x['gen.race.sectionMin'] as number, maxLength: x['gen.race.sectionMax'] as number }).sections ?? [];
+      expect(placed.length, v.name).toBeGreaterThanOrEqual(2);
+      want += count;
+      got += placed.length;
+    }
+    expect(got / want).toBeGreaterThan(0.7);
   });
 
   it('only set vars that exist', () => {
@@ -43,19 +82,7 @@ describe('race venues', () => {
     for (const v of list) {
       const x = v.vars ?? {};
       const num = (k: string, d: number) => (typeof x[k] === 'number' ? (x[k] as number) : d);
-      const p: RaceGenParams = {
-        seed: v.seed ?? 1,
-        points: num('gen.race.points', 12),
-        radius: num('gen.race.radius', 1000),
-        wobble: num('gen.race.wobble', 0.35),
-        height: num('gen.race.height', 250),
-        twist: num('gen.race.twist', 0),
-        twistNoise: num('gen.race.twistNoise', 0.5),
-        tubeRadius: num('gen.race.tubeRadius', 40),
-        spacing: 4,
-        checkpoints: 8,
-        shape: (x['gen.race.shape'] as TrackShape | undefined) ?? 'loop',
-      };
+      const p = params(v);
       const t = generateTrack(p);
       expect(t.attempts, v.name).toBeLessThanOrEqual(3);
       const kinds = String(x['world.scenery.kinds']).split(',') as SceneryKind[];

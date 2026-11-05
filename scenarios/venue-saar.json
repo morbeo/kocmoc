@@ -34,7 +34,11 @@
     "render.ambient": 0.6,
     "render.toon.floor": 0.45,
     "render.outline.color": "#3a2b5c",
-    "gen.race.profile": "halfpipe"
+    "gen.race.profile": "halfpipe",
+    "gen.race.sections": 4,
+    "gen.race.sectionKinds": "cavern,rect,square",
+    "gen.race.sectionMin": 250,
+    "gen.race.sectionMax": 800
   },
   "presets": []
 }

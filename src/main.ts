@@ -26,7 +26,7 @@ import { createSky } from './render/sky';
 import { createPipeline } from './render/pipeline';
 import { createViewports, layout } from './render/viewports';
 import { detectTouch, touchUi } from './input/touch';
-import { createRaceScene, gameMode, genParams, onTrack, oobTime, openSpace, routeColors, ROUTE_NAMES, routeParams, routesOn, seedVar, track } from './world/race';
+import { createRaceScene, gameMode, genParams, onTrack, oobTime, openSpace, routeColors, ROUTE_NAMES, routeParams, routesOn, sectionParams, seedVar, track } from './world/race';
 import { forkAhead } from './gen/routes';
 import { createProvingScene, nextGatePoint, provingCourse, provingLevel, provingParams, provingRules } from './world/proving';
 import { levelScenario, parseLadder, recordRun, type Ladder, type RunOutcome } from './core/ladder';
@@ -199,7 +199,7 @@ const bestKey = () =>
     ? `kocmoc.best.gauntlet.${JSON.stringify([genParams.value, gauntletParams.value])}`
     : gameMode.value === 'proving'
       ? `kocmoc.best.proving.${JSON.stringify([genParams.value, provingParams.value])}`
-      : `kocmoc.best.${JSON.stringify(genParams.value)}${routesOn() ? `|routes${JSON.stringify(routeParams.value)}` : ''}`;
+      : `kocmoc.best.${JSON.stringify(genParams.value)}${routesOn() ? `|routes${JSON.stringify(routeParams.value)}` : ''}${sectionParams.value.count > 0 ? `|sections${JSON.stringify(sectionParams.value)}` : ''}`;
 const ghostKey = () => bestKey().replace('kocmoc.best.', 'kocmoc.ghost.');
 let savedBest: number | null = null;
 let ghost: Ghost | null = null;

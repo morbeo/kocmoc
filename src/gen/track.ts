@@ -1,6 +1,7 @@
 import { CatmullRomCurve3, Vector3 } from 'three';
 import { rng } from '../core/rng';
 import type { Branch } from './routes';
+import type { Section } from './sections';
 
 export interface RaceGenParams {
   seed: number;
@@ -88,6 +89,8 @@ export interface Track {
   attempts: number;
   /** alternate routes that leave the loop and rejoin it (none unless added by `addRoutes`) */
   branches?: Branch[];
+  /** stretches of the loop with their own cross-section (none unless added by `addSections`) */
+  sections?: Section[];
 }
 
 const WORLD_UP = new Vector3(0, 1, 0);

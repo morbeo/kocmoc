@@ -5,6 +5,7 @@ import { toon } from '../render/toon';
 import { generateTrack, nearestOnTrack, TRACK_SHAPES, type Nearest, type RaceGenParams, type Track } from '../gen/track';
 import { addRoutes, nearestOnPath, radAt, routeS, type Branch, type RouteKind, type RouteParams } from '../gen/routes';
 import { botJudge } from '../sim/forks';
+import { addSections, sectionAngles, sectionAt, SECTION_KINDS, wallAt, type Section, type SectionKind, type SectionParams } from '../gen/sections';
 import { GAME_MODES } from '../core/scenarios';
 
 export const gameMode = vars.enum('game.mode', 'race', GAME_MODES, { tags: ['game'], desc: 'race: generated track; gauntlet: the track filled with obstacles; proving: gates against the clock; free: open rock field' });
@@ -31,6 +32,12 @@ const routes = {
   saveMin: vars.num('gen.race.route.saveMin', 0.03, { min: 0, max: 0.3, hardMin: 0, hardMax: 1, tags: [...g, 'route'], regen: true, desc: 'a shortcut must save at least this share of the main line\'s time (the autopilot flies both)' }),
   saveMax: vars.num('gen.race.route.saveMax', 0.2, { min: 0.05, max: 0.6, hardMin: 0, hardMax: 1, tags: [...g, 'route'], regen: true, desc: 'and at most this share' }),
   costMax: vars.num('gen.race.route.costMax', 0.3, { min: 0.05, max: 1, hardMin: 0, tags: [...g, 'route'], regen: true, desc: 'the long way may cost at most this share more' }),
+};
+const sectionVars = {
+  count: vars.int('gen.race.sections', 0, { min: 0, max: 8, hardMin: 0, hardMax: 32, tags: [...g, 'section'], regen: true, desc: 'race mode: stretches with their own cross-section (hex / square tunnels, irregular bores, caverns, open air)' }),
+  kinds: vars.str('gen.race.sectionKinds', SECTION_KINDS.join(','), { tags: [...g, 'section'], regen: true, desc: `comma-separated, used in turn: ${SECTION_KINDS.join(', ')}` }),
+  minLength: vars.num('gen.race.sectionMin', 300, { min: 50, max: 3000, hardMin: 10, unit: 'm', tags: [...g, 'section'], regen: true }),
+  maxLength: vars.num('gen.race.sectionMax', 900, { min: 50, max: 5000, hardMin: 10, unit: 'm', tags: [...g, 'section'], regen: true }),
 };
 const rtags = ['render', 'track'];
 const routeTags = ['race', 'render', 'route'];
@@ -80,11 +87,22 @@ export const routeParams = computed<RouteParams>(() => {
     costMax: routes.costMax.value,
   };
 });
+/** Sections only in race mode, like forks. */
+export const sectionParams = computed<SectionParams>(() => ({
+  seed: gen.seed.value,
+  count: gameMode.value === 'race' ? sectionVars.count.value : 0,
+  kinds: sectionVars.kinds.value
+    .split(',')
+    .map((k) => k.trim())
+    .filter((k): k is SectionKind => (SECTION_KINDS as readonly string[]).includes(k)),
+  minLength: sectionVars.minLength.value,
+  maxLength: Math.max(sectionVars.minLength.value, sectionVars.maxLength.value),
+}));
 /** Routes are on (the track has or may have forks); part of the best-lap key when they are. */
 export const routesOn = () => routeParams.value.forks > 0 || routeParams.value.pitLane;
 const loop = computed<Track>(() => generateTrack(genParams.value));
 /** Regenerates when any `gen.race.*` var changes. Forks are balanced by flying the autopilot through them. */
-export const track = computed<Track>(() => addRoutes(loop.value, routeParams.value, botJudge));
+export const track = computed<Track>(() => addSections(addRoutes(loop.value, routeParams.value, botJudge), sectionParams.value));
 export const seedVar = gen.seed;
 
 // --- meshes ------------------------------------------------------------------
@@ -105,7 +123,7 @@ interface Sweep {
 function sweep(
   t: Path,
   angles: number[],
-  radius: number | number[],
+  radius: number | number[] | ((i: number, angle: number) => number),
   closedRing: boolean,
   centre?: (i: number, out: THREE.Vector3) => void,
   closedPath = true,
@@ -121,8 +139,8 @@ function sweep(
     if (centre) centre(i, c);
     else c.copy(t.pos[i]);
     const band = Math.floor(t.s[i] / stripeEvery.value) % 2;
-    const r = typeof radius === 'number' ? radius : radius[i];
     for (let k = 0; k < m; k++) {
+      const r = typeof radius === 'number' ? radius : typeof radius === 'function' ? radius(i, angles[k]) : radius[i];
       v.copy(c)
         .addScaledVector(t.right[i], Math.cos(angles[k]) * r)
         .addScaledVector(t.up[i], Math.sin(angles[k]) * r);
@@ -194,13 +212,49 @@ function ringMatrices(mesh: THREE.InstancedMesh, t: Path, at: number[], length: 
 
 const sampleOf = (t: Track, s: number) => Math.min(t.pos.length - 1, Math.floor((((s % t.length) + t.length) % t.length / t.length) * t.pos.length));
 
+/** Main-loop quads in a shaped section are left out: the section draws its own walls. */
+function sectionKeep(t: Track): Keep | undefined {
+  if (!t.sections?.length) return undefined;
+  return (i) => {
+    const n = t.pos.length;
+    return !sectionAt(t, t.s[i]) && !sectionAt(t, t.s[(i + 1) % n]);
+  };
+}
+
+/** A stretch of the main loop as an open path, samples i0..i1 (no wrap: sections never cross the line). */
+const slicePath = (t: Track, i0: number, i1: number): Path => ({
+  pos: t.pos.slice(i0, i1 + 1),
+  tan: t.tan.slice(i0, i1 + 1),
+  up: t.up.slice(i0, i1 + 1),
+  right: t.right.slice(i0, i1 + 1),
+  s: t.s.slice(i0, i1 + 1),
+});
+
+/** Walls of a shaped section: polygon corners land on vertices; faceted. */
+function sectionGeometry(t: Track, sec: Section, colA: THREE.Color, colB: THREE.Color): THREE.BufferGeometry {
+  const n = t.pos.length;
+  const i0 = Math.max(0, Math.floor((sec.s0 / t.length) * n));
+  const i1 = Math.min(n - 1, Math.ceil((sec.s1 / t.length) * n));
+  const path = slicePath(t, i0, i1);
+  const w = { rho: 0, open: false, oob: 0 };
+  const angles = sectionAngles(sec);
+  const part = sweep(path, angles, (i, a) => wallAt(t, Math.min(sec.s1 - 1e-3, Math.max(sec.s0 + 1e-3, path.s[i])), a, w).rho, true, undefined, false);
+  const indexed = mergeSweeps([part], colA, colB);
+  const flat = indexed.toNonIndexed();
+  indexed.dispose();
+  flat.computeVertexNormals();
+  return flat;
+}
+
 /** Main-loop wall quads inside a branch's tube are cut, so the branch opens off the loop. */
 function mainKeep(t: Track): Keep | undefined {
   const bs = t.branches ?? [];
-  if (!bs.length) return undefined;
+  if (!bs.length) return sectionKeep(t);
+  const inSection = sectionKeep(t);
   const R = t.radius;
   const n: Nearest = { index: 0, t: 0, s: 0, point: new THREE.Vector3(), dist: Infinity };
   return (i, c) => {
+    if (inSection && !inSection(i, c)) return false;
     const s = t.s[i];
     for (const b of bs) {
       if (s < b.s0 - R || s > b.s1 + R) continue;
@@ -294,9 +348,28 @@ export function createRaceScene(scene: THREE.Scene) {
       disposables.push(geo);
     }
 
+    // shaped sections draw their own walls whatever the profile; open air gets faint guide rings
+    const guides: number[] = [];
+    for (const sec of t.sections ?? []) {
+      if (sec.kind === 'open') {
+        for (let s = sec.s0 + every / 2; s < sec.s1; s += every) guides.push(s);
+        continue;
+      }
+      const sg = sectionGeometry(t, sec, colA, colB);
+      group.add(new THREE.Mesh(sg, wallMat));
+      disposables.push(sg);
+    }
+    if (guides.length) {
+      const guideGeo = new THREE.TorusGeometry(R, 0.3, 6, 40);
+      const rings = new THREE.InstancedMesh(guideGeo, guideMat, guides.length);
+      ringMatrices(rings, t, guides, t.length);
+      group.add(rings);
+      disposables.push(guideGeo, rings);
+    }
+
     if (look === 'gates' || look === 'rails' || look === 'open') {
       // rings down the loop (not in fork mouths, where they would block the way in) and down each branch
-      const at = range(Math.max(1, Math.floor(t.length / every)), 0, t.length, false).filter((s) => !inMouth(t, s));
+      const at = range(Math.max(1, Math.floor(t.length / every)), 0, t.length, false).filter((s) => !inMouth(t, s) && !sectionAt(t, s));
       const along = bs.map((b) => range(Math.max(1, Math.floor(b.length / every)), b.open0, b.open1, true));
       const ringGeo = new THREE.TorusGeometry(R, look === 'open' ? 0.3 : 1, 6, 40);
       const gates = new THREE.InstancedMesh(ringGeo, look === 'open' ? guideMat : gateMat, at.length + along.reduce((x, a) => x + a.length, 0));
