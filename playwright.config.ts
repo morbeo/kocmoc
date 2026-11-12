@@ -1,5 +1,7 @@
-/// <reference types="node" />
 import { defineConfig } from '@playwright/test';
+
+// Node global; the project's tsconfig only loads browser types
+declare const process: { env: Record<string, string | undefined> };
 
 // CI runners have no GPU either, and share their cores: slower waits there, one worker, one retry
 const ci = !!process.env.CI;
