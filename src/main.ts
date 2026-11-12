@@ -6,7 +6,7 @@ import { isTyping } from './core/dom';
 import { FixedLoop } from './core/loop';
 import { newShip, lerpShip, noControls, type ShipParams } from './sim/ship';
 import { newSim, spawnSim, stepSim, type SimConfig, type Spawn } from './sim/world';
-import { Player, Recorder, parseRecording, quantize, type Recording } from './sim/replay';
+import { Player, Recorder, parseRecording, quantize, trimInputs, type Recording } from './sim/replay';
 import { GhostRecorder, parseGhost, sampleGhost, type Ghost } from './sim/ghost';
 import { BOT_ROUTES, botControls, botTargets, defaultBot, type BotRoute } from './sim/bot';
 import { flyBotLap, makeRival, standings, type Rival } from './sim/rivals';
@@ -410,17 +410,8 @@ function download(name: string, data: unknown): void {
 function saveRepro(note?: string): void {
   const rec = replay ? { ...replay.rec, ticks: replay.player.tick, note: note ?? replay.rec.note } : recorder?.finish({ note });
   if (!rec) return;
-  if (replay) {
-    // trim the inputs to the current tick so the bundle ends where you are
-    let left = rec.ticks;
-    const inputs: number[][] = [];
-    for (const r of replay.rec.inputs) {
-      if (left <= 0) break;
-      inputs.push([Math.min(r[0], left), ...r.slice(1)]);
-      left -= r[0];
-    }
-    rec.inputs = inputs;
-  }
+  // trim the inputs to the current tick so the bundle ends where you are
+  if (replay) rec.inputs = trimInputs(replay.rec.inputs, rec.ticks);
   download(`kocmoc-repro-${seedVar.value}-${rec.ticks}.json`, rec);
 }
 
