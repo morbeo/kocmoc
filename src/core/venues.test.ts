@@ -4,7 +4,9 @@ import { generateTrack, TRACK_SHAPES, type RaceGenParams, type TrackShape } from
 import { generateScenery, SCENERY_KINDS, GROUND_MODES, type SceneryKind } from '../gen/scenery';
 import { venueTags } from '../ui/tracks';
 import { addSections, SECTION_KINDS, type SectionKind } from '../gen/sections';
-import { HAZARD_KINDS } from '../gen/gauntlet';
+import { HAZARD_KINDS, generateHazards, type HazardKind } from '../gen/gauntlet';
+import { generatePads } from '../gen/pads';
+import { generateMovers } from '../gen/movers';
 import type { Scenario } from './scenarios';
 
 // every source file, to check that venue vars name real vars
@@ -32,11 +34,11 @@ function params(v: Scenario): RaceGenParams {
 describe('race venues', () => {
   const list = venues();
 
-  it('there are twelve, each with its own title, seed and look', () => {
-    expect(list).toHaveLength(12);
-    expect(new Set(list.map((v) => v.title)).size).toBe(12);
-    expect(new Set(list.map((v) => v.seed)).size).toBe(12);
-    expect(new Set(list.map((v) => v.vars?.['render.background'])).size).toBe(12);
+  it('there are fifteen, each with its own title, seed and look', () => {
+    expect(list).toHaveLength(15);
+    expect(new Set(list.map((v) => v.title)).size).toBe(15);
+    expect(new Set(list.map((v) => v.seed)).size).toBe(15);
+    expect(new Set(list.map((v) => v.vars?.['render.background'])).size).toBe(15);
     for (const v of list) {
       expect(v.mode).toBe('race');
       expect(v.desc?.length).toBeGreaterThan(20);
@@ -63,7 +65,7 @@ describe('race venues', () => {
   it('every venue has hazards, and the underground ones are enclosed', () => {
     for (const v of list) expect(v.vars?.['gen.race.hazards'], v.name).toBeGreaterThan(0);
     const under = list.filter((v) => (v.vars?.['gen.race.profile'] ?? 'tube') === 'tube');
-    expect(under.length).toBeGreaterThanOrEqual(2);
+    expect(under.length).toBeGreaterThanOrEqual(5);
     for (const v of under) expect(v.vars?.['gen.race.sections'], v.name).toBeGreaterThanOrEqual(8);
   });
 
@@ -81,6 +83,22 @@ describe('race venues', () => {
       got += placed.length;
     }
     expect(got / want).toBeGreaterThan(0.7);
+  });
+
+  it('place their boost strips and slow fields, and fill their caverns', () => {
+    const withPads = list.filter((v) => (v.vars?.['gen.race.boostPads'] as number) > 0 || (v.vars?.['gen.race.slowFields'] as number) > 0);
+    expect(withPads.length).toBeGreaterThanOrEqual(6);
+    for (const v of withPads) {
+      const x = v.vars ?? {};
+      const kinds = String(x['gen.race.sectionKinds']).split(',') as SectionKind[];
+      const t = addSections(generateTrack(params(v)), { seed: v.seed ?? 1, count: x['gen.race.sections'] as number, kinds, minLength: x['gen.race.sectionMin'] as number, maxLength: x['gen.race.sectionMax'] as number });
+      const hz = generateHazards(t, { seed: v.seed ?? 1, count: x['gen.race.hazards'] as number, kinds: String(x['gen.race.hazardKinds']).split(',') as HazardKind[], difficulty: (x['gen.race.hazardDifficulty'] as number) ?? 0.5, minClearance: 1.8, shipRadius: 1.5 });
+      const boosts = (x['gen.race.boostPads'] as number) ?? 0;
+      const slows = (x['gen.race.slowFields'] as number) ?? 0;
+      const pads = generatePads(t, { seed: v.seed ?? 1, boosts, slows, boostLength: 60, slowLength: 160, avoid: hz.planes.map((q) => q.s) });
+      expect(pads.length, v.name).toBeGreaterThanOrEqual(Math.ceil((boosts + slows) * 0.6));
+      if (t.sections?.some((s) => s.kind === 'cavern')) expect(generateMovers(t, { seed: v.seed ?? 1, perCavern: 4, core: 0.6 }).length, v.name).toBeGreaterThan(0);
+    }
   });
 
   it('only set vars that exist', () => {

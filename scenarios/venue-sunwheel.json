@@ -51,7 +51,9 @@
     "gen.race.sectionMax": 1000,
     "gen.race.hazards": 3,
     "gen.race.hazardKinds": "iris,turbine",
-    "world.screens.count": 4
+    "world.screens.count": 4,
+    "gen.race.boostPads": 2,
+    "gen.race.slowFields": 2
   },
   "presets": []
 }

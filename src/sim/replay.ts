@@ -23,6 +23,18 @@ export interface Recording {
   build?: string;
 }
 
+/** Run-length encoded inputs cut to their first `ticks` ticks (the last run kept goes short). */
+export function trimInputs(inputs: number[][], ticks: number): number[][] {
+  let left = ticks;
+  const out: number[][] = [];
+  for (const r of inputs) {
+    if (left <= 0) break;
+    out.push([Math.min(r[0], left), ...r.slice(1)]);
+    left -= r[0];
+  }
+  return out;
+}
+
 const Q = 1024;
 const AXES = ['pitch', 'yaw', 'roll', 'strafe', 'lift', 'thrust'] as const;
 
