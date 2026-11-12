@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { effect } from '@preact/signals-core';
-import { vars, valueEquals } from './core/vars';
+import { vars } from './core/vars';
 import { initPersistence } from './core/persist';
 import { isTyping } from './core/dom';
 import { FixedLoop } from './core/loop';
@@ -28,19 +28,22 @@ import { createPipeline } from './render/pipeline';
 import { createViewports, layout } from './render/viewports';
 import { detectTouch, touchUi } from './input/touch';
 import { padName } from './input/pad';
-import { createRaceScene, gameMode, genParams, onTrack, oobTime, openSpace, routeColors, ROUTE_NAMES, routeParams, routesOn, sectionParams, seedVar, track } from './world/race';
+import { createRaceScene, gameMode, onTrack, oobTime, openSpace, routeColors, ROUTE_NAMES, seedVar, track } from './world/race';
 import { forkAhead } from './gen/routes';
-import { createProvingScene, nextGatePoint, provingCourse, provingLevel, provingParams, provingRules } from './world/proving';
-import { levelScenario, parseLadder, recordRun, type Ladder, type RunOutcome } from './core/ladder';
+import { createProvingScene, nextGatePoint, provingCourse, provingLevel, provingRules } from './world/proving';
+import { recordRun, type RunOutcome } from './core/ladder';
 import { createLevels } from './ui/levels';
 import { createTracks } from './ui/tracks';
-import { presets, applyPreset, activePreset } from './core/presets';
-import { createGauntletScene, gauntlet, gauntletParams, hazardParams, nearMissDistance, shipRadius } from './world/gauntlet';
+import { createGauntletScene, gauntlet, nearMissDistance, shipRadius } from './world/gauntlet';
 import { createJuice } from './juice';
 import { raceDistance, splitDelta, type RaceState, type WallParams } from './sim/race';
-import { scenarios, applyScenario, parseScenario, scenarioLayer, setSpawnHandler, setSpawnSource, venues } from './core/scenarios';
+import { scenarios, applyScenario, parseScenario, setSpawnHandler, setSpawnSource, venues } from './core/scenarios';
 import type { ProvingHud } from './ui/hud';
 import './ui/hud.css';
+import { bestKey, ghostKey, LADDER_KEY, loadLadder } from './world/records';
+import { currentShip, currentVenue, playLevel } from './core/selection';
+import { createRivalModels, RIVAL_NAMES, type RivalKind } from './render/rivals';
+import { keyButton } from './ui/keyButton';
 
 // --- vars ------------------------------------------------------------------
 const lightColor = vars.color('render.light.color', '#ffffff', { tags: ['render'] });
@@ -137,31 +140,7 @@ scene.add(sun, amb);
 
 const shipModel = createShipModel();
 scene.add(shipModel.object);
-// the best lap's ghost: the ship's shape in one translucent colour
-const ghostMat = new THREE.MeshBasicMaterial({ transparent: true, depthWrite: false });
-const ghostModel = shipModel.object.clone(true);
-ghostModel.traverse((o) => {
-  if (o instanceof THREE.Mesh) o.material = ghostMat;
-});
-ghostModel.visible = false;
-scene.add(ghostModel);
-/** One translucent ship per rival kind; the best lap keeps the original ghost model. */
-type RivalKind = 'best' | 'last' | 'bot';
-const RIVAL_NAMES: Record<RivalKind, string> = { best: 'BEST', last: 'LAST', bot: 'AUTOPILOT' };
-const rivalModels: Record<RivalKind, { model: THREE.Object3D; mat: THREE.MeshBasicMaterial }> = {
-  best: { model: ghostModel, mat: ghostMat },
-  last: cloneGhost(),
-  bot: cloneGhost(),
-};
-function cloneGhost() {
-  const mat = ghostMat.clone();
-  const model = ghostModel.clone(true);
-  model.traverse((o) => {
-    if (o instanceof THREE.Mesh) o.material = mat;
-  });
-  scene.add(model);
-  return { model, mat };
-}
+const rivalModels = createRivalModels(scene, shipModel.object);
 const field = createField(scene);
 const raceScene = createRaceScene(scene);
 const sceneryScene = createScenery(scene);
@@ -197,13 +176,6 @@ effect(() => void (loop.step = 1 / simRate.value));
 // --- race ------------------------------------------------------------------
 let race: RaceState | null = null;
 const walls = (): WallParams => ({ shipRadius: shipRadius.value, bounce: wallBounce.value, scrape: wallScrape.value, open: openSpace(), oobTime: oobTime.value });
-const bestKey = () =>
-  gameMode.value === 'gauntlet'
-    ? `kocmoc.best.gauntlet.${JSON.stringify([genParams.value, gauntletParams.value])}`
-    : gameMode.value === 'proving'
-      ? `kocmoc.best.proving.${JSON.stringify([genParams.value, provingParams.value])}`
-      : `kocmoc.best.${JSON.stringify(genParams.value)}${routesOn() ? `|routes${JSON.stringify(routeParams.value)}` : ''}${sectionParams.value.count > 0 ? `|sections${JSON.stringify(sectionParams.value)}` : ''}${hazardParams.value.count > 0 ? `|hazards${JSON.stringify(hazardParams.value)}` : ''}`;
-const ghostKey = () => bestKey().replace('kocmoc.best.', 'kocmoc.ghost.');
 let savedBest: number | null = null;
 let ghost: Ghost | null = null;
 /** the last full lap flown this session, per track */
@@ -327,51 +299,12 @@ const simConfig = (): SimConfig => {
 };
 
 // --- proving ladder ----------------------------------------------------------
-const LADDER_KEY = 'kocmoc.proving.ladder';
-function loadLadder(): Ladder {
-  try {
-    return parseLadder(JSON.parse(localStorage.getItem(LADDER_KEY) ?? 'null'));
-  } catch {
-    return {};
-  }
-}
 let ladder = loadLadder();
 /** the finished proving run, folded into the ladder once */
 let outcome: RunOutcome | null = null;
-const shipPreset = presets.find((x) => x.id === 'feel/balanced');
-/** Ship preset in use (light/balanced/heavy), null when the ship is custom-tuned. */
-function currentShip(): string | null {
-  const snap = vars.snapshot();
-  const active = activePreset(vars, 'preset:feel');
-  const name = active ? active.name : Object.keys(snap['preset:feel'] ?? {}).length === 0 ? 'balanced' : null;
-  const user = snap.user ?? {};
-  if (shipPreset && Object.keys(shipPreset.vars).some((k) => k in user)) return null;
-  return name;
-}
-/** Load ladder level `n` flown in ship preset `ship` (drops your own tuning of the ship's vars). */
-function playLevel(n: number, ship: string): void {
-  const sc = levelScenario(n, scenarios);
-  const preset = presets.find((x) => x.id === `feel/${ship}`);
-  if (!sc || !preset) return;
-  const user = vars.snapshot().user ?? {};
-  const drop = Object.keys(preset.vars).filter((k) => k in user);
-  if (drop.length) vars.change(drop.map((path) => ({ layer: 'user', path, before: user[path], after: undefined })));
-  applyPreset(vars, preset);
-  applyScenario(vars, sc);
-}
 const levels = createLevels({ ladder: () => ladder, ship: currentShip, play: playLevel });
 
 // --- race tracks -------------------------------------------------------------
-/** The venue whose scenario is loaded as it ships (none once you've loaded something else). */
-function currentVenue(): string | null {
-  const layer = vars.snapshot().scenario ?? {};
-  const keys = Object.keys(layer);
-  const hit = venues().find((sc) => {
-    const data = scenarioLayer(sc);
-    return keys.length === Object.keys(data).length && keys.every((k) => valueEquals(layer[k], data[k]));
-  });
-  return hit?.name ?? null;
-}
 const tracks = createTracks({ venues: () => venues(), current: currentVenue, play: (sc) => applyScenario(vars, sc) });
 
 /** Start a recording from its spawn and fast-forward to `tick`. */
@@ -497,45 +430,14 @@ onKey(nextLevelKey, () => {
   if (race?.proving?.result !== 'clear') return;
   playLevel(provingLevel.value + 1, currentShip() ?? 'balanced');
 });
-const levelsBtn = document.createElement('button');
-levelsBtn.id = 'levels-btn';
-levelsBtn.addEventListener('click', () => {
-  levelsBtn.blur();
-  levels.toggle();
-});
-document.body.appendChild(levelsBtn);
-effect(() => {
-  const codes = levelsKey.value.split(',').filter(Boolean);
-  levelsBtn.textContent = codes.length ? `Levels (${keyLabel(codes[0].trim())})` : 'Levels';
-});
-
-const tracksBtn = document.createElement('button');
-tracksBtn.id = 'tracks-btn';
-tracksBtn.addEventListener('click', () => {
-  tracksBtn.blur();
-  tracks.toggle();
-});
-document.body.appendChild(tracksBtn);
-effect(() => {
-  const codes = tracksKey.value.split(',').filter(Boolean);
-  tracksBtn.textContent = codes.length ? `Tracks (${keyLabel(codes[0].trim())})` : 'Tracks';
-});
+keyButton('levels-btn', 'Levels', levelsKey, () => levels.toggle());
+keyButton('tracks-btn', 'Tracks', tracksKey, () => tracks.toggle());
 
 // controls panel (rebinding, invert pitch), lazy-loaded
 let controlsUi: Promise<typeof import('./ui/controls')> | undefined;
 const toggleControls = () => void (controlsUi ??= import('./ui/controls')).then((m) => m.toggle());
 onKey(controlsKey, toggleControls);
-const controlsBtn = document.createElement('button');
-controlsBtn.id = 'controls-btn';
-controlsBtn.addEventListener('click', () => {
-  controlsBtn.blur(); // keep Space from re-clicking it
-  toggleControls();
-});
-document.body.appendChild(controlsBtn);
-effect(() => {
-  const codes = controlsKey.value.split(',').filter(Boolean);
-  controlsBtn.textContent = codes.length ? `Controls (${keyLabel(codes[0].trim())})` : 'Controls';
-});
+keyButton('controls-btn', 'Controls', controlsKey, toggleControls);
 
 // on-screen sticks and buttons on touch screens, lazy-loaded
 detectTouch();
