@@ -37,7 +37,7 @@ function toggleFav(path: string): void {
 }
 
 const rows = computed<Row[]>(() => {
-  vars.version.value;
+  void vars.version.value;
   return [
     ...vars.list().map((v) => ({ kind: 'var' as const, path: v.path, tags: v.meta.tags ?? [], desc: v.meta.desc ?? '', v })),
     ...[...vars.watches.values()].map((w) => ({
@@ -52,7 +52,7 @@ const rows = computed<Row[]>(() => {
 
 const matches = computed(() => {
   // `:mod` depends on values, so re-filter on layer changes too
-  layersVersion.value;
+  void layersVersion.value;
   return filterRows(rows.value, parseQuery(query.value), favs.value);
 });
 
@@ -76,7 +76,7 @@ const diffOn = signal(false);
 const diffBase = signal('');
 
 function DiffView() {
-  layersVersion.value;
+  void layersVersion.value;
   const base = diffBase.value ? snapshots.value.find((x) => x.id === diffBase.value) : undefined;
   const list = vars.list().map((v) => ({ path: v.path, def: v.def, value: v.value, coerce: (r: unknown) => v.coerce(r) }));
   const rows = diffVars(list, base ? base.state : null);
@@ -168,7 +168,7 @@ function VarRow({ row, indexes }: { row: Row; indexes: readonly number[] }) {
     </button>
   );
   if (row.kind === 'watch') {
-    tick.value;
+    void tick.value;
     return (
       <tr class="watch">
         <td>{star}</td>
@@ -211,7 +211,7 @@ function VarRow({ row, indexes }: { row: Row; indexes: readonly number[] }) {
 }
 
 function PresetPickers() {
-  layersVersion.value;
+  void layersVersion.value;
   const layers = LAYERS.filter((l) => presets.some((p) => p.layer === l));
   return (
     <>

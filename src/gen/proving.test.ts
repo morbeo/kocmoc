@@ -35,7 +35,7 @@ describe('generateProving', () => {
       expect(g.s).toBeGreaterThanOrEqual(base.lead);
       expect(g.s).toBeLessThan(track.length);
     }
-    expect(gates.map((g) => g.s)).toEqual([...gates.map((g) => g.s)].sort((a, b) => a - b));
+    expect(gates.map((g) => g.s)).toEqual(gates.map((g) => g.s).sort((a, b) => a - b));
   });
 
   it('tightens gates and moves them off the centre as difficulty ramps', () => {
