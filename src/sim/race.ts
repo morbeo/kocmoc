@@ -5,6 +5,9 @@ import { locate, newRouteState, resetRoute, type RouteKind, type RouteState } fr
 import type { Gauntlet } from '../gen/gauntlet';
 import { polar, sectionAt, wallAt, wallNormal, type Wall } from '../gen/sections';
 import { collideObstacles, newObstacleResult, type ObstacleResult } from './gauntlet';
+import { collideMovers, stepPads, type PadEffect, type ZoneState } from './zones';
+import type { Pad, PadKind } from '../gen/pads';
+import type { Mover } from '../gen/movers';
 import { finishProving, newProving, stepProving, type ProvingEvent, type ProvingSetup, type ProvingState } from './proving';
 
 export interface WallParams {
@@ -28,6 +31,8 @@ export type RaceEvent =
   | { type: 'oob' | 'oobReset' }
   /** entered branch `branch` of kind `kind`, or came back to the main loop (`kind` null, `branch` -1) */
   | { type: 'route'; kind: RouteKind | null; branch: number }
+  /** flew onto a boost strip or into a slow field */
+  | { type: 'pad'; kind: PadKind }
   | ProvingEvent;
 
 export interface Course {
@@ -38,6 +43,10 @@ export interface Course {
   nearMiss: number;
   /** pit lane: boost refill while in it, and the speed it holds you to */
   pit?: PitParams;
+  /** boost strips and slow fields on the main loop, and what they do */
+  pads?: { list: Pad[]; fx: PadEffect; lanes: Gauntlet['lanes'] };
+  /** drifting slabs and falling rocks in caverns */
+  movers?: Mover[];
 }
 
 export interface PitParams {
@@ -92,6 +101,8 @@ export interface RaceState {
   /** seconds outside the corridor in open space (0 = inside) */
   oob: number;
   oobResets: number;
+  /** the pad the ship is over (for entry events) */
+  zone: ZoneState;
 }
 
 export function newRace(track: Track, ship: ShipState, laps = 0): RaceState {
@@ -124,6 +135,7 @@ export function newRace(track: Track, ship: ShipState, laps = 0): RaceState {
     proving: null,
     oob: 0,
     oobResets: 0,
+    zone: { pad: -1 },
   };
 }
 
@@ -263,6 +275,19 @@ export function stepRace(r: RaceState, ship: ShipState, track: Track, p: WallPar
         const v = ship.vel.length();
         if (v > pit.speed) ship.vel.multiplyScalar(Math.max(pit.speed / v, Math.exp(-2 * dt)));
       }
+    }
+  }
+  const onMain = !branches?.length || r.loc.route < 0;
+  if (course?.pads?.list.length) {
+    const entered = onMain ? stepPads(course.pads.list, ship, track, r.near, course.pads.fx, dt, r.zone) : ((r.zone.pad = -1), null);
+    if (entered) r.events.push({ type: 'pad', kind: entered });
+  }
+  if (course?.movers?.length && onMain && sec?.kind === 'cavern') {
+    const impact = collideMovers(course.movers, ship, track, r.near, r.time, p.shipRadius, p.bounce);
+    if (impact > 1) {
+      r.events.push({ type: 'hit', what: 'obstacle', impact });
+      r.obstacleHits++;
+      r.obstacle.point.copy(ship.pos);
     }
   }
   if (course?.gauntlet) {

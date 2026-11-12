@@ -31,7 +31,7 @@ npm run build        # static build → dist/
 | `P` | autopilot on/off |
 | `B` | replay the run since the last respawn; in a replay, play/pause |
 | `H` | HUD editor: drag widgets to move, scroll to resize, × to hide |
-| `T` | race tracks: pick one of twelve alien venues |
+| `T` | race tracks: pick one of fifteen alien venues |
 | `L` | proving ground levels: pick a ship and a level |
 | `N` | next proving level (after a clear) |
 
@@ -90,7 +90,7 @@ on or off with `gen.gauntlet.kinds.*`. Obstacles bounce you like walls. Try
 
 ## Race tracks
 
-Press `T` (or **Tracks**) for twelve alien venues (two of them underground mines and caves), each a race scenario (`scenarios/venue-*.json`) with
+Press `T` (or **Tracks**) for fifteen alien venues (five of them underground: mines, a lava mine, ice caves, a crystal and a hive), each a race scenario (`scenarios/venue-*.json`) with
 its own layout, scenery, sky and palette: a coil above a glassy sea, a trefoil knot under a ringed
 giant, a figure eight among monoliths, a loop on its edge in a girder lattice, peaks hanging from a
 cloud ceiling, and more. The parts are plain vars, so any track can use them:
@@ -107,7 +107,14 @@ cloud ceiling, and more. The parts are plain vars, so any track can use them:
 - `gen.race.hazards` (race mode): obstacles from `gen.race.hazardKinds`: iris apertures and shutter
   gates that open and shut (shut, they still leave a tight gap), turbines, crushers, lasers, moving
   rings; solid, so a mistimed pass bounces you
-- `world.screens.count`: giant screens beside the track showing a broadcast view of your ship
+- `world.screens.count`: giant screens beside the track showing a broadcast view of your ship, with
+  a lower third of your place, lap, the gap to the rival ahead and the clock (`world.screens.overlay`)
+- `gen.race.boostPads` / `gen.race.slowFields` (race mode): glowing strips along the wall that push
+  you up to `race.pad.speed`, and murky stretches that drag you down (`race.pad.drag`) except in a
+  clear lane along one wall; the autopilot rides the strips and keeps to the lanes
+- `gen.race.cavernMovers`: slabs drifting across each cavern and rocks that hang, then drop from its
+  ceiling, on a fixed clock (ghosts stay fair) and never within `gen.race.cavernCore` of the
+  centreline; solid, like the hazards
 
 ## Proving ground
 

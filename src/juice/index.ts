@@ -204,6 +204,14 @@ export function createJuice(scene: THREE.Scene, glow: () => string) {
         if (k(audio) > 0) sound.thump(25, k(audio));
       } else if (e.type === 'oob') {
         return;
+      } else if (e.type === 'pad') {
+        // onto a boost strip: a whoosh and a kick; into murk: a dull thud
+        trauma.add((e.kind === 'boost' ? 0.12 : 0.06) * k(shake));
+        if (k(audio) > 0) {
+          if (e.kind === 'boost') sound.whoosh(k(audio));
+          else sound.thump(8, k(audio));
+        }
+        return;
       } else if (e.type === 'route') {
         // into a branch: a whoosh, no flash (that's for lines and laps)
         if (e.kind && k(audio) > 0) sound.whoosh(k(audio));

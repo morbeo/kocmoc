@@ -21,6 +21,7 @@ import { createShipModel } from './render/shipModel';
 import { createField } from './world/field';
 import { createScenery } from './world/scenery';
 import { createScreens } from './world/screens';
+import { createPadScene, movers, padEffect, padLanes, pads } from './world/pads';
 import { createHud } from './ui/hud';
 import { createHudLayout, editKey as hudEditKey, editMode as hudEdit } from './ui/hudLayout';
 import { createSky } from './render/sky';
@@ -146,6 +147,7 @@ const raceScene = createRaceScene(scene);
 const sceneryScene = createScenery(scene);
 const screensScene = createScreens(scene);
 const gauntletScene = createGauntletScene(scene);
+const padScene = createPadScene(scene);
 const provingScene = createProvingScene(scene);
 const juice = createJuice(scene, () => vars.get('ship.glow')?.value as string ?? '#7fe7ff');
 const hud = createHud();
@@ -282,17 +284,21 @@ function respawn(t = spawnT.value, speed = spawnSpeed.value, at?: Spawn): void {
 const simConfig = (): SimConfig => {
   const g = gauntlet.value;
   const pc = provingCourse.value;
+  const pl = pads.value;
+  const mv = movers.value;
   return {
     ship: params(),
     walls: walls(),
     track: onTrack() ? track.value : null,
     course:
-      g || pc || track.value.branches?.length
+      g || pc || track.value.branches?.length || pl.length || mv.length
         ? {
             gauntlet: g ?? undefined,
             proving: pc ? { course: pc, rules: provingRules() } : undefined,
             nearMiss: nearMissDistance.value,
             pit: { refill: pitRefill.value, speed: pitSpeed.value },
+            pads: pl.length ? { list: pl, fx: padEffect(), lanes: padLanes.value } : undefined,
+            movers: mv.length ? mv : undefined,
           }
         : undefined,
   };
@@ -368,6 +374,8 @@ effect(() => {
   void track.value;
   void gameMode.value;
   void gauntlet.value;
+  void pads.value;
+  void movers.value;
   void provingCourse.value;
   void raceLaps.value;
   if (!replay) respawn();
@@ -660,6 +668,7 @@ renderer.setAnimationLoop((now) => {
     }
   }
   gauntletScene.update(race ? race.time - (1 - alpha) * loop.step : 0);
+  padScene.update(race ? race.time - (1 - alpha) * loop.step : 0);
   provingScene.update(race ? race.time : 0, race?.proving ?? null);
   gizmoUi?.update();
 
@@ -731,7 +740,7 @@ renderer.setAnimationLoop((now) => {
     target: race?.proving && provingCourse.value && !race.proving.result ? nextGatePoint(provingCourse.value, race.proving, _gate) : null,
     branchColors: onTrack() ? branchColors() : [],
   });
-  screensScene.update(renderer, view, dt, sky, camera);
+  screensScene.update(renderer, view, dt, sky, camera, raceHud || null);
   sky.update(camera, renderer.getPixelRatio());
   renderer.info.reset();
   pipeline.render(scene, camera, layout.value === 'single' ? undefined : rect);

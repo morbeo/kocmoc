@@ -283,7 +283,7 @@ finish with positions. AI racers stay out of scope; ghosts are the rivals.
   round). Glowing sign ring per marked route, HUD label for the fork ahead and the route you're on,
   branches on the minimap (hidden ones once found). `bot.route` / `race.rival.botRoute`: main,
   shortcut, long, random. Not done: funnels at the mouths, a split-route arrow, see-through sections.
-- **M7c, alien venues (built)**: twelve race tracks on other worlds (two underground, enclosed like Descent's mines), picked from the track list (`T`,
+- **M7c, alien venues (built)**: fifteen race tracks on other worlds (five underground, enclosed like Descent's mines), picked from the track list (`T`,
   `src/ui/tracks.ts`); each is a scenario `scenarios/venue-*.json` with a `title`. They are built from:
   - layouts (`gen.race.shape`, `src/gen/track.ts`): the wobbly loop, a figure eight whose lobes pass
     over and under each other, torus knots (trefoil, a five-lobed star, a coil winding round a ring),
@@ -318,12 +318,24 @@ finish with positions. AI racers stay out of scope; ghosts are the rivals.
   - giant screens (`src/gen/screens.ts`, `src/world/screens.ts`, `world.screens.*`, race mode): 16:9
     panels beside the track, clear of every corridor and out of shaped tunnels, turned to face the
     ship coming at them; a second camera with its own cinematic director state renders into a texture
-    `world.screens.fps` times a second;
+    `world.screens.fps` times a second, with a broadcast lower third (place, lap, gap to the rival
+    ahead, clock; `src/ui/broadcast.ts`) drawn on a canvas laid over the picture and hidden while it
+    is filmed;
+  - speed zones (`src/gen/pads.ts`, `src/sim/zones.ts`, `gen.race.boostPads` / `slowFields`,
+    `race.pad.*`, race mode): boost strips along the wall at an angle (flying within `depth` of the
+    wall over one pushes you forward up to the pad speed) and slow fields (murk over the tube's
+    cross-section cut by a chord, so a lane along one wall stays clear; drag inside). Placed clear of
+    the start, forks, sections and hazards; their lanes join the autopilot's targets (`fast` lanes:
+    no slowing down, and it coasts on the extra speed afterwards). They join the best-lap key;
+  - cavern movers (`src/gen/movers.ts`, `gen.race.cavernMovers` / `cavernCore`): slabs drifting to
+    and fro across each cavern and rocks that hang from its ceiling, drop and vanish, as functions
+    of sim time; never closer to the centreline than the core, so the middle is always safe.
+    Collision pushes out of the box or ball and bounces off its moving surface;
   - open profiles (rails, halfpipe, gates) so the scenery is in view, and per-venue palettes.
   The classic loop leaves the shape out of the track params, so saved bests and ghosts keep their keys.
 - **Scenic biomes** (proposed): the lap cut into sections (canyon, cave, city,
   orbit) with their own tube radius and profile, palette, scenery and landmarks.
-- Later: pickups and boost pads (built on §12 beacons), championship (cups as
+- Later: pickups (built on §12 beacons), championship (cups as
   scenario lists, points, unlocks, an upgrade preset layer).
 
 ---
@@ -356,4 +368,4 @@ scenarios/   bundled scenario JSON
 | M4 | Gauntlet chunks, juice system + presets |
 | M5 | Replay + ghost, autopilot bot, viewports + pop-outs, HUD editor, diff view |
 | M6 | Proving ground (§12): gate hoops, countdown rules + time beacons, level ladder + ship presets + badges, open-space profile |
-| M7 | Race (§13). M7a: lap count, finish, results, positions and gaps against ghost rivals (best, last, autopilot). M7b: route graph (shortcut, long way, split, hidden, pit lane) balanced by the autopilot. M7c: twelve alien venues (track shapes incl. loops and corkscrews, shaped tunnel sections and open air, iris and shutter hazards, giant screens, scenery, sky planets, track list). _Proposed_: biomes along the lap, pickups and boost pads, championship |
+| M7 | Race (§13). M7a: lap count, finish, results, positions and gaps against ghost rivals (best, last, autopilot). M7b: route graph (shortcut, long way, split, hidden, pit lane) balanced by the autopilot. M7c: fifteen alien venues (track shapes incl. loops and corkscrews, shaped tunnel sections and open air, iris and shutter hazards, giant screens, scenery, sky planets, track list). boost strips, slow fields, cavern movers, screen overlay. _Proposed_: biomes along the lap, pickups, championship |
