@@ -51,7 +51,8 @@
     "gen.race.sectionMax": 900,
     "gen.race.hazards": 3,
     "gen.race.hazardKinds": "iris,shutter",
-    "world.screens.count": 4
+    "world.screens.count": 4,
+    "gen.race.boostPads": 3
   },
   "presets": []
 }

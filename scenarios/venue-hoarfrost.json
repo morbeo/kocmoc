@@ -1,0 +1,53 @@
+{
+  "name": "venue-hoarfrost",
+  "title": "Hoarfrost Grottoes",
+  "desc": "Ice caves under a frozen moon: oval bores of blue ice, frost-fog drifts and wide grottoes where shelves of ice slide across and icicles drop.",
+  "mode": "race",
+  "seed": 322,
+  "spawn": {
+    "trackT": 0,
+    "speed": 0
+  },
+  "vars": {
+    "gen.race.shape": "trefoil",
+    "gen.race.radius": 900,
+    "gen.race.height": 240,
+    "gen.race.tubeRadius": 40,
+    "gen.race.profile": "tube",
+    "gen.race.twistNoise": 0.9,
+    "gen.race.sections": 8,
+    "gen.race.sectionKinds": "cavern,ellipse,irregular,octagon",
+    "gen.race.sectionMin": 200,
+    "gen.race.sectionMax": 600,
+    "gen.race.hazards": 4,
+    "gen.race.hazardKinds": "iris,ring",
+    "gen.race.hazardDifficulty": 0.5,
+    "gen.race.boostPads": 4,
+    "gen.race.slowFields": 2,
+    "render.background": "#06121c",
+    "render.sky.zenith": "#000000",
+    "render.stars.enabled": false,
+    "render.track.color": "#1d3a52",
+    "render.track.stripe": "#bfefff",
+    "render.track.stripeEvery": 34,
+    "render.light.color": "#d8f4ff",
+    "render.light.dir": [
+      -0.3,
+      1,
+      0.2
+    ],
+    "render.ambient": 0.55,
+    "render.outline.color": "#02060a",
+    "render.rim.color": "#9fe8ff",
+    "render.rim.strength": 0.9,
+    "render.gauntlet.color": "#e8fbff",
+    "render.gauntlet.trim": "#3a7aa0",
+    "render.pad.boost": "#5ef0ff",
+    "render.pad.slow": "#dff4ff",
+    "render.pad.slowOpacity": 0.5,
+    "render.mover.slab": "#a8dcf0",
+    "render.mover.rock": "#e8fbff",
+    "race.checkpoint.color": "#5ef0ff"
+  },
+  "presets": []
+}

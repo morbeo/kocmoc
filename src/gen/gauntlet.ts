@@ -77,8 +77,8 @@ export interface Gauntlet {
   /** sorted by s */
   planes: Plane[];
   rocks: Rock[];
-  /** clear straight lane through each debris field (for the autopilot) */
-  lanes: { s0: number; s1: number; x: number; y: number }[];
+  /** clear straight lane through each debris field (for the autopilot); `fast`: no need to slow down (pads) */
+  lanes: { s0: number; s1: number; x: number; y: number; fast?: boolean }[];
 }
 
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
