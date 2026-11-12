@@ -16,7 +16,7 @@ document.body.appendChild(root);
 const listening = signal<{ path: string; slot: number } | null>(null);
 
 const bindVars = computed(() => {
-  vars.version.value;
+  void vars.version.value;
   return vars.list().filter((v): v is Var<string> => v.type === 'str' && v.path.startsWith(BIND_PREFIX));
 });
 const clashes = computed(() => conflicts(Object.fromEntries(bindVars.value.map((v) => [v.path, v.value]))));

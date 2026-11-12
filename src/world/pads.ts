@@ -77,16 +77,16 @@ function boostGeometry(p: Pad, R: number): { strip: THREE.BufferGeometry; arrows
   for (let s = p.s0; s < p.s1; s += step) {
     const s2 = Math.min(p.s1, s + step);
     const [a, b] = [p.theta - p.half, p.theta + p.half];
-    at(s, a, r0, strip), at(s2, a, r0, strip), at(s, b, r0, strip);
-    at(s2, a, r0, strip), at(s2, b, r0, strip), at(s, b, r0, strip);
+    at(s, a, r0, strip); at(s2, a, r0, strip); at(s, b, r0, strip);
+    at(s2, a, r0, strip); at(s2, b, r0, strip); at(s, b, r0, strip);
   }
   // chevrons: a V every 12 m, tip forward
   const h = p.half * 0.8;
   for (let s = p.s0 + 4; s + 8 < p.s1; s += 12) {
     for (const side of [-1, 1]) {
       const outer = p.theta + side * h;
-      at(s, outer, r1, arrows), at(s + 5, p.theta, r1, arrows), at(s + 2.5, outer, r1, arrows);
-      at(s + 2.5, outer, r1, arrows), at(s + 5, p.theta, r1, arrows), at(s + 7.5, p.theta, r1, arrows);
+      at(s, outer, r1, arrows); at(s + 5, p.theta, r1, arrows); at(s + 2.5, outer, r1, arrows);
+      at(s + 2.5, outer, r1, arrows); at(s + 5, p.theta, r1, arrows); at(s + 7.5, p.theta, r1, arrows);
     }
   }
   const mk = (a: number[]) => {
@@ -109,7 +109,10 @@ function slowGeometry(p: Pad, R: number): { murk: THREE.BufferGeometry; edges: T
     let x = rr * Math.cos((k / n) * TAU);
     let y = rr * Math.sin((k / n) * TAU);
     const d = x * c + y * sn - p.w;
-    if (d > 0) (x -= d * c), (y -= d * sn);
+    if (d > 0) {
+      x -= d * c;
+      y -= d * sn;
+    }
     prof.push([x, y]);
   }
   const pos: number[] = [];

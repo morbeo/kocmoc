@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
+    "lint": "oxlint --deny-warnings",
     "test:e2e": "playwright test",
     "tdd": "node scripts/tdd.mjs",
     "test:mutate": "stryker run"
@@ -27,6 +28,7 @@
     "@stryker-mutator/core": "^10.0.0",
     "@stryker-mutator/vitest-runner": "^10.0.0",
     "@types/three": "^0.186.0",
+    "oxlint": "^1.93.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.2",
     "vitest": "^5.0.3"

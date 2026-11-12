@@ -55,7 +55,7 @@ jobs:
           node-version: 22
           cache: npm
       - if: github.event.action != 'closed'
-        run: npm ci && npm test && npm run build
+        run: npm ci && npm run lint && npm test && npm run build
 
       - id: preview
         uses: rossjrw/pr-preview-action@v1

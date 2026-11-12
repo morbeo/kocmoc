@@ -76,8 +76,14 @@ export function generatePads(track: Track, p: PadParams): Pad[] {
   // interleave the kinds so boosts and slows alternate round the lap
   const order: PadKind[] = [];
   for (let b = p.boosts, sl = p.slows; b > 0 || sl > 0; ) {
-    if (b > 0) (order.push('boost'), b--);
-    if (sl > 0) (order.push('slow'), sl--);
+    if (b > 0) {
+      order.push('boost');
+      b--;
+    }
+    if (sl > 0) {
+      order.push('slow');
+      sl--;
+    }
   }
   order.forEach((kind, k) => {
     const len = Math.max(10, kind === 'boost' ? p.boostLength : p.slowLength) * (0.8 + 0.4 * rand());
