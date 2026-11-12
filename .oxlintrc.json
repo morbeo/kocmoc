@@ -1,0 +1,48 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "categories": {
+    "correctness": "error"
+  },
+  "plugins": [
+    "typescript",
+    "unicorn",
+    "oxc",
+    "import"
+  ],
+  "env": {
+    "browser": true,
+    "es2022": true
+  },
+  "ignorePatterns": [
+    "dist",
+    "node_modules",
+    "reports",
+    ".stryker-tmp",
+    "test-results",
+    "playwright-report",
+    ".claude"
+  ],
+  "rules": {
+    "no-unused-vars": [
+      "error",
+      {
+        "ignoreRestSiblings": true,
+        "argsIgnorePattern": "^_",
+        "varsIgnorePattern": "^_"
+      }
+    ],
+    "no-unused-expressions": "error",
+    "unicorn/no-new-array": "off"
+  },
+  "overrides": [
+    {
+      "files": [
+        "scripts/**",
+        "*.config.*"
+      ],
+      "env": {
+        "node": true
+      }
+    }
+  ]
+}

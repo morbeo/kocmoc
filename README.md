@@ -9,6 +9,7 @@ See [docs/DESIGN.md](docs/DESIGN.md).
 npm install
 npm run dev          # http://localhost:5173  (add ?debug to open the debug table)
 npm test             # unit tests (vitest)
+npm run lint         # oxlint (.oxlintrc.json)
 npm run test:e2e     # browser smoke test, local only (first run: npx playwright install chromium)
 npm run build        # static build → dist/
 ```
