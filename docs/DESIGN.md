@@ -338,6 +338,12 @@ finish with positions. AI racers stay out of scope; ghosts are the rivals.
 - Later: pickups (built on §12 beacons), championship (cups as
   scenario lists, points, unlocks, an upgrade preset layer).
 
+## 14. Track editor (M8, proposed)
+
+Record a track (loop or point-to-point) by flying it, then edit points, sections, branches, hazards, pads and scenery,
+playtest and share. Tracks become a JSON document compiled into the same `Track` the generators
+make. See [EDITOR.md](EDITOR.md).
+
 ---
 
 ## Architecture
@@ -369,3 +375,4 @@ scenarios/   bundled scenario JSON
 | M5 | Replay + ghost, autopilot bot, viewports + pop-outs, HUD editor, diff view |
 | M6 | Proving ground (§12): gate hoops, countdown rules + time beacons, level ladder + ship presets + badges, open-space profile |
 | M7 | Race (§13). M7a: lap count, finish, results, positions and gaps against ghost rivals (best, last, autopilot). M7b: route graph (shortcut, long way, split, hidden, pit lane) balanced by the autopilot. M7c: fifteen alien venues (track shapes incl. loops and corkscrews, shaped tunnel sections and open air, iris and shutter hazards, giant screens, scenery, sky planets, track list). boost strips, slow fields, cavern movers, screen overlay. _Proposed_: biomes along the lap, pickups, championship |
+| M8 | _Proposed_: track editor ([EDITOR.md](EDITOR.md)). M8a track doc + compiler, M8b point-to-point tracks, M8c record by flying, M8d editor shell and cameras (desktop only), M8e placement timeline, M8f playtest and share |
