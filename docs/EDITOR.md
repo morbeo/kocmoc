@@ -32,7 +32,7 @@ One JSON file describes an authored track. The generators stop being the only so
 ```jsonc
 {
   "kind": "kocmoc.track", "version": 1,
-  "title": "Glass Loop", "author": "",
+  "title": "Glass Loop", "author": "", "closed": true,
   "points": [ { "p": [0, 0, 0], "roll": 0, "r": 40 }, ... ],   // r: tube radius at this point
   "spacing": 6, "checkpoints": 8,
   "branches": [ { "kind": "shortcut", "from": [3, 0.2], "to": [7, 0.5], "points": [ ... ] } ],
@@ -74,9 +74,28 @@ Authored bests key on a hash of the compiled doc.
 6. **Check**: the generator's acceptance tests (`minSeparation` > 2.4 R, `minCurvatureRadius` > 1.2 R)
    run on the result. Failures are marked red on the track instead of silently retrying.
 
-Point-to-point tracks (no loop) are left for later: laps, progress, ghosts and rivals all assume a loop.
+If you don't close it, the recording is a point-to-point track (below).
+
+## Point-to-point tracks
+
+`"closed": false` makes a track with a start and a separate finish, like a downhill run.
+
+- Spline: an open centripetal Catmull-Rom, with its end tangents taken from the first and last
+  segments. Frames are transported from the start with no closure fix, so there is no seam.
+- Race rules: one run, no laps (`race.laps` is ignored). The start line is at `s = 0` and the finish
+  gate at the end; checkpoints and splits work as now. Progress is plain `s` that never wraps.
+- Ends: the tube is capped behind the start; past the finish it opens into a run-off area where the
+  ship slows down, and the results card shows.
+- Ghosts, rivals, positions and gaps work unchanged, since they already measure distance from the start.
+  The bot flies it once instead of a lap.
+- Branches can't merge after the finish, and the start-line and lap checks that look across the seam
+  are skipped.
+- The editor shows open tracks the same way; the lap timeline becomes a start-to-finish timeline.
 
 ## Editor
+
+Desktop only: mouse and keyboard. On touch the track list and playtest still work, but the editor
+is not offered.
 
 A new game mode `edit`, opened from the track list or a free key (G today, rebindable).
 
@@ -136,17 +155,26 @@ be opened, edited and saved as new tracks.
 
 | # | Scope |
 |---|---|
-| M8a | Track doc + `compileTrack`, per-point radius, anchors, explicit lists in place of generators, scenario `track` field, Bake, file and URL load. Test: a baked venue compiles to the same samples as the generator |
-| M8b | Record by flying: ghost tube, sampling, close or bridge, fit, checks, save to library |
-| M8c | Editor shell: `edit` mode, orbit / fly / ortho cams, picking, point gizmo, insert / delete / roll / radius, undo, validation overlay |
-| M8d | Placement: lap timeline, sections, branches, hazards, pads, movers, screens, scenery pins, Fill buttons |
-| M8e | Playtest and share: play from here and back, bot lap, heat strip, My tracks in the track list, URL share |
+| M8a | Track doc + `compileTrack` (closed and open), per-point radius, anchors, explicit lists in place of generators, scenario `track` field, Bake, file and URL load. Test: a baked venue compiles to the same samples as the generator |
+| M8b | Point-to-point race rules: one run, finish gate, run-off, results; bot and ghosts on open tracks |
+| M8c | Record by flying: ghost tube, sampling, close or bridge, fit, checks, save to library |
+| M8d | Editor shell (desktop only): `edit` mode, orbit / fly / ortho cams, picking, point gizmo, insert / delete / roll / radius, undo, validation overlay |
+| M8e | Placement: lap timeline, sections, branches, hazards, pads, movers, screens, scenery pins, Fill buttons |
+| M8f | Playtest and share: play from here and back, bot lap, heat strip, My tracks in the track list, URL share |
 
 M8a has no UI but carries the risk (radius per sample touches collision, bot, scenery and sections),
-so it goes first. M8b can ship before the full editor: record, fit, fly.
+so it goes first. Recording (M8c) can ship before the full editor: record, fit, fly.
 
-## Open questions
+## Spline tension (decided: not now)
 
-- Keep Catmull-Rom (recommended: it passes through what you flew) or add per-point tension?
-- Desktop-first editor; on touch only playtest and the track list?
-- Point-to-point tracks: worth a later milestone?
+Kochanek-Bartels splines would add per-point tension (and optionally continuity and bias) to
+Catmull-Rom. High tension pulls the curve tight at a point and straightens the segments either side;
+low tension rounds it out.
+
+- For: hairpins next to straights without piling up points; recorded paths fit with fewer points.
+- Against: another knob per point that interacts with roll and radius; high tension makes kinks that
+  fail the bend check; three.js only has a global tension and not for the centripetal type, so it
+  needs our own spline code; it adds a field every track has to carry.
+
+Points plus insert / smooth cover the same need for now. The doc format leaves room for an optional
+`"tension"` per point later, defaulting to today's curve so nothing changes.
