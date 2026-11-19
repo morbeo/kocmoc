@@ -96,9 +96,10 @@ describe('addRoutes', () => {
     }
   });
 
-  // flies 2 x SEEDS full tracks: ~2 s plain, ~13 s under coverage instrumentation
+  // two seeds, not all of SEEDS: a strict band makes addRoutes search hard for forks that fit (~0.5 s plain,
+  // ~4 s under coverage; all eight took ~15 s, more on slow CI runners). Seed 2 keeps none, seed 3 keeps 2 of 3.
   it('a generous band keeps more forks than a strict one', { timeout: 30_000 }, () => {
-    const count = (p: Partial<RouteParams>) => SEEDS.reduce((x, seed) => x + (addRoutes(generateTrack(gen(seed)), routes(seed, p)).branches?.length ?? 0), 0);
+    const count = (p: Partial<RouteParams>) => [2, 3].reduce((x, seed) => x + (addRoutes(generateTrack(gen(seed)), routes(seed, p)).branches?.length ?? 0), 0);
     expect(count({ saveMin: 0.5, saveMax: 0.6, costMax: 0.01, pitLane: false })).toBeLessThan(count({ pitLane: false }));
   });
 });

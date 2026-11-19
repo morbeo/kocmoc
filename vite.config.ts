@@ -8,6 +8,9 @@ export default defineConfig({
   test: {
     environment: 'node',
     include: ['src/**/*.test.ts'],
+    // coverage instrumentation makes the sim-heavy tests (autopilot laps, route balancing) ~5x slower,
+    // and CI runners are slower again: 5 s (the default) is too tight for them
+    testTimeout: 15_000,
     // npm run coverage. Unit tests cover the logic; three.js, DOM and audio glue is left to e2e.
     coverage: {
       provider: 'v8',
