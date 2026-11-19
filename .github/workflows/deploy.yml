@@ -27,7 +27,10 @@ jobs:
       - run: npm ci
       - run: npm run lint
       - run: npm run tdd -- verify
-      - run: npm test
+      # unit tests with coverage; fails under the floor in vite.config.ts
+      - run: npm run coverage
+      - if: ${{ !cancelled() }}
+        run: node scripts/coverage-summary.mjs || true
       - run: npm run build
       - run: touch dist/.nojekyll
       - uses: JamesIves/github-pages-deploy-action@v4

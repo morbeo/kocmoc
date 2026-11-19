@@ -1,5 +1,7 @@
-import { describe, it, expect } from 'vitest';
-import { applyDeadzone, bindingValue, detectPress, mergePads, padLabel, padLabels, parseSource, radialDeadzone, sourceValue } from './pad';
+import { afterEach, describe, it, expect, vi } from 'vitest';
+import { vars } from '../core/vars';
+import { applyDeadzone, bindingValue, detectPress, mergePads, padLabel, padLabels, padName, parseSource, radialDeadzone, readPads, sourceValue } from './pad';
+import * as live from './pad';
 
 const pad = (axes: number[] = [], buttons: number[] = []) => ({ axes, buttons });
 
@@ -69,5 +71,42 @@ describe('pads', () => {
     expect(padLabel('b20')).toBe('B20');
     expect(padLabel('+a5')).toBe('Axis 5+');
     expect(padLabels('b0,b10')).toBe('A / L3');
+  });
+});
+
+describe('readPads', () => {
+  const gp = (id: string, axes: number[], buttons: { value: number; pressed: boolean }[], connected = true) => ({ id, axes, buttons, connected }) as unknown as Gamepad;
+  const connect = (...pads: (Gamepad | null)[]) => vi.stubGlobal('navigator', { getGamepads: () => pads });
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vars.unset('input.pad.enabled');
+    vars.unset('input.pad.deadzone');
+  });
+
+  it('reads nothing without the Gamepad API', () => {
+    vi.stubGlobal('navigator', {});
+    readPads();
+    expect(padName.value).toBe('');
+    expect(live.pad).toEqual({ axes: [], buttons: [] });
+  });
+
+  it('merges connected pads, names the first, and applies the deadzone to the game copy only', () => {
+    vars.set('input.pad.deadzone', 0.2);
+    connect(null, gp('Pad A', [0.1, 0, 0.9, 0], [{ value: 0, pressed: true }]), gp('Gone', [1, 1], [], false));
+    readPads();
+    expect(padName.value).toBe('Pad A');
+    expect(live.rawPad.axes[0]).toBeCloseTo(0.1);
+    expect(live.pad.axes[0]).toBe(0); // inside the deadzone
+    expect(live.pad.axes[2]).toBeGreaterThan(0.8);
+    expect(live.pad.buttons[0]).toBe(1); // pressed without an analog value reads as 1
+  });
+
+  it('ignores pads when input.pad.enabled is off, but still reports the name', () => {
+    vars.set('input.pad.enabled', false);
+    connect(gp('Pad B', [1], [{ value: 1, pressed: true }]));
+    readPads();
+    expect(padName.value).toBe('Pad B');
+    expect(live.pad).toEqual({ axes: [], buttons: [] });
+    expect(live.rawPad).toEqual({ axes: [], buttons: [] });
   });
 });
