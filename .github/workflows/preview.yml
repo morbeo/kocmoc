@@ -55,7 +55,9 @@ jobs:
           node-version: 22
           cache: npm
       - if: github.event.action != 'closed'
-        run: npm ci && npm run lint && npm test && npm run build
+        run: npm ci && npm run lint && npm run coverage && npm run build
+      - if: ${{ !cancelled() && github.event.action != 'closed' }}
+        run: node scripts/coverage-summary.mjs || true
 
       - id: preview
         uses: rossjrw/pr-preview-action@v1

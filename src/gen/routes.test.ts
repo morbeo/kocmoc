@@ -96,7 +96,8 @@ describe('addRoutes', () => {
     }
   });
 
-  it('a generous band keeps more forks than a strict one', () => {
+  // flies 2 x SEEDS full tracks: ~2 s plain, ~13 s under coverage instrumentation
+  it('a generous band keeps more forks than a strict one', { timeout: 30_000 }, () => {
     const count = (p: Partial<RouteParams>) => SEEDS.reduce((x, seed) => x + (addRoutes(generateTrack(gen(seed)), routes(seed, p)).branches?.length ?? 0), 0);
     expect(count({ saveMin: 0.5, saveMax: 0.6, costMax: 0.01, pitLane: false })).toBeLessThan(count({ pitLane: false }));
   });

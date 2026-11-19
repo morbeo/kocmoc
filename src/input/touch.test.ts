@@ -1,5 +1,6 @@
-import { describe, it, expect } from 'vitest';
-import { dragAxes, wrapDeg, screenDown, screenTilt, tiltAxes } from './touch';
+import { afterEach, describe, it, expect, vi } from 'vitest';
+import { vars } from '../core/vars';
+import { detectTouch, dragAxes, resetTouch, touch, touchUi, wrapDeg, screenDown, screenTilt, tiltAxes } from './touch';
 
 const tilt = (beta: number, gamma: number, angle = 0) => screenTilt(screenDown(beta, gamma, angle));
 
@@ -74,5 +75,44 @@ describe('tiltAxes', () => {
 
   it('is zero for a non-positive range', () => {
     expect(tiltAxes({ side: 10, pitch: 10 }, 0, 0)).toEqual({ side: 0, pitch: 0 });
+  });
+});
+
+describe('detectTouch', () => {
+  let listeners: Record<string, () => void>;
+  const page = (coarse: boolean) => {
+    listeners = {};
+    vi.stubGlobal('matchMedia', () => ({ matches: coarse }));
+    vi.stubGlobal('addEventListener', (type: string, fn: () => void) => void (listeners[type] = fn));
+  };
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vars.unset('input.touch.ui');
+  });
+
+  it('shows the controls on a touch screen, and on a hybrid after the first touch', () => {
+    page(false);
+    detectTouch();
+    expect(touchUi.value).toBe(false);
+    listeners.touchstart();
+    expect(touchUi.value).toBe(true);
+  });
+
+  it('input.touch.ui forces them on or off', () => {
+    page(true);
+    detectTouch();
+    expect(touchUi.value).toBe(true);
+    vars.set('input.touch.ui', 'off');
+    expect(touchUi.value).toBe(false);
+    vars.set('input.touch.ui', 'on');
+    expect(touchUi.value).toBe(true);
+  });
+});
+
+describe('resetTouch', () => {
+  it('centres every axis and releases boost', () => {
+    Object.assign(touch, { pitch: 1, yaw: -1, roll: 0.5, strafe: 1, lift: -1, thrust: 1, boost: true });
+    resetTouch();
+    expect(touch).toEqual({ pitch: 0, yaw: 0, roll: 0, strafe: 0, lift: 0, thrust: 0, boost: false });
   });
 });

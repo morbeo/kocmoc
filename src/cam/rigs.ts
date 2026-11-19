@@ -105,7 +105,9 @@ export function placeRig(rig: Rig, camera: PerspectiveCamera, ship: ShipState, d
       // a fixed spot ahead and to the side; jump to a new one once the ship is well past
       _fwd.set(0, 0, -1).applyQuaternion(ship.quat);
       const d = sideDistance.value;
-      if (!st.spotInit || st.spot.distanceTo(ship.pos) > d * 3) {
+      // "past" = behind the ship: a fresh spot is ahead and can start further than d * 3 away at speed
+      const past = _offset.subVectors(st.spot, ship.pos).dot(_fwd) < 0 && st.spot.distanceTo(ship.pos) > d * 3;
+      if (!st.spotInit || past) {
         _up.set(0, 1, 0).applyQuaternion(ship.quat);
         st.spot.copy(ship.pos).addScaledVector(_fwd, d * 2 + ship.vel.length() * 1.5).add(_offset.crossVectors(_fwd, _up).multiplyScalar(d * 0.5));
         st.spotInit = true;

@@ -1,3 +1,4 @@
+/// <reference types="node" />
 import { describe, it, expect } from 'vitest';
 import { scenarios, venues } from './scenarios';
 import { generateTrack, TRACK_SHAPES, type RaceGenParams, type TrackShape } from '../gen/track';
@@ -8,9 +9,14 @@ import { HAZARD_KINDS, generateHazards, type HazardKind } from '../gen/gauntlet'
 import { generatePads } from '../gen/pads';
 import { generateMovers } from '../gen/movers';
 import type { Scenario } from './scenarios';
+import { readdirSync, readFileSync } from 'node:fs';
 
-// every source file, to check that venue vars name real vars
-const sources = Object.values(import.meta.glob<string>('/src/**/*.{ts,tsx}', { eager: true, query: '?raw', import: 'default' })).join('\n');
+// every source file, to check that venue vars name real vars. Read from disk rather than through
+// import.meta.glob('?raw'): raw imports count as loaded modules and hide them from the coverage report.
+const sources = readdirSync('src', { recursive: true, encoding: 'utf8' })
+  .filter((f) => /\.tsx?$/.test(f))
+  .map((f) => readFileSync(`src/${f}`, 'utf8'))
+  .join('\n');
 
 /** A venue's track params, as its vars set them over the defaults. */
 function params(v: Scenario): RaceGenParams {
