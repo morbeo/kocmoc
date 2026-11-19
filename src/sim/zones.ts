@@ -1,6 +1,6 @@
 import { Vector3 } from 'three';
 import type { ShipState } from './ship';
-import type { Nearest, Track } from '../gen/track';
+import { radiusAt, type Nearest, type Track } from '../gen/track';
 import { inPad, type Pad, type PadKind } from '../gen/pads';
 import { moverPose, type Mover, type MoverPose } from '../gen/movers';
 import { arcDelta } from './gauntlet';
@@ -25,7 +25,7 @@ export interface ZoneState {
  */
 export function stepPads(pads: Pad[], ship: ShipState, track: Track, near: Nearest, fx: PadEffect, dt: number, st: ZoneState): PadKind | null {
   const i = near.index;
-  const R = track.radius;
+  const R = radiusAt(track, i, near.t);
   _off.subVectors(ship.pos, near.point);
   const x = _off.dot(track.right[i]);
   const y = _off.dot(track.up[i]);

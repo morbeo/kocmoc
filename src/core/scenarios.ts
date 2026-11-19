@@ -1,5 +1,6 @@
 import { presets, applyPreset, activePreset } from './presets';
 import { LAYERS, type Change, type LayerData, type Registry } from './vars';
+import { parseTrackDoc, parseTrackText, serializeTrackDoc, type TrackDoc } from '../gen/trackDoc';
 
 export const GAME_MODES = ['race', 'gauntlet', 'proving', 'free'] as const;
 export type GameMode = (typeof GAME_MODES)[number];
@@ -16,7 +17,34 @@ export interface Scenario {
   spawn?: { trackT?: number; speed?: number };
   vars?: LayerData;
   presets?: string[];
+  /** a track file to fly: inline, or the name of a bundled one (`tracks/<name>.json`) */
+  track?: TrackDoc | string;
 }
+
+// tracks/<name>.json, bundled
+const trackFiles = import.meta.glob<unknown>('/tracks/*.json', { eager: true, import: 'default' });
+/** Bundled track files by name. */
+export const bundledTracks: Record<string, TrackDoc> = Object.fromEntries(
+  Object.entries(trackFiles).flatMap(([file, raw]) => {
+    const doc = parseTrackDoc(raw);
+    if (!doc) console.warn(`kocmoc: ${file} is not a valid track file`);
+    return doc ? [[file.replace(/^\/tracks\//, '').replace(/\.json$/, ''), doc]] : [];
+  }),
+);
+
+/** A scenario's track file, if it names one that exists. */
+export function scenarioTrack(sc: Scenario): TrackDoc | undefined {
+  if (sc.track === undefined) return undefined;
+  if (typeof sc.track === 'string') {
+    const doc = bundledTracks[sc.track];
+    if (!doc) console.warn(`kocmoc: scenario "${sc.name}" names unknown track ${sc.track}`);
+    return doc;
+  }
+  return parseTrackDoc(sc.track);
+}
+
+/** A scenario that flies a track file in race mode, with the file's look. */
+export const trackScenario = (doc: TrackDoc, name = 'track'): Scenario => ({ name, title: doc.title, mode: 'race', seed: doc.seed, track: doc, spawn: { trackT: 0, speed: 0 } });
 
 // scenarios/<name>.json, bundled
 const files = import.meta.glob<Scenario>('/scenarios/*.json', { eager: true, import: 'default' });
@@ -46,12 +74,23 @@ export function parseScenario(raw: unknown): Scenario | undefined {
   }
   if (r.vars && typeof r.vars === 'object' && !Array.isArray(r.vars)) out.vars = { ...(r.vars as LayerData) };
   if (Array.isArray(r.presets)) out.presets = r.presets.filter((p): p is string => typeof p === 'string');
+  if (typeof r.track === 'string') out.track = r.track;
+  else if (r.track !== undefined) {
+    const doc = parseTrackDoc(r.track);
+    if (doc) out.track = doc;
+  }
   return out;
 }
 
-/** The `scenario` layer contents a scenario produces (mode and seed become vars). */
+/**
+ * The `scenario` layer contents a scenario produces (mode and seed become vars). A track file's
+ * look goes under the scenario's own vars, and its text into `gen.race.track`.
+ */
 export function scenarioLayer(sc: Scenario): LayerData {
-  const data: LayerData = { ...sc.vars };
+  const doc = scenarioTrack(sc);
+  const data: LayerData = { ...doc?.vars, ...sc.vars };
+  if (doc) data['gen.race.track'] = serializeTrackDoc(doc);
+  if (doc && sc.seed === undefined) data['gen.race.seed'] = doc.seed;
   if (sc.mode) data['game.mode'] = sc.mode;
   if (sc.seed !== undefined) data['gen.race.seed'] = sc.seed;
   return data;
@@ -88,6 +127,9 @@ export function applyScenario(registry: Registry, sc: Scenario): void {
     const user = current.user?.[path];
     if (user !== undefined) changes.push({ layer: 'user', path, before: user, after: undefined });
   }
+  // a track file set by hand would outlive the scenario: any scenario replaces it
+  const userTrack = current.user?.['gen.race.track'];
+  if (userTrack !== undefined && !('gen.race.track' in data)) changes.push({ layer: 'user', path: 'gen.race.track', before: userTrack, after: undefined });
   registry.change(changes);
   for (const id of sc.presets ?? []) {
     const p = presets.find((x) => x.id === id);
@@ -107,8 +149,10 @@ export function captureScenario(
   const merged: LayerData = { ...snap.scenario, ...snap.user };
   const mode = merged['game.mode'];
   const seed = merged['gen.race.seed'];
+  const text = merged['gen.race.track'];
   delete merged['game.mode'];
   delete merged['gen.race.seed'];
+  delete merged['gen.race.track'];
   const sc: Scenario = { name };
   sc.mode = isMode(mode) ? mode : 'race';
   sc.seed = typeof seed === 'number' ? seed : (registry.get('gen.race.seed')?.value as number | undefined);
@@ -117,5 +161,8 @@ export function captureScenario(
   sc.presets = LAYERS.filter((l) => l.startsWith('preset:'))
     .map((l) => activePreset(registry, l)?.id)
     .filter((id): id is string => !!id);
+  // a track file in use goes in whole, so the scenario carries it
+  const doc = typeof text === 'string' && text ? parseTrackText(text) : undefined;
+  if (doc) sc.track = doc;
   return sc;
 }

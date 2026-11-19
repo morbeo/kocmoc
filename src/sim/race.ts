@@ -1,6 +1,6 @@
 import { Matrix4, Vector3 } from 'three';
 import type { ShipState } from './ship';
-import { nearestOnTrack, type Nearest, type Track } from '../gen/track';
+import { nearestOnTrack, radiusAt, type Nearest, type Track } from '../gen/track';
 import { locate, newRouteState, resetRoute, type RouteKind, type RouteState } from '../gen/routes';
 import type { Gauntlet } from '../gen/gauntlet';
 import { polar, sectionAt, wallAt, wallNormal, type Wall } from '../gen/sections';
@@ -230,7 +230,10 @@ export function stepRace(r: RaceState, ship: ShipState, track: Track, p: WallPar
   const branches = track.branches;
   const routeWas = r.loc.route;
   if (branches?.length) locate(track, ship.pos, r.loc, r.near, p.shipRadius);
-  else nearestOnTrack(track, ship.pos, r.near.index, 24, r.near);
+  else {
+    nearestOnTrack(track, ship.pos, r.near.index, 24, r.near);
+    if (track.rad) r.loc.radius = radiusAt(track, r.near.index, r.near.t);
+  }
   // a shaped section of the main loop: its own walls, or none in open air
   const sec = (!branches?.length || r.loc.route < 0) && track.sections ? sectionAt(track, r.near.s) : null;
   const wall = sec ? wallAt(track, r.near.s, polar(track, r.near.index, r.near.point, ship.pos).theta, _wl) : null;

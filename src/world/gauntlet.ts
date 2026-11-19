@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import { computed, effect } from '@preact/signals-core';
+import { radiusAtS } from '../gen/track';
 import { vars } from '../core/vars';
 import { toon } from '../render/toon';
 import { CHUNK_KINDS, HAZARD_KINDS, generateGauntlet, generateHazards, irisRadius, pointOnTrack, sampleAt, slotWidth, type Gauntlet, type GauntletParams, type HazardKind, type HazardParams, type Plane } from '../gen/gauntlet';
-import { gameMode, seedVar, track } from './race';
+import { authored, gameMode, seedVar, track } from './race';
 
 export const shipRadius = vars.num('ship.radius', 1.5, { min: 0.2, max: 6, hardMin: 0.05, unit: 'm', tags: ['ship', 'race'], desc: 'collision sphere' });
 export const nearMissDistance = vars.num('race.nearMiss', 2.5, {
@@ -64,6 +65,8 @@ export const hazardParams = computed<HazardParams>(() => ({
 /** The obstacle layout: the gauntlet in gauntlet mode, race hazards in race mode (if any), else null. */
 export const gauntlet = computed<Gauntlet | null>(() => {
   if (gameMode.value === 'gauntlet') return generateGauntlet(track.value, gauntletParams.value);
+  // a track file places its own hazards
+  if (authored.value) return gameMode.value === 'race' ? authored.value.hazards : null;
   if (hazardParams.value.count > 0 && gameMode.value === 'race') {
     const h = generateHazards(track.value, hazardParams.value);
     return h.planes.length ? h : null;
@@ -188,7 +191,7 @@ export function createGauntletScene(scene: THREE.Scene) {
       // local X → right, Y → up, Z → along the track
       m4.makeBasis(t.right[i], t.up[i], t.tan[i]).setPosition(pointOnTrack(t, pl.s, 0, 0, p));
       holder.applyMatrix4(m4);
-      const { spin, update } = planeMesh(pl, t.radius, solid, trim, laser, own);
+      const { spin, update } = planeMesh(pl, radiusAtS(t, pl.s), solid, trim, laser, own);
       holder.add(spin);
       group.add(holder);
       updaters.push(update);

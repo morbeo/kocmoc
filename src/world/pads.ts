@@ -1,12 +1,13 @@
 import * as THREE from 'three';
 import { computed, effect } from '@preact/signals-core';
+import { radiusAtS } from '../gen/track';
 import { vars } from '../core/vars';
 import { toon } from '../render/toon';
 import { generatePads, padLane, type Pad, type PadParams } from '../gen/pads';
 import { generateMovers, moverPose, type Mover, type MoverParams, type MoverPose } from '../gen/movers';
 import { pointOnTrack, sampleAt } from '../gen/gauntlet';
 import type { PadEffect } from '../sim/zones';
-import { gameMode, seedVar, track } from './race';
+import { authored, gameMode, seedVar, track } from './race';
 import { gauntlet } from './gauntlet';
 
 const g = ['gen', 'race', 'pad'];
@@ -42,15 +43,17 @@ export const padParams = computed<PadParams>(() => ({
   slowLength: pv.slowLength.value,
 }));
 export const pads = computed<Pad[]>(() => {
+  // a track file places its own pads
+  if (authored.value) return gameMode.value === 'race' ? authored.value.pads : [];
   const p = padParams.value;
   if (!p.boosts && !p.slows) return [];
   return generatePads(track.value, { ...p, avoid: gauntlet.value?.planes.map((q) => q.s) });
 });
 /** Where the autopilot flies through each pad: over the strip, down the clear lane. */
 export const padLanes = computed(() => {
-  const R = track.value.radius;
+  const t = track.value;
   return pads.value.map((p) => {
-    const [x, y] = padLane(p, R);
+    const [x, y] = padLane(p, radiusAtS(t, (p.s0 + p.s1) / 2));
     return { s0: p.s0, s1: p.s1, x, y, fast: true };
   });
 });
@@ -191,11 +194,11 @@ export function createPadScene(scene: THREE.Scene) {
     slabs = rocks = null;
     for (const pad of list) {
       if (pad.kind === 'boost') {
-        const { strip, arrows } = boostGeometry(pad, t.radius);
+        const { strip, arrows } = boostGeometry(pad, radiusAtS(t, (pad.s0 + pad.s1) / 2));
         group.add(new THREE.Mesh(strip, stripMat), new THREE.Mesh(arrows, arrowMat));
         own.push(strip, arrows);
       } else {
-        const { murk, edges } = slowGeometry(pad, t.radius);
+        const { murk, edges } = slowGeometry(pad, radiusAtS(t, (pad.s0 + pad.s1) / 2));
         const mesh = new THREE.Mesh(murk, murkMat);
         mesh.renderOrder = 2;
         group.add(mesh, new THREE.LineSegments(edges, edgeMat));
