@@ -39,6 +39,8 @@ import { createGauntletScene, gauntlet, nearMissDistance, shipRadius } from './w
 import { createJuice } from './juice';
 import { raceDistance, splitDelta, type RaceState, type WallParams } from './sim/race';
 import { scenarios, applyScenario, parseScenario, setSpawnHandler, setSpawnSource, venues } from './core/scenarios';
+import { parseTrackDoc } from './gen/trackDoc';
+import { loadTrackDoc, trackFromHash, TRACK_HASH } from './world/trackFile';
 import type { ProvingHud } from './ui/hud';
 import './ui/hud.css';
 import { bestKey, ghostKey, LADDER_KEY, loadLadder } from './world/records';
@@ -402,6 +404,13 @@ if (urlScenario) {
   if (sc) applyScenario(vars, sc);
   else console.warn(`kocmoc: no scenario named ${urlScenario}`);
 }
+// #t=<lz-string> opens a shared track file; the hash goes once it's loaded
+if (location.hash.startsWith(TRACK_HASH)) {
+  const doc = trackFromHash(location.hash);
+  if (doc) loadTrackDoc(doc);
+  else console.warn('kocmoc: invalid track file in URL');
+  history.replaceState(null, '', location.pathname + location.search);
+}
 // drop a scenario JSON on the page to load it
 addEventListener('dragover', (e) => e.preventDefault());
 addEventListener('drop', async (e) => {
@@ -415,9 +424,14 @@ addEventListener('drop', async (e) => {
       playRecording(rec);
       return;
     }
+    const doc = parseTrackDoc(raw);
+    if (doc) {
+      loadTrackDoc(doc);
+      return;
+    }
     const sc = parseScenario(raw);
     if (sc) applyScenario(vars, sc);
-    else console.warn('kocmoc: dropped file is not a scenario');
+    else console.warn('kocmoc: dropped file is not a scenario or a track file');
   } catch {
     console.warn('kocmoc: dropped file is not valid JSON');
   }

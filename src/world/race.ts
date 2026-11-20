@@ -2,11 +2,12 @@ import * as THREE from 'three';
 import { computed, effect } from '@preact/signals-core';
 import { vars } from '../core/vars';
 import { toon } from '../render/toon';
-import { generateTrack, nearestOnTrack, TRACK_SHAPES, type Nearest, type RaceGenParams, type Track } from '../gen/track';
+import { generateTrack, nearestOnTrack, radiusAt, TRACK_SHAPES, type Nearest, type RaceGenParams, type Track } from '../gen/track';
 import { addRoutes, nearestOnPath, radAt, routeS, type Branch, type RouteKind, type RouteParams } from '../gen/routes';
 import { botJudge } from '../sim/forks';
 import { addSections, sectionAngles, sectionAt, SECTION_KINDS, wallAt, type Section, type SectionKind, type SectionParams } from '../gen/sections';
 import { GAME_MODES } from '../core/scenarios';
+import { compileTrack, hashText, parseTrackText, type CompiledTrack, type TrackDoc } from '../gen/trackDoc';
 
 export const gameMode = vars.enum('game.mode', 'race', GAME_MODES, { tags: ['game'], desc: 'race: generated track; gauntlet: the track filled with obstacles; proving: gates against the clock; free: open rock field' });
 /** Race and gauntlet both fly the generated track. */
@@ -100,9 +101,33 @@ export const sectionParams = computed<SectionParams>(() => ({
 }));
 /** Routes are on (the track has or may have forks); part of the best-lap key when they are. */
 export const routesOn = () => routeParams.value.forks > 0 || routeParams.value.pitLane;
+
+/** A track file (JSON, `src/gen/trackDoc.ts`) to fly instead of the generated track. */
+export const trackText = vars.str('gen.race.track', '', { tags: g, regen: true, desc: 'a track file (JSON) flown instead of the generated track; empty = generated. Load one from the debug panel, a file drop or a #t= link' });
+/** The track file in use, or null for the generated track (or one that doesn't parse). */
+export const trackDoc = computed<TrackDoc | null>(() => {
+  const text = trackText.value.trim();
+  if (!text) return null;
+  const doc = parseTrackText(text);
+  if (!doc) console.warn('kocmoc: gen.race.track is not a valid track file; flying the generated track');
+  return doc ?? null;
+});
+/** Hash of the track file's text, for saved bests and ghosts. */
+export const trackHash = computed(() => (trackDoc.value ? hashText(trackText.value.trim()) : ''));
+/** The track file compiled, or null. */
+export const authored = computed<CompiledTrack | null>(() => (trackDoc.value ? compileTrack(trackDoc.value) : null));
+
 const loop = computed<Track>(() => generateTrack(genParams.value));
-/** Regenerates when any `gen.race.*` var changes. Forks are balanced by flying the autopilot through them. */
-export const track = computed<Track>(() => addSections(addRoutes(loop.value, routeParams.value, botJudge), sectionParams.value));
+/**
+ * The track flown: a track file's when one is loaded (its forks and sections only in race mode, like
+ * the generator's), else generated, regenerating when any `gen.race.*` var changes. Generated forks
+ * are balanced by flying the autopilot through them.
+ */
+export const track = computed<Track>(() => {
+  const a = authored.value;
+  if (a) return gameMode.value === 'race' ? a.track : a.base;
+  return addSections(addRoutes(loop.value, routeParams.value, botJudge), sectionParams.value);
+});
 export const seedVar = gen.seed;
 
 // --- meshes ------------------------------------------------------------------
@@ -272,7 +297,7 @@ function branchKeep(t: Track, b: Branch): Keep {
   const n: Nearest = { index: 0, t: 0, s: 0, point: new THREE.Vector3(), dist: Infinity };
   return (i, c) => {
     nearestOnTrack(t, c, sampleOf(t, routeS(b, b.s[i])), 40, n);
-    return n.dist >= t.radius * 0.995;
+    return n.dist >= radiusAt(t, n.index, n.t) * 0.995;
   };
 }
 
@@ -307,6 +332,10 @@ export function createRaceScene(scene: THREE.Scene) {
     group.clear();
 
     const R = t.radius;
+    /** the main tube's radius at each sample, and as a scale of the nominal one for rings */
+    const mainRad = t.rad ?? R;
+    const ringScale = t.rad ? (i: number) => t.rad![i] / R : undefined;
+    const closedPath = t.closed !== false;
     const bs = t.branches ?? [];
     const keepMain = look === 'tube' || look === 'halfpipe' || look === 'rails' ? mainKeep(t) : undefined;
     /** each branch's stripe colour: its route's (hidden routes look like the loop) */
@@ -315,7 +344,7 @@ export function createRaceScene(scene: THREE.Scene) {
     if (look === 'tube' || look === 'halfpipe') {
       const angles = look === 'tube' ? range(32, 0, Math.PI * 2, false) : range(17, Math.PI, Math.PI * 2, true);
       const ring = look === 'tube';
-      const parts = [sweep(t, angles, R, ring, undefined, true, keepMain)];
+      const parts = [sweep(t, angles, mainRad, ring, undefined, closedPath, keepMain)];
       for (const b of bs) parts.push({ ...sweep(b, angles, b.rad, ring, undefined, false, branchKeep(t, b)), colors: tint(b) });
       geo = mergeSweeps(parts, colA, colB);
     } else if (look === 'rails') {
@@ -331,10 +360,10 @@ export function createRaceScene(scene: THREE.Scene) {
             0.6,
             true,
             (i, out) => {
-              const r = rad ? rad[i] : R;
+              const r = rad ? rad[i] : radiusAt(t, i);
               out.copy(path.pos[i]).addScaledVector(path.right[i], Math.cos(a) * r).addScaledVector(path.up[i], Math.sin(a) * r);
             },
-            !b,
+            b ? false : closedPath,
             b ? branchKeep(t, b) : keepMain,
           );
           parts.push(b ? { ...part, colors: tint(b) } : part);
@@ -362,7 +391,7 @@ export function createRaceScene(scene: THREE.Scene) {
     if (guides.length) {
       const guideGeo = new THREE.TorusGeometry(R, 0.3, 6, 40);
       const rings = new THREE.InstancedMesh(guideGeo, guideMat, guides.length);
-      ringMatrices(rings, t, guides, t.length);
+      ringMatrices(rings, t, guides, t.length, ringScale);
       group.add(rings);
       disposables.push(guideGeo, rings);
     }
@@ -373,7 +402,7 @@ export function createRaceScene(scene: THREE.Scene) {
       const along = bs.map((b) => range(Math.max(1, Math.floor(b.length / every)), b.open0, b.open1, true));
       const ringGeo = new THREE.TorusGeometry(R, look === 'open' ? 0.3 : 1, 6, 40);
       const gates = new THREE.InstancedMesh(ringGeo, look === 'open' ? guideMat : gateMat, at.length + along.reduce((x, a) => x + a.length, 0));
-      ringMatrices(gates, t, at, t.length);
+      ringMatrices(gates, t, at, t.length, ringScale);
       let from = at.length;
       bs.forEach((b, k) => {
         ringMatrices(gates, b, along[k], b.length, (i) => b.rad[i] / R, from);
@@ -396,10 +425,10 @@ export function createRaceScene(scene: THREE.Scene) {
 
     const cpGeo = new THREE.TorusGeometry(R * 0.98, 0.5, 6, 48);
     const cps = new THREE.InstancedMesh(cpGeo, cpMat, Math.max(1, t.checkpoints.length - 1));
-    ringMatrices(cps, t, t.checkpoints.slice(1), t.length);
+    ringMatrices(cps, t, t.checkpoints.slice(1), t.length, ringScale);
     cps.count = t.checkpoints.length - 1;
     const start = new THREE.InstancedMesh(new THREE.TorusGeometry(R * 0.98, 0.6, 6, 48), startMat, 1);
-    ringMatrices(start, t, [0], t.length);
+    ringMatrices(start, t, [0], t.length, ringScale);
     group.add(cps, start);
     disposables.push(cpGeo, cps, start.geometry, start);
   });

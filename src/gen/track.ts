@@ -156,6 +156,61 @@ export interface Track {
   branches?: Branch[];
   /** stretches of the loop with their own cross-section (none unless added by `addSections`) */
   sections?: Section[];
+  /** false: a point-to-point track from the first sample to the last (default: a closed loop) */
+  closed?: boolean;
+  /** tube radius at each sample, when it varies along the track (else `radius` everywhere) */
+  rad?: number[];
+  /** what the centreline was built from, so it can be baked into a track file */
+  source?: TrackSource;
+}
+
+/** Control points and roll a track's centreline was sampled from. */
+export interface TrackSource {
+  points: Vector3[];
+  /** roll at each control point, radians */
+  rolls: number[];
+  /** whole turns of roll over a closed lap */
+  twist: number;
+  /** tube radius at each control point, when it varies */
+  radii?: number[];
+  /** sample spacing and checkpoint count asked for */
+  spacing: number;
+  checkpoints: number;
+}
+
+/** How to sample a spline through control points into a `Track`. */
+export interface SampleOptions {
+  closed: boolean;
+  spacing: number;
+  /** nominal tube radius, m */
+  radius: number;
+  checkpoints: number;
+  /** whole turns of roll over the track (rounded on a closed loop) */
+  twist: number;
+  /** tube radius at each control point; omitted = `radius` everywhere */
+  radii?: number[];
+}
+
+/** Tube radius at sample `i`, `t` of the way to the next. */
+export function radiusAt(track: Track, i: number, t = 0): number {
+  const r = track.rad;
+  if (!r) return track.radius;
+  const n = r.length;
+  const a = r[Math.min(n - 1, Math.max(0, i))];
+  return t > 0 ? a + (r[Math.min(n - 1, i + 1) % n] - a) * t : a;
+}
+
+/** Tube radius at arc length `s`. */
+export function radiusAtS(track: Track, s: number): number {
+  if (!track.rad) return track.radius;
+  const n = track.pos.length;
+  const L = track.length;
+  const ss = track.closed === false ? Math.min(L, Math.max(0, s)) : ((s % L) + L) % L;
+  const i = Math.min(n - 1, Math.floor((ss / L) * n));
+  const j = Math.min(n - 1, i + 1);
+  const span = (j === i ? 0 : j === 0 ? L : track.s[j]) - track.s[i];
+  const f = span > 0 ? Math.min(1, Math.max(0, (ss - track.s[i]) / span)) : 0;
+  return track.rad[i] + (track.rad[j] - track.rad[i]) * f;
 }
 
 const WORLD_UP = new Vector3(0, 1, 0);
@@ -190,7 +245,7 @@ export function transportFrame(pos: Vector3[], tan: Vector3[], r: Vector3, i: nu
  * Rotation-minimising frames along a closed polyline (double reflection, Wang et al. 2008),
  * with the closure mismatch spread evenly so the frame is continuous across the seam.
  */
-export function parallelTransport(pos: Vector3[], tan: Vector3[]): Vector3[] {
+export function parallelTransport(pos: Vector3[], tan: Vector3[], closed = true): Vector3[] {
   const n = pos.length;
   const up: Vector3[] = new Array(n);
   // start with world up projected onto the plane across the track
@@ -200,6 +255,7 @@ export function parallelTransport(pos: Vector3[], tan: Vector3[]): Vector3[] {
 
   const transport = (r: Vector3, i: number, j: number) => transportFrame(pos, tan, r, i, j);
   for (let i = 1; i < n; i++) up[i] = transport(up[i - 1], i - 1, i).normalize();
+  if (!closed) return up;
 
   // closure: angle between where up[0] would be after going round, and up[0] itself
   const back = transport(up[n - 1], n - 1, 0).normalize();
@@ -237,6 +293,68 @@ export function minCurvatureRadius(tan: Vector3[], s: number[], length: number):
   return best;
 }
 
+const smoothstep = (f: number) => f * f * (3 - 2 * f);
+
+/**
+ * Sample a centripetal Catmull-Rom spline through `ctrl` every `spacing` m by arc length, with
+ * rotation-minimising frames and roll: whole turns of `twist` over the track plus each control
+ * point's roll, eased between points (and the tube radius the same way, when `radii` is given).
+ * A closed loop's frame is spread so it meets itself; an open track starts upright and runs free.
+ */
+export function sampleTrack(ctrl: Vector3[], rolls: number[], o: SampleOptions): Omit<Track, 'attempts'> {
+  const n = ctrl.length;
+  const closed = o.closed;
+  const curve = new CatmullRomCurve3(ctrl, closed, 'centripetal');
+  curve.arcLengthDivisions = 4000; // the default (200) is too coarse for even spacing on a long track
+  const length = curve.getLength();
+  const count = Math.max(16, Math.round(length / Math.max(o.spacing, 0.5)));
+  const samples = closed ? count : count + 1;
+  const pos: Vector3[] = [];
+  const tan: Vector3[] = [];
+  const s: number[] = [];
+  for (let i = 0; i < samples; i++) {
+    const u = i / count;
+    pos.push(curve.getPointAt(u));
+    tan.push(curve.getTangentAt(u).normalize());
+    s.push(u * length);
+  }
+  const up = parallelTransport(pos, tan, closed);
+  // which control points sample i lies between, and how far: closed tracks wrap, open ones stop at the last
+  const segs = closed ? n : n - 1;
+  const between = (u: number): [number, number, number] => {
+    const k = u * segs;
+    const i0 = closed ? Math.floor(k) % n : Math.min(n - 2, Math.floor(k));
+    return [i0, (i0 + 1) % n, smoothstep(Math.min(1, k - Math.floor(closed ? k : i0)))];
+  };
+  const turns = closed ? Math.round(o.twist) : o.twist;
+  const right: Vector3[] = [];
+  const radii = o.radii && o.radii.length === n && o.radii.some((r) => r !== o.radius) ? o.radii : undefined;
+  const rad: number[] | undefined = radii ? [] : undefined;
+  for (let i = 0; i < samples; i++) {
+    const u = i / count;
+    const [i0, i1, f] = between(u);
+    const roll = turns * Math.PI * 2 * u + rolls[i0] + (rolls[i1] - rolls[i0]) * f;
+    rotateAbout(up[i], tan[i], roll).normalize();
+    right.push(new Vector3().crossVectors(tan[i], up[i]).normalize());
+    if (rad && radii) rad.push(radii[i0] + (radii[i1] - radii[i0]) * f);
+  }
+  const cps = Math.max(1, Math.round(o.checkpoints));
+  const track: Omit<Track, 'attempts'> = {
+    pos,
+    tan,
+    up,
+    right,
+    s,
+    length,
+    radius: o.radius,
+    checkpoints: Array.from({ length: cps }, (_, k) => (k * length) / cps),
+    source: { points: ctrl.map((v) => v.clone()), rolls: [...rolls], twist: turns, spacing: o.spacing, checkpoints: cps, ...(radii ? { radii: [...radii] } : {}) },
+  };
+  if (!closed) track.closed = false;
+  if (rad) track.rad = rad;
+  return track;
+}
+
 const MAX_ATTEMPTS = 24;
 
 /** Deterministic closed race track from a seed. Retries (and calms the layout) until it is flyable. */
@@ -270,44 +388,8 @@ export function generateTrack(p: RaceGenParams): Track {
       }
       rolls.push((rand() * 2 - 1) * p.twistNoise);
     }
-    const curve = new CatmullRomCurve3(ctrl, true, 'centripetal');
-    curve.arcLengthDivisions = 4000; // the default (200) is too coarse for even spacing on a long loop
-    const length = curve.getLength();
-    const count = Math.max(16, Math.round(length / Math.max(p.spacing, 0.5)));
-    const pos: Vector3[] = [];
-    const tan: Vector3[] = [];
-    const s: number[] = [];
-    for (let i = 0; i < count; i++) {
-      const u = i / count;
-      pos.push(curve.getPointAt(u));
-      tan.push(curve.getTangentAt(u).normalize());
-      s.push(u * length);
-    }
-    const up = parallelTransport(pos, tan);
-    // authored twist: whole turns over the lap, plus smooth per-control-point roll
-    const right: Vector3[] = [];
-    for (let i = 0; i < count; i++) {
-      const u = i / count;
-      const k = u * n;
-      const i0 = Math.floor(k) % n;
-      const f = k - Math.floor(k);
-      const smooth = f * f * (3 - 2 * f);
-      const roll = Math.round(p.twist) * Math.PI * 2 * u + rolls[i0] + (rolls[(i0 + 1) % n] - rolls[i0]) * smooth;
-      rotateAbout(up[i], tan[i], roll).normalize();
-      right.push(new Vector3().crossVectors(tan[i], up[i]).normalize());
-    }
-    const cps = Math.max(1, Math.round(p.checkpoints));
-    last = {
-      pos,
-      tan,
-      up,
-      right,
-      s,
-      length,
-      radius: p.tubeRadius,
-      checkpoints: Array.from({ length: cps }, (_, k) => (k * length) / cps),
-      attempts: attempt,
-    };
+    last = { ...sampleTrack(ctrl, rolls, { closed: true, spacing: p.spacing, radius: p.tubeRadius, checkpoints: p.checkpoints, twist: p.twist }), attempts: attempt };
+    const { pos, s, length, tan } = last;
     const clear = minSeparation(pos, s, length, p.tubeRadius * 4) > p.tubeRadius * 2.4;
     const bendable = minCurvatureRadius(tan, s, length) > p.tubeRadius * 1.2;
     if (clear && bendable) return last;
@@ -360,7 +442,14 @@ export function nearestOnTrack(track: Track, p: Vector3, hint = -1, window = 24,
   const res = out ?? { index: 0, t: 0, s: 0, point: new Vector3(), dist: Infinity };
   res.dist = Infinity;
   const n = track.pos.length;
-  if (hint < 0) for (let i = 0; i < n; i++) projectOnSegment(track, i, p, res);
-  else for (let k = -window; k <= window; k++) projectOnSegment(track, (((hint + k) % n) + n) % n, p, res);
+  // an open track has no segment from its last sample back to its first
+  const open = track.closed === false;
+  if (hint < 0) for (let i = 0; i < (open ? n - 1 : n); i++) projectOnSegment(track, i, p, res);
+  else
+    for (let k = -window; k <= window; k++) {
+      const i = hint + k;
+      if (open && (i < 0 || i > n - 2)) continue;
+      projectOnSegment(track, ((i % n) + n) % n, p, res);
+    }
   return res;
 }

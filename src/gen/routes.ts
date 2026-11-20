@@ -1,6 +1,6 @@
 import { Vector3 } from 'three';
 import { rng } from '../core/rng';
-import { nearestOnTrack, rotateAbout, transportFrame, type Nearest, type Track } from './track';
+import { nearestOnTrack, radiusAt, radiusAtS, rotateAbout, transportFrame, type Nearest, type Track } from './track';
 
 /**
  * Route graph: branches that leave the main loop and rejoin it further on. The main loop stays the
@@ -31,6 +31,9 @@ export interface Branch {
   open1: number;
   /** share of the main line's time saved over [s0, s1] (negative = slower), as judged or estimated */
   save: number;
+  /** direction it bulges off the loop (angle from right towards up) and how far, m */
+  theta: number;
+  amp: number;
 }
 
 export interface RouteParams {
@@ -98,14 +101,18 @@ function resample(fine: Vector3[], spacing: number): { pos: Vector3[]; s: number
   return { pos, s, length };
 }
 
-/** Dense centreline of a branch of `kind` over main [s0, s0 + span]. */
-function shape(kind: RouteKind, t: Track, s0: number, span: number, rand: () => number): Vector3[] {
-  const R = t.radius;
-  const steps = Math.max(16, Math.ceil(span / 2));
+/** A random bulge for a branch of `kind`: which way off the loop, and how far. */
+function drawBulge(kind: RouteKind, R: number, rand: () => number): { theta: number; amp: number } {
   const theta = kind === 'pit' ? (rand() < 0.5 ? 0 : Math.PI) : rand() * Math.PI * 2;
   const rb = R * RADIUS[kind];
   const amp =
     kind === 'long' ? R * (3.5 + 1.5 * rand()) : kind === 'split' ? (R + rb) * 1.2 : kind === 'pit' ? R * 2.3 : R * 1.5 * rand();
+  return { theta, amp };
+}
+
+/** Dense centreline of a branch of `kind` over main [s0, s0 + span], bulging `amp` m towards `theta`. */
+function shape(kind: RouteKind, t: Track, s0: number, span: number, theta: number, amp: number): Vector3[] {
+  const steps = Math.max(16, Math.ceil(span / 2));
   const P0 = mainPoint(t, s0, new Vector3());
   const P1 = mainPoint(t, s0 + span, new Vector3());
   const T0 = t.tan[sampleIndex(t, s0)];
@@ -139,8 +146,21 @@ function shape(kind: RouteKind, t: Track, s0: number, span: number, rand: () => 
 
 /** Sampled branch with frames that start and end matching the main track's. */
 function buildBranch(kind: RouteKind, t: Track, s0: number, span: number, rand: () => number): Branch {
+  const { theta, amp } = drawBulge(kind, t.radius, rand);
+  return branchFrom(kind, t, s0, span, theta, amp);
+}
+
+/** Its own tube radius for a branch of `kind` on track `t` (or the one given). */
+export const branchRadius = (kind: RouteKind, t: Track, radius?: number) => radius ?? t.radius * RADIUS[kind];
+
+/**
+ * A branch of `kind` from main `s0` to `s0 + span` that bulges `amp` m towards `theta`, sampled
+ * like the loop, with frames matching it at both ends; `radius` overrides its kind's tube radius.
+ * `open0`/`open1` are its whole length until `branchOpenings` finds where it leaves the main tube.
+ */
+export function branchFrom(kind: RouteKind, t: Track, s0: number, span: number, theta: number, amp: number, radius?: number): Branch {
   const spacing = t.length / t.pos.length;
-  const { pos, s, length } = resample(shape(kind, t, s0, span, rand), spacing);
+  const { pos, s, length } = resample(shape(kind, t, s0, span, theta, amp), spacing);
   const n = pos.length;
   const i0 = sampleIndex(t, s0);
   const i1 = sampleIndex(t, s0 + span);
@@ -157,10 +177,15 @@ function buildBranch(kind: RouteKind, t: Track, s0: number, span: number, rand: 
   const mismatch = Math.atan2(want.dot(side), want.dot(up[n - 1]));
   for (let k = 1; k < n; k++) rotateAbout(up[k], tan[k], (mismatch * k) / (n - 1)).normalize();
   const right = tan.map((f, k) => new Vector3().crossVectors(f, up[k]).normalize());
-  const R = t.radius;
-  const radius = R * RADIUS[kind];
-  const rad = s.map((d) => R + (radius - R) * plateau(d / length, 0.25));
-  return { kind, s0, s1: s0 + span, pos, tan, up, right, s, length, rad, radius, open0: 0, open1: length, save: 0 };
+  const rb = branchRadius(kind, t, radius);
+  // the main tube's radius at the mouths, easing to the branch's own in the middle
+  const R0 = radiusAtS(t, s0);
+  const R1 = radiusAtS(t, s0 + span);
+  const rad = s.map((d) => {
+    const base = R0 + (R1 - R0) * (d / length);
+    return base + (rb - base) * plateau(d / length, 0.25);
+  });
+  return { kind, s0, s1: s0 + span, pos, tan, up, right, s, length, rad, radius: rb, open0: 0, open1: length, save: 0, theta, amp };
 }
 
 /** Smallest radius of curvature along an open polyline. */
@@ -212,8 +237,47 @@ export function estimateSave(t: Track, b: Branch): number {
  * from other branches, and it bends gently enough to fly. Sets `open0`/`open1`.
  */
 function fits(t: Track, b: Branch, others: Branch[]): boolean {
-  const R = t.radius;
   if (minBend(b) < t.radius * 3) return false;
+  const clearAt = clearance(t, b);
+  if (!clearAt) return false;
+  const a = clearAt.indexOf(true);
+  const z = clearAt.lastIndexOf(true);
+  if (a < 0) return false;
+  for (let k = a; k <= z; k++) if (!clearAt[k]) return false;
+  if (b.s[z] - b.s[a] < b.length * 0.3) return false;
+  for (const o of others) {
+    for (let k = 0; k < b.pos.length; k += 2) {
+      for (let j = 0; j < o.pos.length; j += 2) {
+        if (o.pos[j].distanceTo(b.pos[k]) < (o.rad[j] + b.rad[k]) * 1.3) return false;
+      }
+    }
+  }
+  b.open0 = b.s[a];
+  b.open1 = b.s[z];
+  return true;
+}
+
+/**
+ * Set where a branch's tube first and last clears the main tube (`open0`/`open1`), whatever else
+ * it runs into; a branch that never clears keeps its whole length. For branches given by hand.
+ */
+export function branchOpenings(t: Track, b: Branch): Branch {
+  const clearAt = clearance(t, b, true) ?? [];
+  const a = clearAt.indexOf(true);
+  const z = clearAt.lastIndexOf(true);
+  if (a >= 0) {
+    b.open0 = b.s[a];
+    b.open1 = b.s[z];
+  }
+  return b;
+}
+
+/**
+ * For each branch sample, whether its tube is clear of the main tube near the fork; null if it
+ * comes too close to another part of the loop (unless `lenient`).
+ */
+function clearance(t: Track, b: Branch, lenient = false): boolean[] | null {
+  const R = t.radius;
   const margin = R * 4;
   const n = b.pos.length;
   const clearAt: boolean[] = [];
@@ -227,24 +291,10 @@ function fits(t: Track, b: Branch, others: Branch[]): boolean {
       if (t.s[i] >= b.s0 - margin && t.s[i] <= b.s1 + margin) near = Math.min(near, d);
       else far = Math.min(far, d);
     }
-    if (Math.sqrt(far) < (R + rb) * 1.3) return false;
+    if (!lenient && Math.sqrt(far) < (R + rb) * 1.3) return null;
     clearAt.push(Math.sqrt(near) > (R + rb) * 1.06);
   }
-  const a = clearAt.indexOf(true);
-  const z = clearAt.lastIndexOf(true);
-  if (a < 0) return false;
-  for (let k = a; k <= z; k++) if (!clearAt[k]) return false;
-  if (b.s[z] - b.s[a] < b.length * 0.3) return false;
-  for (const o of others) {
-    for (let k = 0; k < n; k += 2) {
-      for (let j = 0; j < o.pos.length; j += 2) {
-        if (o.pos[j].distanceTo(b.pos[k]) < (o.rad[j] + b.rad[k]) * 1.3) return false;
-      }
-    }
-  }
-  b.open0 = b.s[a];
-  b.open1 = b.s[z];
-  return true;
+  return clearAt;
 }
 
 /** Whether a branch's time `save` (share of the main line's) is in its kind's band. */
@@ -328,8 +378,17 @@ export function addRoutes(track: Track, p: RouteParams, judge?: RouteJudge): Tra
     }
   }
   if (!branches.length) return track;
+  return withBranches(track, branches);
+}
+
+/**
+ * The track with these branches, sorted; a checkpoint inside a fork moves to the nearer end of it
+ * (dropped if that crowds another).
+ */
+export function withBranches(track: Track, branches: Branch[]): Track {
+  if (!branches.length) return track;
   branches.sort((a, b) => a.s0 - b.s0);
-  // a checkpoint inside a fork moves to the nearer end of it (dropped if that crowds another)
+  const R = track.radius;
   const checkpoints: number[] = [];
   for (const [k, s] of track.checkpoints.entries()) {
     const b = branches.find((x) => s >= x.s0 - R * 2 && s <= x.s1 + R * 2);
@@ -391,7 +450,7 @@ export interface RouteState {
 
 export function newRouteState(track: Track, p: Vector3): RouteState {
   const main = nearestOnTrack(track, p);
-  return { route: -1, main, branch: (track.branches ?? []).map(() => ({ ...newNearest(), index: -1 })), radius: track.radius, s: main.s };
+  return { route: -1, main, branch: (track.branches ?? []).map(() => ({ ...newNearest(), index: -1 })), radius: radiusAt(track, main.index, main.t), s: main.s };
 }
 
 /** Forget the branch (after the ship is put back on the main line). */
@@ -399,7 +458,7 @@ export function resetRoute(st: RouteState, track: Track, p: Vector3): void {
   st.route = -1;
   nearestOnTrack(track, p, -1, 24, st.main);
   for (const b of st.branch) b.index = -1;
-  st.radius = track.radius;
+  st.radius = radiusAt(track, st.main.index, st.main.t);
   st.s = st.main.s;
 }
 
@@ -414,7 +473,7 @@ export function locate(track: Track, p: Vector3, st: RouteState, out: Nearest, m
   const bs = track.branches ?? [];
   // on a branch the closest point of the loop can be far off; search where the branch maps to instead
   nearestOnTrack(track, p, st.route >= 0 ? sampleIndex(track, st.s) : st.main.index, 24, st.main);
-  const R = track.radius;
+  const R = radiusAt(track, st.main.index, st.main.t);
   let pick = -1;
   let pickRadius = R;
   // current route first: stay on it while inside its tube

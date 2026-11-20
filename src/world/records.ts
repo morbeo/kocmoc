@@ -1,4 +1,4 @@
-import { gameMode, genParams, routeParams, routesOn, sectionParams } from './race';
+import { gameMode, genParams, routeParams, routesOn, sectionParams, trackHash } from './race';
 import { gauntletParams, hazardParams } from './gauntlet';
 import { provingParams } from './proving';
 import { moverParams, movers, padEffect, padParams, pads } from './pads';
@@ -8,7 +8,16 @@ import { parseLadder, type Ladder } from '../core/ladder';
  * localStorage key of the best lap for what is flown now: the mode and everything that shapes the
  * course (track, gauntlet or proving parameters; routes, sections, hazards, pads and movers when they're on).
  */
-export const bestKey = () =>
+export const bestKey = () => (trackHash.value ? fileKey() : generatedKey());
+
+/** A track file: its hash names the course; the mode's own parameters and the pad and mover settings join it. */
+const fileKey = () => {
+  const mode = gameMode.value;
+  const extra = mode === 'gauntlet' ? JSON.stringify(gauntletParams.value) : mode === 'proving' ? JSON.stringify(provingParams.value) : '';
+  return `kocmoc.best.track.${trackHash.value}|${mode}${extra}${pads.value.length ? `|pads${JSON.stringify(padEffect())}` : ''}${movers.value.length ? `|movers${JSON.stringify(moverParams.value)}` : ''}`;
+};
+
+const generatedKey = () =>
   gameMode.value === 'gauntlet'
     ? `kocmoc.best.gauntlet.${JSON.stringify([genParams.value, gauntletParams.value])}`
     : gameMode.value === 'proving'

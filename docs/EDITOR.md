@@ -24,40 +24,59 @@ Everything after step 1 is placed by **arc length `s` and a cross-section positi
 `theta` or `x, y` in the frame). That is what makes an editor cheap: the generators already
 produce plain data, so an authored track is the same data written down instead of rolled from a seed.
 
-## Track document
+## Track document (built, M8a)
 
-One JSON file describes an authored track. The generators stop being the only source and become
-"fill" tools that write into it.
+One JSON file describes an authored track (`src/gen/trackDoc.ts`). The generators stop being the
+only source and become "fill" tools that write into it.
 
 ```jsonc
 {
   "kind": "kocmoc.track", "version": 1,
-  "title": "Glass Loop", "author": "", "closed": true,
-  "points": [ { "p": [0, 0, 0], "roll": 0, "r": 40 }, ... ],   // r: tube radius at this point
-  "spacing": 6, "checkpoints": 8,
-  "branches": [ { "kind": "shortcut", "from": [3, 0.2], "to": [7, 0.5], "points": [ ... ] } ],
+  "title": "Glass Loop", "closed": true,
+  "seed": 309,            // scenery, screens and cavern movers are still generated from it
+  "radius": 40,           // nominal tube radius, m
+  "spacing": 4, "checkpoints": 8,
+  "twist": 2,             // whole turns of roll over the track
+  "points":   [ { "p": [0, 0, 0], "roll": 0.2, "r": 60 }, ... ],        // roll and r optional
+  "branches": [ { "kind": "shortcut", "from": [3, 0.2], "to": [7, 0.5], "theta": 1.2, "amp": 40, "radius": 30 } ],
   "sections": [ { "kind": "hex", "from": [10, 0], "to": [12, 0.6], "ramp": 60, "seed": 4, "roll": 0 } ],
-  "hazards":  [ { "kind": "iris", "at": [5, 0.4], "shape": { ... } } ],
-  "pads":     [ { "kind": "boost", "from": [2, 0.1], "to": [2, 0.8], "theta": 1.57, ... } ],
-  "screens":  [ { "at": [8, 0.5], "side": 1 } ],
-  "scenery":  { "seed": 1, "kinds": "columns,shards", "count": 120, "pinned": [] },
+  "hazards":  [ { "kind": "iris", "at": [5, 0.4], "thickness": 2, "shape": { "k": "iris", ... } } ],
+  "pads":     [ { "kind": "boost", "from": [2, 0.1], "to": [2, 0.8], "theta": 1.57, "half": 0.4, "depth": 6, "w": 0 } ],
   "vars":     { "render.track.color": "#4b3a78", "gen.race.profile": "halfpipe" }
 }
 ```
 
-- **Anchors are `[segment, t]`** on the control polygon, not raw `s`. Moving a point changes arc
-  lengths everywhere, but a hazard on segment 5 stays on segment 5. `compileTrack` turns anchors
-  into `s` for the existing runtime.
-- **Per-point radius** is new. The main track gets a `rad[]` per sample like branches already have;
-  `wallAt`, collision, bot and scenery read it instead of the single `track.radius`.
-- Positions are rounded to 0.1 m and angles to 0.001 rad on save, so files diff well and URLs stay short.
-- `vars` holds the venue look (palette, profile, ground, sky), applied as the scenario layer.
-- `parseTrackDoc` validates untrusted input like `parseScenario` does (types, ranges, at most
-  2000 points and 500 items).
+- **Tracks are sampled exactly as the generator samples them** (`sampleTrack` in `src/gen/track.ts`
+  is shared), so a baked track compiles back to the generator's centreline and frames within the
+  0.1 m rounding of its points.
+- **Anchors are `[segment, t]`** on the control polygon, not raw `s`: `s = (segment + t) / segments ×
+  length`, the same parameter roll and radius are eased by. Moving a point changes arc lengths
+  everywhere, but a hazard on segment 5 stays on segment 5.
+- **Per-point radius**: the main track gets `rad[]` per sample (smoothstep between points, like roll)
+  when any point's `r` differs from `radius`. `radiusAt` / `radiusAtS` feed `locate`, wall
+  collision, `wallAt` / `reachAt` (sections, scenery), pads, hazard and pad meshes, and the tube,
+  rail and ring meshes. Hazard shapes are in metres, so they don't scale with it.
+- **Branches** keep the generator's shape (`branchFrom`: a Hermite cut or a bulge of `amp` m towards
+  `theta`); free control points for branches come with the editor (M8e).
+- **Open tracks** (`"closed": false`) compile, with frames that run free from the start and no
+  segment back from the end. Race rules for them (start run-up, finish gate, run-off, minimap) are M8b.
+- Positions are rounded to 0.1 m, angles to 0.001 rad and anchors to 1e-4, so files diff well and
+  links stay short (a 12-point loop is about 600 characters as a link).
+- `vars` holds the look (palette, profile, ground, sky, scenery settings), applied under the scenario.
+- `parseTrackDoc` validates untrusted input (kinds, finite numbers in range, at most 2000 points and
+  500 items per list, bad items dropped) and returns the rounded, canonical form.
+- Not in v1: hand-placed screens and pinned scenery props (M8e); both are still generated from `seed`.
 
-A scenario gains an optional `track` (inline doc or `tracks/<name>.json`). With it, the race
-uses `compileTrack(doc)`; without it, nothing changes, so every venue, best and ghost keeps its key.
-Authored bests key on a hash of the compiled doc.
+**In the game.** The file's canonical text is the var `gen.race.track` (empty = generated), so
+undo, autosave, `#s=` links, repro bundles and replays carry it. `world/race.ts` compiles it and
+`track` uses it in place of the generator (its forks and sections in race mode only, like the
+generator's); hazards and pads come from the file in race mode. Saved bests and ghosts key on a
+hash of the text (`kocmoc.best.track.<hash>|<mode>...`). A scenario takes an optional `track` (inline,
+or the name of a bundled `tracks/<name>.json`); loading any scenario replaces a file loaded before.
+
+**Getting files in and out** (debug panel `track` row): **bake** saves the track flown now (any
+venue or seed, with its forks, sections, hazards, pads and look) as `*.kocmoc-track.json`; **load**
+or a file drop opens one; **link** copies a `#t=<lz-string>` URL; **generated** goes back.
 
 ## Record a track by flying
 
@@ -155,14 +174,14 @@ be opened, edited and saved as new tracks.
 
 | # | Scope |
 |---|---|
-| M8a | Track doc + `compileTrack` (closed and open), per-point radius, anchors, explicit lists in place of generators, scenario `track` field, Bake, file and URL load. Test: a baked venue compiles to the same samples as the generator |
+| M8a | **Built.** Track doc + `compileTrack` (closed and open), per-point radius, anchors, explicit lists in place of generators, scenario `track` field, Bake, file and URL load. Test: a baked track compiles to the same samples as the generator |
 | M8b | Point-to-point race rules: one run, finish gate, run-off, results; bot and ghosts on open tracks |
 | M8c | Record by flying: ghost tube, sampling, close or bridge, fit, checks, save to library |
 | M8d | Editor shell (desktop only): `edit` mode, orbit / fly / ortho cams, picking, point gizmo, insert / delete / roll / radius, undo, validation overlay |
 | M8e | Placement: lap timeline, sections, branches, hazards, pads, movers, screens, scenery pins, Fill buttons |
 | M8f | Playtest and share: play from here and back, bot lap, heat strip, My tracks in the track list, URL share |
 
-M8a has no UI but carries the risk (radius per sample touches collision, bot, scenery and sections),
+M8a has only debug-panel UI but carries the risk (radius per sample touches collision, bot, scenery and sections),
 so it goes first. Recording (M8c) can ship before the full editor: record, fit, fly.
 
 ## Spline tension (decided: not now)

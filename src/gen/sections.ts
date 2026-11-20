@@ -1,6 +1,6 @@
 import { Vector3 } from 'three';
 import { rng } from '../core/rng';
-import type { Track } from './track';
+import { radiusAtS, type Track } from './track';
 
 /**
  * Stretches of the main loop with their own cross-section, so not every track is a round tube:
@@ -173,7 +173,7 @@ export interface Wall {
 
 /** Main-loop wall at arc length `s` and angle `theta`, eased from the round tube. */
 export function wallAt(track: Track, s: number, theta: number, out: Wall = { rho: 0, open: false, oob: 0 }): Wall {
-  const R = track.radius;
+  const R = radiusAtS(track, s);
   out.rho = R;
   out.open = false;
   out.oob = R;
@@ -194,7 +194,7 @@ export function wallAt(track: Track, s: number, theta: number, out: Wall = { rho
 /** Widest the main loop's corridor gets at `s`, m (for keeping scenery clear). */
 export function reachAt(track: Track, s: number): number {
   const sec = sectionAt(track, s);
-  return track.radius * (sec ? 1 + (SECTION_REACH[sec.kind] - 1) * sectionWeight(sec, s) : 1);
+  return radiusAtS(track, s) * (sec ? 1 + (SECTION_REACH[sec.kind] - 1) * sectionWeight(sec, s) : 1);
 }
 
 /** Hex, square, octagon, triangle, star: any roll. Rectangles, diamonds and ellipses: wide or tall. */

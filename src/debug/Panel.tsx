@@ -4,6 +4,10 @@ import { vars, LAYERS, type Layer } from '../core/vars';
 import { presets, applyPreset, activePreset } from '../core/presets';
 import { shareUrl } from '../core/persist';
 import { scenarios, applyScenario, captureScenario, currentSpawn } from '../core/scenarios';
+import { currentVenue } from '../core/selection';
+import { parseTrackText } from '../gen/trackDoc';
+import { trackDoc } from '../world/race';
+import { bakeCurrent, clearTrackFile, loadTrackDoc, trackShareUrl } from '../world/trackFile';
 import { parseQuery, filterRows, type Row } from './query';
 import { diffVars } from './diff';
 import { session } from '../core/session';
@@ -122,6 +126,65 @@ function DiffView() {
     </div>
   );
 }
+
+/** Track files: bake the track flown now, load one, share it as a link, or go back to generated. */
+function TrackTools() {
+  const file = useRef<HTMLInputElement>(null);
+  void layersVersion.value;
+  const doc = trackDoc.value;
+  return (
+    <div class="row run">
+      <span class="label" title={doc ? `flying a track file${doc.title ? `: ${doc.title}` : ''}` : 'flying the generated track'}>
+        track{doc ? ' (file)' : ''}
+      </span>
+      <button
+        title="save the track flown now (centreline, forks, sections, hazards, pads and look) as a track file; drop it on the page to load it"
+        onClick={() => {
+          const title = prompt('Track name', doc?.title ?? currentTitle());
+          if (title !== null) download(`${slug(title) || 'track'}.kocmoc-track.json`, bakeCurrent(title || undefined));
+        }}
+      >
+        bake
+      </button>
+      <button title="load a track file (or drop it on the page)" onClick={() => file.current?.click()}>
+        load
+      </button>
+      <input
+        ref={file}
+        type="file"
+        accept=".json,application/json"
+        hidden
+        onChange={async (e) => {
+          const f = e.currentTarget.files?.[0];
+          e.currentTarget.value = '';
+          if (!f) return;
+          const loaded = parseTrackText(await f.text());
+          if (loaded) loadTrackDoc(loaded);
+          else alert('Not a kocmoc track file');
+        }}
+      />
+      <button
+        title="copy a link that opens the track flown now (baked if it is generated)"
+        onClick={() => {
+          const url = trackShareUrl(doc ?? bakeCurrent(currentTitle()));
+          void navigator.clipboard?.writeText(url).catch(() => {});
+          console.info(`kocmoc: track link (${url.length} characters)`, url);
+        }}
+      >
+        link
+      </button>
+      {doc && (
+        <button title="fly the generated track again" onClick={() => clearTrackFile()}>
+          generated
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Title of the scenario loaded now, if it has one. */
+const currentTitle = () => scenarios.find((sc) => sc.name === currentVenue())?.title ?? '';
+const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
 
 function RunTools() {
   const file = useRef<HTMLInputElement>(null);
@@ -363,6 +426,7 @@ function Toolbar() {
         <ScenarioPicker />
       </div>
       <RunTools />
+      <TrackTools />
       <details>
         <summary>snapshots ({snapshots.value.length})</summary>
         <Snapshots />
