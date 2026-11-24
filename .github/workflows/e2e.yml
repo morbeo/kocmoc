@@ -1,12 +1,15 @@
 name: E2E
 
-# The Playwright browser tests (e2e/), in headless Chromium with software GL. Not a gate for
-# deploys yet: they are slow on runners without a GPU and some fail there. The HTML report is
-# uploaded on every run.
+# The Playwright browser tests (e2e/), in headless Chromium with software GL. They take
+# ~15 min on runners without a GPU, so they run on releases, once a day and by hand, not on
+# every PR or push (PRs still get lint, unit tests, coverage, typecheck and a preview build).
+# Not a gate for deploys. The suite is split into shards that run in parallel; each shard
+# uploads its own HTML report.
 on:
-  pull_request:
-  push:
-    branches: [master]
+  release:
+    types: [published]
+  schedule:
+    - cron: '17 3 * * *' # daily, 03:17 UTC
   workflow_dispatch:
 
 concurrency:
@@ -15,8 +18,13 @@ concurrency:
 
 jobs:
   e2e:
+    name: e2e (shard ${{ matrix.shard }}/4)
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -30,11 +38,11 @@ jobs:
           path: ~/.cache/ms-playwright
           key: playwright-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
       - run: npx playwright install --with-deps chromium
-      - run: npm run test:e2e
+      - run: npm run test:e2e -- --shard=${{ matrix.shard }}/4
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: playwright-report
+          name: playwright-report-${{ matrix.shard }}
           path: |
             playwright-report/
             test-results/
