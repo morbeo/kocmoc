@@ -11,7 +11,7 @@ npm run dev          # http://localhost:5173  (add ?debug to open the debug tabl
 npm test             # unit tests (vitest)
 npm run coverage     # unit tests + coverage (html in coverage/; CI fails under the floor in vite.config.ts)
 npm run lint         # oxlint (.oxlintrc.json)
-npm run test:e2e     # browser tests (first run: npx playwright install chromium); CI runs them too, not yet as a gate
+npm run test:e2e     # browser tests (first run: npx playwright install chromium); CI runs them on releases and daily, not as a gate
 npm run build        # static build → dist/
 ```
 
