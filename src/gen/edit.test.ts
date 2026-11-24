@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { Euler, Quaternion, Vector3 } from 'three';
 import { compileTrack, anchorS, parseTrackDoc, serializeTrackDoc, TRACK_KIND, type TrackDoc } from './trackDoc';
-import { deletePoints, EditHistory, flyStep, turnView, insertPoint, movePoints, nudgePoints, pointSample, radiusPoints, rollPoints, sampleSegment, smoothPoints } from './edit';
+import { deletePoints, docSections, sectionOver, sectionSpan, EditHistory, flyStep, removeSection, setSection, turnView, updateSection, insertPoint, movePoints, nudgePoints, pointSample, radiusPoints, rollPoints, sampleSegment, smoothPoints } from './edit';
 
 /** A closed square-ish loop of 8 points, 400 m across, with things placed on it. */
 function loop(closed = true): TrackDoc {
@@ -279,5 +279,49 @@ describe('view turns', () => {
     for (const axis of ['yaw', 'pitch', 'roll'] as const) for (let k = 0; k < 4; k++) turnView(pos, q, new Vector3(1, 2, 3), axis, Math.PI / 2);
     expect(pos.distanceTo(p0)).toBeLessThan(1e-6);
     expect(Math.abs(q.dot(q0))).toBeCloseTo(1, 6);
+  });
+});
+
+describe('sections', () => {
+  it('shapes the stretch between two points, replacing what it overlaps', () => {
+    const d = loop(); // has a hex section from [2, 0.25] to [3, 0.5]
+    const a = setSection(d, 5, 3, 'star')!;
+    expect(a.sections!.map((x) => [x.kind, x.from, x.to])).toEqual([['star', [3, 0], [5, 0]]]);
+    expect(a.sections![0].ramp).toBe(45);
+    const b = setSection(d, 5, 6, 'cavern')!;
+    expect(b.sections!.map((x) => x.kind)).toEqual(['hex', 'cavern']);
+    expect(b.sections![1].seed).toBe(2);
+    // back to round
+    expect(setSection(d, 2, 4, null)!.sections).toBeUndefined();
+  });
+
+  it('one point means the segment after it, or before it at the end of a run', () => {
+    const d = loop();
+    expect(setSection(d, 6, 6, 'octagon')!.sections!.at(-1)!.from).toEqual([6, 0]);
+    const o = loop(false);
+    const s = setSection(o, 7, 7, 'square')!.sections!.at(-1)!;
+    expect([s.from, s.to]).toEqual([[6, 0], [6, 1]]);
+    expect(setSection(d, 0, 99, 'hex')).toBeUndefined();
+    expect(sectionSpan(d, 4, 1)).toEqual([1, 4]);
+    expect(sectionSpan(d, 7, 7)).toEqual([7, 8]);
+    expect(sectionSpan(d, -1, 2)).toBeNull();
+    expect(sectionOver(d, 3, 4)).toBe(0);
+    expect(sectionOver(d, 4, 6)).toBe(-1);
+  });
+
+  it('changes and removes sections, and places them on the centreline', () => {
+    const d = loop();
+    const u = updateSection(d, 0, { kind: 'ellipse', roll: Math.PI / 2, ramp: -5 })!;
+    expect(u.sections![0]).toMatchObject({ kind: 'ellipse', roll: 1.571, ramp: 0 });
+    expect(updateSection(d, 3, { kind: 'hex' })).toBeUndefined();
+    expect(removeSection(d, 0)!.sections).toBeUndefined();
+    expect(removeSection(d, 1)).toBeUndefined();
+    const t = compileTrack(d).base;
+    const [sec] = docSections(d, t);
+    expect(sec.s0).toBeCloseTo(t.length * (2.25 / 8), 3);
+    expect(sec.s1).toBeCloseTo(t.length * (3.5 / 8), 3);
+    // the same as the game puts it
+    const raced = compileTrack(d).track.sections![0];
+    expect(raced.s0).toBeCloseTo(sec.s0, 6);
   });
 });

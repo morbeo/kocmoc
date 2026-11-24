@@ -7,10 +7,11 @@ import { keyLabel } from '../input/bindings';
 import { canvasInput, invert, sampleInput } from '../input/input';
 import { touchUi } from '../input/touch';
 import { noControls } from '../sim/ship';
-import { compileBase, deletePoints, EditHistory, flyStep, insertPoint, movePoints, radiusPoints, rollPoints, sampleSegment, smoothPoints, turnView, type TurnAxis, type Vec3 } from '../gen/edit';
+import { compileBase, deletePoints, docSections, removeSection, sectionOver, sectionSpan, setSection, updateSection, EditHistory, flyStep, insertPoint, movePoints, radiusPoints, rollPoints, sampleSegment, smoothPoints, turnView, type TurnAxis, type Vec3 } from '../gen/edit';
 import { trackProblems, type Problem } from '../gen/record';
 import { parseTrackText, serializeTrackDoc, type TrackDoc } from '../gen/trackDoc';
 import { radiusAt, type Track } from '../gen/track';
+import { SECTION_KINDS, type SectionKind } from '../gen/sections';
 import { gameMode, trackDoc, trackText } from '../world/race';
 import { bakeCurrent, loadTrackDoc } from '../world/trackFile';
 import { saveTrack } from '../world/library';
@@ -439,6 +440,13 @@ export function createEditor(host: EditorHost) {
     lookAt(sphere.center, sphere.radius * 1.1);
   }
 
+  /** Look at the stretch of track from `s0` to `s1`. */
+  function focusStretch(s0: number, s1: number): void {
+    if (!base) return;
+    const i = Math.min(base.pos.length - 1, Math.round(((s0 + s1) / 2 / base.length) * base.pos.length));
+    lookAt(base.pos[i], Math.max(radiusAt(base, i) * 5, (s1 - s0) * 0.7));
+  }
+
   function focusProblem(p: Problem): void {
     if (!base) return;
     const i = Math.round((p.i0 + p.i1) / 2);
@@ -449,7 +457,25 @@ export function createEditor(host: EditorHost) {
 
   function draw(): void {
     if (!active || !doc || !base) return;
-    const view = { doc, length: base.length, selection: selected(), problems, cam: ev.cam.value, view: ev.view.value, canUndo: history.canUndo, canRedo: history.canRedo, changed: history.current !== original, notice, step: ev.viewStep.value };
+    const sel = selected();
+    const span = sel.length ? sectionSpan(doc, sel[0], sel[sel.length - 1]) : null;
+    const over = span ? sectionOver(doc, span[0], span[1]) : -1;
+    const view = {
+      doc,
+      length: base.length,
+      selection: sel,
+      problems,
+      cam: ev.cam.value,
+      view: ev.view.value,
+      canUndo: history.canUndo,
+      canRedo: history.canRedo,
+      changed: history.current !== original,
+      notice,
+      step: ev.viewStep.value,
+      sections: docSections(doc, base),
+      shape: over >= 0 ? doc.sections![over].kind : '',
+      span: span && ([span[0] + 1, span[1] + 1] as [number, number]),
+    };
     const keys = Object.fromEntries(Object.entries(host.keys).map(([n, k]) => [n, keyOf(k)])) as Record<keyof EditorKeys, string>;
     panel.innerHTML = panelHtml(view, keys);
     help.innerHTML = helpText(view.cam);
@@ -470,6 +496,12 @@ export function createEditor(host: EditorHost) {
       return draw();
     }
     if (b.dataset.problem) return focusProblem(problems[Number(b.dataset.problem)]);
+    if (b.dataset.secRm && doc) return void commit(removeSection(doc, Number(b.dataset.secRm)));
+    if (b.dataset.secGo && doc && base) {
+      const sec = docSections(doc, base)[Number(b.dataset.secGo)];
+      if (sec) focusStretch(sec.s0, sec.s1);
+      return;
+    }
     act(b.dataset.a as Action);
   });
   panel.addEventListener('change', (e) => {
@@ -488,6 +520,12 @@ export function createEditor(host: EditorHost) {
       for (const i of sel) next.points[i].roll = rad(x);
       commit(parseTrackText(JSON.stringify(next)));
     } else if (el.dataset.f === 'radius' && Number.isFinite(x) && sel.length) commit(radiusPoints(doc, sel, x, true));
+    else if (el.dataset.f === 'shape' && sel.length) {
+      const kind = (SECTION_KINDS as readonly string[]).includes(el.value) ? (el.value as SectionKind) : null;
+      commit(setSection(doc, sel[0], sel[sel.length - 1], kind));
+    } else if (el.dataset.secKind) commit(updateSection(doc, Number(el.dataset.secKind), { kind: el.value as SectionKind }));
+    else if (el.dataset.secRoll && Number.isFinite(x)) commit(updateSection(doc, Number(el.dataset.secRoll), { roll: rad(x) }));
+    else if (el.dataset.secRamp && Number.isFinite(x)) commit(updateSection(doc, Number(el.dataset.secRamp), { ramp: x }));
   });
 
   // --- actions -----------------------------------------------------------------------------

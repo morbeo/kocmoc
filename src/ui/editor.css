@@ -60,3 +60,12 @@ body.editing #minimap, body.editing #cp-arrow, body.editing #hud-editor, body.ed
 body.editing #levels-btn, body.editing #tracks-btn, body.editing #controls-btn, body.editing .letterbox { display: none !important; }
 .ed-turn button { min-width: 30px; }
 .ed-row > button[data-a="center"] { margin-left: auto; }
+.ed-panel select { font: inherit; padding: 1px 4px; border: 1px solid var(--c-line); border-radius: 4px; background: #fff; color: var(--c-fg); }
+.ed-shape { display: inline-flex; gap: 6px; align-items: center; }
+.ed-fields small { color: var(--c-dim); align-self: center; }
+.ed-secs { border-top: 1px solid var(--c-line); margin-top: 8px; padding-top: 6px; }
+.ed-secs > p { margin: 0 0 4px; color: var(--c-dim); }
+.ed-sec { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 3px 0; }
+.ed-sec input { width: 52px; }
+.ed-sec button[data-sec-go] { border: 0; background: none; padding: 0; text-decoration: underline dotted; }
+.ed-sec button[data-sec-rm] { padding: 0 6px; }

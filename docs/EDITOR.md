@@ -188,6 +188,14 @@ autopilot rival is not flown for each change.
 - Moving a point keeps anchors, so things placed on a segment ride along with it. Inserting and
   deleting re-anchor every item to the nearest point of the new centreline to where it was on the old
   one, which is exact away from the edit.
+- **Tube shape (sections)**: **Shape** in the panel makes the stretch between the first and last
+  selected points (or the segment after a single point, before it at the end of a run) a section of
+  that kind, anchored `[lo, 0]` to `[hi, 0]`, ramp 1.5 tube radii, the next seed; sections it overlaps
+  are replaced, and **round** removes them (`setSection`). The sections list edits each one's kind,
+  corner roll and ramp, removes it, or looks at it. The ghost tube draws sections in their shape
+  (`wallAt`, open air at its out-of-bounds limit) and blue; the solid view shows them as raced.
+  Sections still can't cross the start of a loop, and the "section wall reaches another part of the
+  lap" check is M8e.
 - **Undo** is the editor's own stack of doc texts (`EditHistory`): **Ctrl/Cmd+Z**, **Ctrl/Cmd+Shift+Z**
   or **Ctrl+Y**, ahead of the vars undo. Repeats of one key within 0.6 s (holding `'`) are one step.
   **Revert** goes back to the track as it was opened (undoable).
@@ -199,7 +207,8 @@ the see-through tube and ringed, and listed in the panel; a click looks at one. 
 between the ghost tube (the solid track, pads and hazards hidden) and the track as raced.
 
 Left for M8e: picking the tube surface for `s, theta`, drag handles for roll and radius (they are keys
-and fields now), the other checks below, and everything on the timeline.
+and fields now), the other checks below, and everything on the timeline (sections there get
+draggable ends instead of snapping to control points).
 
 ## Placement (M8e, planned)
 

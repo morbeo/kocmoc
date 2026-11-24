@@ -15,7 +15,7 @@ const hook = <T>(page: Page, fn: (h: Hook, arg: never) => T, arg?: unknown) =>
   page.evaluate(([src, a]) => new Function('h', 'a', `return (${src})(h, a)`)((window as unknown as { __editor: Hook }).__editor, a), [fn.toString(), arg] as const) as Promise<T>;
 
 test('M8d: open the editor, select, edit, undo, cameras, checks, close', async ({ page }) => {
-  test.setTimeout(420_000);
+  test.setTimeout(600_000);
   const errors: string[] = [];
   page.on('pageerror', (e) => errors.push(e.message));
   page.on('console', (m) => m.type() === 'error' && errors.push(m.text()));
@@ -49,6 +49,37 @@ test('M8d: open the editor, select, edit, undo, cameras, checks, close', async (
   await expect(panel.locator('.ed-sel p')).toHaveText('2 points');
   await page.keyboard.press('Escape');
   await expect(panel.locator('.ed-sel p')).toContainText('No point selected');
+  await click(3);
+  await expect(panel.locator('.ed-sel p')).toHaveText('Point 4 of 12');
+
+  // give the stretch between points 4 and 6 a hexagonal cross-section, change it, and take it back
+  await click(5, 'Shift');
+  await expect(panel.locator('.ed-shape small, .ed-fields small')).toContainText('points 4 to 6');
+  await panel.locator('[data-f="shape"]').selectOption('hex');
+  await expect(panel.locator('.ed-sec')).toHaveCount(1);
+  await expect(panel.locator('[data-f="shape"]')).toHaveValue('hex');
+  await panel.locator('[data-sec-kind="0"]').selectOption('star');
+  await expect(panel.locator('[data-sec-kind="0"]')).toHaveValue('star');
+  await panel.locator('[data-sec-roll="0"]').fill('30');
+  await panel.locator('[data-sec-roll="0"]').press('Enter');
+  await expect(panel.locator('[data-sec-roll="0"]')).toHaveValue('30');
+  await panel.locator('[data-sec-go="0"]').click();
+  await page.waitForTimeout(300);
+  await page.screenshot({ path: 'test-results/editor-3a-section.png' });
+  await panel.locator('[data-view="solid"]').click();
+  await page.waitForTimeout(500);
+  await page.screenshot({ path: 'test-results/editor-3a-section-solid.png' });
+  await panel.locator('[data-view="ghost"]').click();
+  await panel.locator('[data-sec-rm="0"]').click();
+  await expect(panel.locator('.ed-sec')).toHaveCount(0);
+  await page.keyboard.press('Control+KeyZ');
+  await expect(panel.locator('.ed-sec')).toHaveCount(1);
+  await page.keyboard.press('Control+KeyZ');
+  await page.keyboard.press('Control+KeyZ');
+  await page.keyboard.press('Control+KeyZ');
+  await expect(panel.locator('.ed-sec')).toHaveCount(0);
+  await page.keyboard.press('Home');
+  await page.keyboard.press('Escape');
   await click(3);
   await expect(panel.locator('.ed-sel p')).toHaveText('Point 4 of 12');
 

@@ -17,7 +17,7 @@ const doc = parseTrackDoc({
   ],
 })!;
 const keys: PanelKeys = { edit: 'G', focus: '.', frame: 'Home', insert: 'I', remove: 'Del', rollLeft: ';', rollRight: "'", smooth: 'M', camera: 'V', record: 'J', wider: ']', narrower: '[', center: 'H', yawLeft: '1', yawRight: '2', pitchUp: '3', pitchDown: '4', viewRollLeft: '5', viewRollRight: '6', step: '0' };
-const view = (o: Partial<PanelView> = {}): PanelView => ({ doc, length: 1600, selection: [], problems: [], cam: 'orbit', view: 'ghost', canUndo: false, canRedo: false, changed: false, notice: '', step: '45', ...o });
+const view = (o: Partial<PanelView> = {}): PanelView => ({ doc, length: 1600, selection: [], problems: [], cam: 'orbit', view: 'ghost', canUndo: false, canRedo: false, changed: false, notice: '', step: '45', sections: [], shape: '', span: null, ...o });
 
 describe('editor panel', () => {
   it('with nothing selected: help to click, point buttons off, checks pass', () => {
@@ -93,6 +93,24 @@ describe('editor panel', () => {
     expect(new Set(hints).size).toBe(3); // top and side share one
     expect(helpText('fly')).toContain('right button to look');
     expect(helpText('orbit')).toContain('double-click the line');
+  });
+});
+
+describe('sections in the panel', () => {
+  it('offers a shape for the selected stretch and lists sections', () => {
+    let h = panelHtml(view({ selection: [1], span: [2, 3] }), keys);
+    expect(h).toContain('data-f="shape"');
+    expect(h).toContain('<option value="" selected>round</option>');
+    expect(h).toContain('points 2 to 3');
+    expect(h).not.toContain('ed-secs');
+    h = panelHtml(view({ selection: [1, 2], span: [2, 3], shape: 'hex', sections: [{ kind: 'hex', s0: 420, s1: 900, roll: Math.PI / 4, ramp: 60 }] }), keys);
+    expect(h).toContain('<option value="hex" selected>hex</option>');
+    expect(h).toContain('0.42–0.90 km');
+    expect(h).toContain('data-sec-roll="0" value="45"');
+    expect(h).toContain('data-sec-ramp="0" value="60"');
+    expect(h).toContain('data-sec-rm="0"');
+    // nothing selected: no shape picker
+    expect(panelHtml(view(), keys)).not.toContain('data-f="shape"');
   });
 });
 

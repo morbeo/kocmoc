@@ -1,5 +1,6 @@
 import { describeProblem, type Problem } from '../gen/record';
 import type { TrackDoc } from '../gen/trackDoc';
+import { SECTION_KINDS } from '../gen/sections';
 
 export const EDIT_CAMS = ['orbit', 'fly', 'top', 'side'] as const;
 export type EditCam = (typeof EDIT_CAMS)[number];
@@ -21,6 +22,12 @@ export interface PanelView {
   notice: string;
   /** view turn step, degrees */
   step: string;
+  /** the doc's sections, placed (arc lengths, m) */
+  sections: readonly { kind: string; s0: number; s1: number; roll: number; ramp: number }[];
+  /** shape of the stretch the selection spans: a section's kind, or '' for the round tube */
+  shape: string;
+  /** the control points that stretch runs between (1-based), when something is selected */
+  span: [number, number] | null;
 }
 /** Key labels for the buttons. */
 export type PanelKeys = Record<
@@ -55,6 +62,23 @@ export function panelHtml(v: PanelView, k: PanelKeys): string {
   const turnBtns = TURNS.map(([a, label, what]) => `<button data-a="${a}" title="${what} ${v.step}° (${esc(k[a])})">${label}</button>`).join('');
   const viewBtns = (['ghost', 'solid'] as const).map((x) => `<button data-view="${x}"${x === v.view ? ' class="on"' : ''}>${x}</button>`).join('');
   const selText = !sel.length ? 'No point selected. Click one.' : one ? `Point ${sel[0] + 1} of ${v.doc.points.length}` : `${sel.length} points`;
+  const kinds = (on: string) => SECTION_KINDS.map((x) => `<option value="${x}"${x === on ? ' selected' : ''}>${x}</option>`).join('');
+  const shape = v.span
+    ? `<label class="ed-shape">Shape <select data-f="shape"><option value=""${v.shape ? '' : ' selected'}>round</option>${kinds(v.shape)}</select></label> <small>points ${v.span[0]} to ${v.span[1]}</small>`
+    : '';
+  const secs = v.sections.length
+    ? `<div class="ed-secs"><p>Sections</p>${v.sections
+        .map(
+          (x, i) => `<div class="ed-sec">
+            <button data-sec-go="${i}" title="look at it">${(x.s0 / 1000).toFixed(2)}–${(x.s1 / 1000).toFixed(2)} km</button>
+            <select data-sec-kind="${i}">${kinds(x.kind)}</select>
+            <label title="roll of its corners">↻ <input type="number" step="15" data-sec-roll="${i}" value="${deg(x.roll).toFixed(0)}">°</label>
+            <label title="how far it blends in from the round tube">ramp <input type="number" step="10" min="0" data-sec-ramp="${i}" value="${x.ramp.toFixed(0)}"> m</label>
+            <button data-sec-rm="${i}" title="back to the round tube">×</button>
+          </div>`,
+        )
+        .join('')}</div>`
+    : '';
   const probs = v.problems.length
     ? `<ul class="ed-problems">${v.problems.map((p, i) => `<li><button data-problem="${i}">${esc(describeProblem(p))}</button></li>`).join('')}</ul>`
     : '<p class="ed-ok">Passes the checks: no tight bends, the tube never touches itself.</p>';
@@ -73,7 +97,8 @@ export function panelHtml(v: PanelView, k: PanelKeys): string {
             ? `<div class="ed-fields">
             <label>Roll <input type="number" step="1" data-f="roll" value="${deg(first.roll ?? 0).toFixed(1)}">°</label>
             <label>Radius <input type="number" step="1" min="3" max="1000" data-f="radius" value="${(first.r ?? v.doc.radius).toFixed(1)}"> m</label>
-          </div>`
+          </div>
+          <div class="ed-fields">${shape}</div>`
             : ''
         }
         <div class="ed-btns">
@@ -84,6 +109,7 @@ export function panelHtml(v: PanelView, k: PanelKeys): string {
           <button data-a="frame">Whole track ${esc(k.frame)}</button>
         </div>
       </section>
+      ${secs}
       <p class="ed-facts">${v.doc.closed ? 'Loop' : 'Point to point'}, ${km(v.length)}, ${v.doc.points.length} points, tube ${v.doc.radius} m</p>
       ${probs}
       <div class="ed-btns">

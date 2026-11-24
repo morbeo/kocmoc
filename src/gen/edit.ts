@@ -1,6 +1,7 @@
 import { CatmullRomCurve3, Quaternion, Vector3 } from 'three';
 import { anchorS, parseTrackDoc, sAnchor, type Anchor, type TrackDoc } from './trackDoc';
 import { nearestOnTrack, sampleTrack, segmentAt, type Nearest, type Track } from './track';
+import type { Section, SectionKind } from './sections';
 
 /**
  * Editing a track file (M8d): pure operations on a `TrackDoc` that return a new, canonical doc (or
@@ -167,6 +168,82 @@ export function smoothPoints(doc: TrackDoc, idx: readonly number[], amount = 0.5
     out.points[i].r = r;
   }
   return canon(out);
+}
+
+// --- sections ------------------------------------------------------------------
+
+/** A section's options that can be changed after it is made. */
+export interface SectionPatch {
+  kind?: SectionKind;
+  /** radians */
+  roll?: number;
+  /** m */
+  ramp?: number;
+}
+
+/**
+ * Give the stretch from control point `a` to control point `b` its own cross-section: a section of
+ * `kind` (or none, with null: back to the round tube). Sections it overlaps are replaced. One point
+ * (`a === b`) means the segment after it (before it, at the end of a run). Sections can't cross the
+ * start, so on a loop the stretch runs from the lower index to the higher.
+ */
+export function setSection(doc: TrackDoc, a: number, b: number, kind: SectionKind | null): TrackDoc | undefined {
+  const span = sectionSpan(doc, a, b);
+  if (!span) return undefined;
+  const [lo, hi] = span;
+  const out = clone(doc);
+  const at = (x: Anchor) => x[0] + x[1];
+  const kept = (out.sections ?? []).filter((x) => at(x.to) <= lo || at(x.from) >= hi);
+  if (kind) {
+    const seeds = (doc.sections ?? []).map((x) => x.seed);
+    kept.push({ kind, from: [lo, 0], to: [hi, 0], ramp: Math.round(doc.radius * 1.5), seed: (seeds.length ? Math.max(...seeds) : doc.seed) + 1, roll: 0 });
+  }
+  kept.sort((x, y) => at(x.from) - at(y.from));
+  if (kept.length) out.sections = kept;
+  else delete out.sections;
+  return canon(out);
+}
+
+/** The control points a section between points `a` and `b` would run between (see `setSection`), or null. */
+export function sectionSpan(doc: TrackDoc, a: number, b: number): [number, number] | null {
+  const n = doc.points.length;
+  if (a < 0 || b < 0 || a >= n || b >= n) return null;
+  const lo = Math.min(a, b);
+  const hi = Math.max(a, b);
+  if (lo !== hi) return [lo, hi];
+  return lo >= segments(doc) ? [lo - 1, lo] : [lo, lo + 1];
+}
+
+/** The section overlapping the stretch from control point `lo` to `hi`, if any (its index). */
+export function sectionOver(doc: TrackDoc, lo: number, hi: number): number {
+  const at = (x: Anchor) => x[0] + x[1];
+  return (doc.sections ?? []).findIndex((x) => at(x.to) > lo && at(x.from) < hi);
+}
+
+/** Change a section's shape, roll or ramp. */
+export function updateSection(doc: TrackDoc, i: number, patch: SectionPatch): TrackDoc | undefined {
+  const out = clone(doc);
+  const sec = out.sections?.[i];
+  if (!sec) return undefined;
+  if (patch.kind) sec.kind = patch.kind;
+  if (patch.roll !== undefined && Number.isFinite(patch.roll)) sec.roll = patch.roll;
+  if (patch.ramp !== undefined && Number.isFinite(patch.ramp)) sec.ramp = Math.max(0, patch.ramp);
+  return canon(out);
+}
+
+/** Remove a section (that stretch goes back to the round tube). */
+export function removeSection(doc: TrackDoc, i: number): TrackDoc | undefined {
+  if (!doc.sections?.[i]) return undefined;
+  const out = clone(doc);
+  out.sections!.splice(i, 1);
+  if (!out.sections!.length) delete out.sections;
+  return canon(out);
+}
+
+/** A doc's sections placed on its centreline (arc lengths), as the game places them. */
+export function docSections(doc: TrackDoc, track: Pick<Track, 'length'>): Section[] {
+  const n = doc.points.length;
+  return (doc.sections ?? []).map((d) => ({ kind: d.kind, s0: anchorS(d.from, n, track.length, doc.closed), s1: anchorS(d.to, n, track.length, doc.closed), ramp: d.ramp, seed: d.seed, roll: d.roll }));
 }
 
 /** Sample index of the track nearest control point `k` in the anchor parameter (where its roll and radius apply). */

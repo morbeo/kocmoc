@@ -123,6 +123,11 @@ first. Every edit is written to that file, so `G` again (or **Fly it**) races th
   to move them. `I` inserts a point after the selected one (or double-click the centreline),
   `Delete` / `Backspace` deletes, `;` / `'` roll, `[` / `]` tube radius, `M` smooths. Roll and radius
   can also be typed in the panel. Each selected point shows its tube ring and a roll tick.
+- **Tube shape**: with points selected, **Shape** gives the stretch between the first and last of
+  them (or the segment after one point) its own cross-section: hex, square, rect, diamond, ellipse,
+  triangle, octagon, star, irregular, cavern or open air; **round** takes it back. Each section is
+  listed with its shape, corner roll and ramp (how far it blends in), and drawn in its shape (blue)
+  on the see-through tube.
 - **Undo**: `Ctrl/Cmd+Z`, `Ctrl/Cmd+Shift+Z` (the editor's own history); **Revert** goes back to how
   the track was when the editor opened.
 - **Checks**: the same tests as recorded tracks run after every edit. Failing stretches are red on the

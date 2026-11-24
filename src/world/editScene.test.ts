@@ -92,6 +92,33 @@ describe('editor overlay', () => {
   });
 });
 
+describe('sections on the see-through tube', () => {
+  it('draws a section in its shape and colour', () => {
+    const scene = new THREE.Scene();
+    const ed = createEditScene(scene);
+    const doc = parseTrackDoc({ ...loop(), sections: [{ kind: 'square', from: [1, 0], to: [3, 0], ramp: 0, seed: 1, roll: 0 }, { kind: 'open', from: [5, 0], to: [6, 0], ramp: 0, seed: 2, roll: 0 }] })!;
+    const t = compileBase(doc);
+    ed.set(doc, t, [], new Set());
+    let geo!: THREE.BufferGeometry;
+    ed.group.traverse((o) => {
+      const g = (o as THREE.Mesh).geometry as THREE.BufferGeometry | undefined;
+      if ((o as THREE.Mesh).isMesh && g?.getAttribute('color')) geo = g;
+    });
+    const pos = geo.getAttribute('position');
+    const col = geo.getAttribute('color');
+    // a ring in the middle of the square section: corners reach √2 radii
+    const i = Math.round(t.pos.length * (2 / 8));
+    let far = 0;
+    for (let k = 0; k < 24; k++) far = Math.max(far, new THREE.Vector3().fromBufferAttribute(pos, i * 24 + k).distanceTo(t.pos[i]));
+    expect(far / 30).toBeGreaterThan(1.3);
+    // blue, not green
+    expect(col.getZ(i * 24)).toBeGreaterThan(col.getY(i * 24) * 0.9);
+    // outside sections: round and green
+    const j = Math.round(t.pos.length * (4 / 8));
+    expect(new THREE.Vector3().fromBufferAttribute(pos, j * 24).distanceTo(t.pos[j])).toBeCloseTo(30, 0);
+  });
+});
+
 describe('recording tube', () => {
   it('grows ring by ring, truncates, closes and shows a fitted track with red stretches', () => {
     const scene = new THREE.Scene();

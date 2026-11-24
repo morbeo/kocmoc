@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { radiusAt, type Track } from '../gen/track';
-import { pointSample } from '../gen/edit';
+import { docSections, pointSample } from '../gen/edit';
+import { sectionAt, wallAt } from '../gen/sections';
 import type { TrackDoc } from '../gen/trackDoc';
 import type { Problem } from '../gen/record';
 import { createRecordScene } from './recording';
@@ -67,8 +68,20 @@ export function createEditScene(parent: THREE.Scene, max = 2000) {
   let tube = true;
   const drawTube = () => {
     if (!track) return;
-    if (tube) ghost.showTrack(track, shown);
-    else ghost.hide();
+    if (!tube) return ghost.hide();
+    // sections: their shape on the tube, blue
+    const t = track;
+    const secs = doc ? docSections(doc, t) : [];
+    if (!secs.length) return ghost.showTrack(t, shown);
+    const shaped = { ...t, sections: secs };
+    const wall = { rho: 0, open: false, oob: 0 };
+    ghost.showTrack(t, shown, {
+      on: (i) => !!sectionAt(shaped, t.s[i]),
+      wall: (i, a) => {
+        wallAt(shaped, t.s[i], a, wall);
+        return Number.isFinite(wall.rho) ? wall.rho : wall.oob;
+      },
+    });
   };
   let selection: ReadonlySet<number> = new Set();
   const m = new THREE.Matrix4();
