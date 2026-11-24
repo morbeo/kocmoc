@@ -30,6 +30,11 @@ export const ACTION_LABELS: Record<string, string> = {
   levels: 'Proving levels',
   nextLevel: 'Next proving level',
   tracks: 'Race tracks',
+  record: 'Record a track / finish',
+  recordWider: 'Recording: wider tube',
+  recordNarrower: 'Recording: narrower tube',
+  recordPause: 'Recording: pause',
+  recordUndo: 'Recording: undo last stretch',
 };
 
 export const actionOf = (path: string) => path.slice(BIND_PREFIX.length);

@@ -33,7 +33,8 @@ npm run build        # static build → dist/
 | `P` | autopilot on/off |
 | `B` | replay the run since the last respawn; in a replay, play/pause |
 | `H` | HUD editor: drag widgets to move, scroll to resize, × to hide |
-| `T` | race tracks: pick one of fifteen alien venues |
+| `T` | race tracks: pick one of fifteen alien venues, your saved tracks, or record one |
+| `J` | record a track by flying it; `J` again to finish (`[` / `]` tube radius, `U` pause, `Backspace` undo) |
 | `L` | proving ground levels: pick a ship and a level |
 | `N` | next proving level (after a clear) |
 
@@ -89,6 +90,21 @@ rings, slaloms, crushers, laser grids, turbines and debris fields. Difficulty ra
 is `gen.gauntlet.minClearance` ship radii, and every gap is tested to stay flyable. Turn chunk kinds
 on or off with `gen.gauntlet.kinds.*`. Obstacles bounce you like walls. Try
 `?scenario=gauntlet-ramp` or `?scenario=laser-stress`.
+
+## Record a track
+
+Press `J` (or **Record a track** in the track list) and fly: the ship goes to open space and a
+see-through tube grows behind it. `[` and `]` change the tube radius as you go, `U` pauses, and
+`Backspace` takes back the last 200 m. Press `J` again to finish:
+
+- **Close the loop**: offered (the start ring turns green) when you come back near the start heading the same way
+- **Bridge back to the start**: a smooth curve joins the end to the start
+- **Keep it open**: a point-to-point run with a start and a finish gate
+
+The path is smoothed and fitted to a few control points (within `record.tolerance` of the tube
+radius, more points in tight turns), then checked like a generated track: bends tighter than 1.2
+radii and parts of the tube within 2.4 radii of each other are listed and drawn red. Then **Fly it**,
+**Save to My tracks** (kept in this browser, listed at the top of the track list) or **Download file**.
 
 ## Race tracks
 
