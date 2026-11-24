@@ -35,6 +35,14 @@ export const ACTION_LABELS: Record<string, string> = {
   recordNarrower: 'Recording: narrower tube',
   recordPause: 'Recording: pause',
   recordUndo: 'Recording: undo last stretch',
+  edit: 'Track editor',
+  editFocus: 'Editor: focus selection',
+  editFrame: 'Editor: frame whole track',
+  editInsert: 'Editor: insert point',
+  editDelete: 'Editor: delete point',
+  editRollLeft: 'Editor: roll left',
+  editRollRight: 'Editor: roll right',
+  editSmooth: 'Editor: smooth points',
 };
 
 export const actionOf = (path: string) => path.slice(BIND_PREFIX.length);
@@ -87,6 +95,8 @@ const NAMED: Record<string, string> = {
   Comma: ',',
   Period: '.',
   Slash: '/',
+  Delete: 'Del',
+  Insert: 'Ins',
 };
 
 /** Short display name for a KeyboardEvent.code: `KeyW` → `W`, `ShiftLeft` → `L Shift`. */

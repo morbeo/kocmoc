@@ -14,7 +14,7 @@ const Z = new THREE.Vector3(0, 0, 1);
  * with failing stretches red, while it is reviewed), a ring at the start to come back to, and red
  * rings on a flown track where it fails the checks.
  */
-export function createRecordScene(parent: THREE.Scene, max = 8000) {
+export function createRecordScene(parent: THREE.Object3D, max = 8000) {
   const group = new THREE.Group();
   parent.add(group);
 

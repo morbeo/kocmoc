@@ -84,8 +84,8 @@ or a file drop opens one; **link** copies a `#t=<lz-string>` URL; **generated** 
    space, no walls; the mode it was in comes back on discard) and a see-through tube grows behind the
    ship, so you see the corridor as you make it. A ring marks the start.
 2. While flying, `PathRecorder` (`src/gen/record.ts`) keeps a sample every `record.step` m (4):
-   position, the ship's up vector and the tube radius at the time. Path source is the ship; the free
-   camera source waits for the editor's fly cam (M8d).
+   position, the ship's up vector and the tube radius at the time. Path source is the ship, or the
+   editor's fly cam (M8d: **Record from here**).
 3. Live controls: `]` / `[` tube radius by `record.radiusStep`, `U` pause/resume, `Backspace` undo
    the last `record.undo` m (200). The same actions are buttons under the recording HUD.
 4. **J** again finishes (at least `record.minLength`, 200 m) and the sim stops while you choose:
@@ -135,23 +135,67 @@ or a file drop opens one; **link** copies a `#t=<lz-string>` URL; **generated** 
 - Not yet: checking that a branch on an open track merges before the finish gate, and the
   editor's start-to-finish timeline (both M8e).
 
-## Editor
+## Editor shell (built, M8d)
 
 Desktop only: mouse and keyboard. On touch the track list and playtest still work, but the editor
-is not offered.
+is not offered (no Edit buttons, `G` does nothing).
 
-A new game mode `edit`, opened from the track list or a free key (G today, rebindable).
+Opened with **G** (`input.key.edit`), **Edit this track** in the track list, or **edit** on a saved
+track (`src/ui/editor.ts`). It is not a `game.mode` value: the game stays in race mode under it with
+the sim stopped, the ship, HUD and corner buttons hidden, and game keys off. The track flown now is
+edited: a loaded track file in place (in the layer that holds it), anything else baked first
+(`bakeCurrent`, then loaded like a dropped file). Every edit writes the canonical text to
+`gen.race.track` outside the vars history, so the race scene rebuilds, the edit survives a reload,
+and closing (**G** again, or **Fly it**) races the edited track from the start. While editing, the
+autopilot rival is not flown for each change.
 
-**Cameras**
-- Orbit around the selection or the whole track (default), fly cam (6DOF input without physics),
-  top and side orthographic views. The debug "detach free cam" becomes the fly cam.
-- Focus on selection, frame the whole track, jump to `s` from the timeline.
+**Cameras** (`edit.cam`, **V** cycles, buttons in the panel)
+- **Orbit** (default, `OrbitControls`): drag to orbit, right-drag to pan, wheel zooms to the cursor.
+- **Fly**: the flight axes (keys, pad) through `sampleInput` drive `flyStep` (`src/gen/edit.ts`):
+  move along the camera's own axes at `edit.fly.speed` (×`edit.fly.boost`), turn at `edit.fly.turn`,
+  no physics; hold the right button for mouse look (honours invert pitch), wheel changes the speed.
+  **Record from here** (or **J**) records a path from the fly cam instead of the ship (`createRecording`
+  `start('camera')`): no switch to open space, and **Edit it** on the result opens it in the editor.
+  The review panel of a normal recording has **Edit it** too.
+- **Top** and **side**: flat views as a 2° lens from 24 track radii away (so there is next to no
+  perspective and the rest of the pipeline, picking and gizmo keep a perspective camera). Drag pans,
+  right-drag spins about the vertical, the wheel zooms by narrowing the lens. The sky is replaced by
+  the horizon colour (the dome sits inside the near plane).
+- **.** focuses the selection (or a clicked problem), **Home** frames the whole track.
 
 **Selecting and moving**
-- Raycasts pick control points, the centreline (gives `s`) and the tube surface (gives `s, theta`).
-- Points: drag with an axis gizmo (`TransformControls`), insert on a segment, delete, roll handle,
-  radius handle, multi-select, smooth selection.
-- Every edit is a command on the editor's own undo stack, same keys as vars undo.
+- Control points are drawn through the walls at a constant size on screen (first point green,
+  selection yellow), with the control polygon dashed and the centreline (`src/world/editScene.ts`).
+- Click picks a point (`Raycaster` on an `InstancedMesh`), shift- or ctrl-click toggles, **Ctrl+A**
+  selects all, **Esc** none, a click on nothing clears. A drag that moves more than 5 px is the camera's.
+- The `TransformControls` arrows on the selection's centre move every selected point; the track
+  redraws while dragging (centreline only) and commits on release.
+- **I** / Insert adds a point after the selected one, mid-segment on the spline; a double-click on the
+  centreline adds one there (`sampleSegment` maps the sample to a spline segment and `t`). Roll and
+  radius are eased from the neighbours.
+- **Delete** (or **Backspace**) removes the selection, down to 4 points on a loop and 2 on a run.
+- **;** / **'** roll by `edit.rollStep`, **[** / **]** change the tube radius by `edit.radiusStep`
+  (the same keys as while recording); both can be typed in the panel for the selection. Each selected
+  point shows its tube ring and a roll tick (the frame's up at that point, roll included).
+- **M** smooths: each selected point (not the ends of a run) moves half way to its neighbours'
+  midpoint, roll and radius too.
+- Moving a point keeps anchors, so things placed on a segment ride along with it. Inserting and
+  deleting re-anchor every item to the nearest point of the new centreline to where it was on the old
+  one, which is exact away from the edit.
+- **Undo** is the editor's own stack of doc texts (`EditHistory`): **Ctrl/Cmd+Z**, **Ctrl/Cmd+Shift+Z**
+  or **Ctrl+Y**, ahead of the vars undo. Repeats of one key within 0.6 s (holding `'`) are one step.
+  **Revert** goes back to the track as it was opened (undoable).
+- The panel also renames the track, saves it to My tracks and downloads it.
+
+**Validation**
+`trackProblems` (the recording checks) runs after every committed edit. Failing stretches are red on
+the see-through tube and ringed, and listed in the panel; a click looks at one. **View** switches
+between the ghost tube (the solid track, pads and hazards hidden) and the track as raced.
+
+Left for M8e: picking the tube surface for `s, theta`, drag handles for roll and radius (they are keys
+and fields now), the other checks below, and everything on the timeline.
+
+## Placement (M8e, planned)
 
 **Lap timeline**
 A strip along the bottom, one lap wide, like a video editor. Sections, branches, pads, hazards,
@@ -168,10 +212,10 @@ the timeline select together.
   so a seeded venue can be baked and then hand-tuned.
 - Look: the existing fuzzy table edits `doc.vars`.
 
-**Validation**
-A live list of problems (tube touching itself, too tight a bend, a section wall reaching another part
-of the lap, a hazard with no way through, overlapping pads), each marked in 3D and clickable.
-They reuse the same checks the generators use to accept a candidate.
+**More validation**
+Beyond the M8d checks (tube touching itself, too tight a bend): a section wall reaching another part
+of the lap, a hazard with no way through, overlapping pads, each marked in 3D and clickable. They
+reuse the same checks the generators use to accept a candidate.
 
 ## Playtest loop
 
@@ -201,7 +245,7 @@ be opened, edited and saved as new tracks.
 | M8a | **Built.** Track doc + `compileTrack` (closed and open), per-point radius, anchors, explicit lists in place of generators, scenario `track` field, Bake, file and URL load. Test: a baked track compiles to the same samples as the generator |
 | M8b | **Built.** Point-to-point race rules: one run, start run-up, finish gate, run-off braking, end walls, results; bot and ghosts on open tracks; open minimap; bundled Canyon Run |
 | M8c | **Built.** Record by flying: ghost tube, sampling, radius / pause / undo, close or bridge or open, fit, checks marked red, save to My tracks, download |
-| M8d | Editor shell (desktop only): `edit` mode, orbit / fly / ortho cams, picking, point gizmo, insert / delete / roll / radius, undo, validation overlay |
+| M8d | **Built.** Editor shell (desktop only): orbit / fly / top / side cams, record from the fly cam, picking, point gizmo, insert / delete / roll / radius / smooth, undo, checks overlay |
 | M8e | Placement: lap timeline, sections, branches, hazards, pads, movers, screens, scenery pins, Fill buttons |
 | M8f | Playtest and share: play from here and back, bot lap, heat strip, My tracks in the track list, URL share |
 
