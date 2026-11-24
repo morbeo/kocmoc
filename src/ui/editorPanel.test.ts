@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { helpText, panelHtml, EDIT_CAMS, type PanelKeys, type PanelView } from './editorPanel';
+import { helpText, orbitLimits, panelHtml, EDIT_CAMS, type PanelKeys, type PanelView } from './editorPanel';
 import { parseTrackDoc, TRACK_KIND } from '../gen/trackDoc';
 
 const doc = parseTrackDoc({
@@ -16,8 +16,8 @@ const doc = parseTrackDoc({
     { p: [0, 0, 400] },
   ],
 })!;
-const keys: PanelKeys = { edit: 'G', focus: '.', frame: 'Home', insert: 'I', remove: 'Del', rollLeft: ';', rollRight: "'", smooth: 'M', camera: 'V', record: 'J', wider: ']', narrower: '[' };
-const view = (o: Partial<PanelView> = {}): PanelView => ({ doc, length: 1600, selection: [], problems: [], cam: 'orbit', view: 'ghost', canUndo: false, canRedo: false, changed: false, notice: '', ...o });
+const keys: PanelKeys = { edit: 'G', focus: '.', frame: 'Home', insert: 'I', remove: 'Del', rollLeft: ';', rollRight: "'", smooth: 'M', camera: 'V', record: 'J', wider: ']', narrower: '[', center: 'H', yawLeft: '1', yawRight: '2', pitchUp: '3', pitchDown: '4', viewRollLeft: '5', viewRollRight: '6', step: '0' };
+const view = (o: Partial<PanelView> = {}): PanelView => ({ doc, length: 1600, selection: [], problems: [], cam: 'orbit', view: 'ghost', canUndo: false, canRedo: false, changed: false, notice: '', step: '45', ...o });
 
 describe('editor panel', () => {
   it('with nothing selected: help to click, point buttons off, checks pass', () => {
@@ -77,10 +77,35 @@ describe('editor panel', () => {
     expect(h).toContain('>Saved</p>');
   });
 
+  it('turns the view by the chosen step, and centers it', () => {
+    let h = panelHtml(view(), keys);
+    expect(h).toContain('<button data-step="45" class="on">45°</button>');
+    expect(h).toContain('data-a="yawRight" title="turn right 45° (2)"');
+    expect(h).toContain('data-a="viewRollLeft"');
+    expect(h).toContain('data-a="center"');
+    h = panelHtml(view({ step: '15' }), keys);
+    expect(h).toContain('<button data-step="15" class="on">15°</button>');
+    expect(h).toContain('title="turn up 15° (3)"');
+  });
+
   it('has a hint for every camera', () => {
     const hints = EDIT_CAMS.map(helpText);
     expect(new Set(hints).size).toBe(3); // top and side share one
     expect(helpText('fly')).toContain('right button to look');
     expect(helpText('orbit')).toContain('double-click the line');
+  });
+});
+
+describe('orbit limits', () => {
+  it('orbit zooms and rotates with the left button, flat views pan and hold their angle', () => {
+    expect(orbitLimits('orbit', false, 1000)).toEqual({ zoom: true, minPolar: 0, maxPolar: Math.PI, minDistance: 2, maxDistance: 30000, leftDrag: 'rotate' });
+    expect(orbitLimits('top', false, 1000)).toMatchObject({ zoom: false, minPolar: 0, maxPolar: 0, leftDrag: 'pan', maxDistance: Infinity });
+    expect(orbitLimits('side', false, 1000)).toMatchObject({ minPolar: Math.PI / 2, maxPolar: Math.PI / 2 });
+  });
+
+  it('a turned flat view is free; the fly cam never holds an angle', () => {
+    expect(orbitLimits('top', true, 1000)).toMatchObject({ minPolar: 0, maxPolar: Math.PI });
+    expect(orbitLimits('side', true, 1000)).toMatchObject({ minPolar: 0, maxPolar: Math.PI });
+    expect(orbitLimits('fly', false, 1000)).toMatchObject({ minPolar: 0, maxPolar: Math.PI, zoom: false });
   });
 });

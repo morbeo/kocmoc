@@ -516,6 +516,7 @@ onKey(editKeys.remove, editor.keys.remove);
 onKey(editKeys.rollLeft, editor.keys.rollLeft);
 onKey(editKeys.rollRight, editor.keys.rollRight);
 onKey(editKeys.smooth, editor.keys.smooth);
+for (const k of ['center', 'step', 'yawLeft', 'yawRight', 'pitchUp', 'pitchDown', 'viewRollLeft', 'viewRollRight'] as const) onKey(editKeys[k], editor.keys[k]);
 onKey(nextLevelKey, game(() => {
   if (race?.proving?.result !== 'clear') return;
   playLevel(provingLevel.value + 1, currentShip() ?? 'balanced');

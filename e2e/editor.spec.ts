@@ -8,6 +8,7 @@ interface Hook {
   screen(i: number): Pt | null;
   line(i: number): Pt | null;
   samples(): number;
+  view(): { fwd: number[]; up: number[]; target: number[] };
   arrow(axis: 'x' | 'y' | 'z', px: number): { from: Pt; dir: Pt };
 }
 const hook = <T>(page: Page, fn: (h: Hook, arg: never) => T, arg?: unknown) =>
@@ -101,6 +102,31 @@ test('M8d: open the editor, select, edit, undo, cameras, checks, close', async (
   await page.screenshot({ path: 'test-results/editor-3-problem.png' });
   await page.keyboard.press('Control+KeyZ');
   await expect(panel.locator('.ed-ok')).toBeVisible();
+
+  // turn the view by steps (keys and buttons) and center it
+  const dot = (a: number[], b: number[]) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const v0 = await hook(page, (h) => h.view());
+  await page.keyboard.press('Digit2'); // yaw right, 45° by default
+  const v1 = await hook(page, (h) => h.view());
+  expect(dot(v0.fwd, v1.fwd)).toBeCloseTo(Math.cos(Math.PI / 4), 2);
+  await panel.locator('[data-step="90"]').click();
+  await expect(panel.locator('[data-step="90"]')).toHaveClass('on');
+  await panel.locator('[data-a="viewRollRight"]').click();
+  const v2 = await hook(page, (h) => h.view());
+  expect(dot(v1.up, v2.up)).toBeCloseTo(0, 2);
+  expect(dot(v1.fwd, v2.fwd)).toBeCloseTo(1, 2);
+  await page.keyboard.press('Numpad8'); // pitch up 90°
+  const v3 = await hook(page, (h) => h.view());
+  expect(dot(v2.fwd, v3.fwd)).toBeCloseTo(0, 2);
+  await page.keyboard.press('Digit0'); // step 90 → 15
+  await expect(panel.locator('[data-step="15"]')).toHaveClass('on');
+  await page.waitForTimeout(200);
+  await page.screenshot({ path: 'test-results/editor-3b-turned.png' });
+  await page.keyboard.press('Escape');
+  await page.keyboard.press('KeyH'); // center on the whole track
+  const v4 = await hook(page, (h) => h.view());
+  expect(dot(v3.fwd, v4.fwd)).toBeCloseTo(1, 3);
+  await page.keyboard.press('Home');
 
   // every camera, and the solid view
   for (const cam of ['top', 'side', 'fly', 'orbit']) {

@@ -116,6 +116,9 @@ first. Every edit is written to that file, so `G` again (or **Fly it**) races th
 - **Cameras** (`V` cycles): orbit (drag to orbit, right-drag to pan, wheel to zoom), fly (the flight
   keys move it without physics, hold the right button to look, wheel for speed), top and side (flat
   views: drag to pan, right-drag to spin, wheel to zoom). `.` focuses the selection, `Home` the whole track.
+- **Turn and center the view** in steps of 15°, 45° or 90° (`0` or the panel cycles the step):
+  `1` / `2` yaw, `3` / `4` pitch, `5` / `6` roll (or numpad `4` `6`, `8` `2`, `7` `9`), round the point
+  the camera orbits. `H` (numpad `5`) centers the selection, or the whole track, without zooming.
 - **Points**: click to select, shift-click to add, `Ctrl+A` all, `Esc` none. Drag the gizmo's arrows
   to move them. `I` inserts a point after the selected one (or double-click the centreline),
   `Delete` / `Backspace` deletes, `;` / `'` roll, `[` / `]` tube radius, `M` smooths. Roll and radius

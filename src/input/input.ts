@@ -64,6 +64,14 @@ export const editKeys = {
   rollLeft: bind('editRollLeft', 'Semicolon'),
   rollRight: bind('editRollRight', 'Quote'),
   smooth: bind('editSmooth', 'KeyM'),
+  center: bind('editCenter', 'KeyH,Numpad5'),
+  yawLeft: bind('editYawLeft', 'Digit1,Numpad4'),
+  yawRight: bind('editYawRight', 'Digit2,Numpad6'),
+  pitchUp: bind('editPitchUp', 'Digit3,Numpad8'),
+  pitchDown: bind('editPitchDown', 'Digit4,Numpad2'),
+  viewRollLeft: bind('editViewRollLeft', 'Digit5,Numpad7'),
+  viewRollRight: bind('editViewRollRight', 'Digit6,Numpad9'),
+  step: bind('editStep', 'Digit0,Numpad0'),
 };
 
 const keyRamp = vars.num('input.key.ramp', 8, { min: 0, max: 30, hardMin: 0, unit: '/s', tags: keyTags, desc: 'how fast key axes move to full; 0 = instant' });

@@ -58,3 +58,5 @@
 body.editing #hud, body.editing #race-hud, body.editing #standings, body.editing #results,
 body.editing #minimap, body.editing #cp-arrow, body.editing #hud-editor, body.editing #viewports,
 body.editing #levels-btn, body.editing #tracks-btn, body.editing #controls-btn, body.editing .letterbox { display: none !important; }
+.ed-turn button { min-width: 30px; }
+.ed-row > button[data-a="center"] { margin-left: auto; }

@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { Quaternion, Vector3 } from 'three';
+import { Euler, Quaternion, Vector3 } from 'three';
 import { compileTrack, anchorS, parseTrackDoc, serializeTrackDoc, TRACK_KIND, type TrackDoc } from './trackDoc';
-import { deletePoints, EditHistory, flyStep, insertPoint, movePoints, nudgePoints, pointSample, radiusPoints, rollPoints, sampleSegment, smoothPoints } from './edit';
+import { deletePoints, EditHistory, flyStep, turnView, insertPoint, movePoints, nudgePoints, pointSample, radiusPoints, rollPoints, sampleSegment, smoothPoints } from './edit';
 
 /** A closed square-ish loop of 8 points, 400 m across, with things placed on it. */
 function loop(closed = true): TrackDoc {
@@ -233,5 +233,51 @@ describe('fly cam', () => {
     flyStep(pos, q, { ...none, roll: 1 }, p, Math.PI / 2);
     // roll right: the camera's up tips to the right
     expect(new Vector3(0, 1, 0).applyQuaternion(q).x).toBeCloseTo(1, 5);
+  });
+});
+
+describe('view turns', () => {
+  const fwdOf = (q: Quaternion) => new Vector3(0, 0, -1).applyQuaternion(q);
+  const upOf = (q: Quaternion) => new Vector3(0, 1, 0).applyQuaternion(q);
+
+  it('yaws round the pivot and keeps looking at it', () => {
+    // 100 m back from the origin on +z, looking at it
+    const pos = new Vector3(0, 0, 100);
+    const q = new Quaternion();
+    turnView(pos, q, new Vector3(), 'yaw', Math.PI / 2);
+    // the view turned right: it now looks along +x... from -x
+    expect(fwdOf(q).x).toBeCloseTo(1, 5);
+    expect(pos.x).toBeCloseTo(-100, 5);
+    expect(pos.z).toBeCloseTo(0, 5);
+    expect(upOf(q).y).toBeCloseTo(1, 5);
+  });
+
+  it('pitches up over the pivot, rolls in place, and turns in place about its own position', () => {
+    const pos = new Vector3(0, 0, 100);
+    const q = new Quaternion();
+    turnView(pos, q, new Vector3(), 'pitch', Math.PI / 2);
+    expect(fwdOf(q).y).toBeCloseTo(1, 5);
+    expect(pos.y).toBeCloseTo(-100, 5);
+    const p2 = new Vector3(0, 0, 100);
+    const q2 = new Quaternion();
+    turnView(p2, q2, new Vector3(), 'roll', Math.PI / 4);
+    expect(p2.toArray()).toEqual([0, 0, 100]);
+    expect(upOf(q2).x).toBeCloseTo(Math.SQRT1_2, 5);
+    expect(fwdOf(q2).z).toBeCloseTo(-1, 5);
+    // a pivot at the camera: it only turns
+    const p3 = new Vector3(5, 6, 7);
+    const q3 = new Quaternion();
+    turnView(p3, q3, p3.clone(), 'yaw', 1);
+    expect(p3.toArray()).toEqual([5, 6, 7]);
+  });
+
+  it('four quarter turns come back', () => {
+    const pos = new Vector3(3, 40, 100);
+    const q = new Quaternion().setFromEuler(new Euler(0.3, 0.2, 0.1));
+    const p0 = pos.clone();
+    const q0 = q.clone();
+    for (const axis of ['yaw', 'pitch', 'roll'] as const) for (let k = 0; k < 4; k++) turnView(pos, q, new Vector3(1, 2, 3), axis, Math.PI / 2);
+    expect(pos.distanceTo(p0)).toBeLessThan(1e-6);
+    expect(Math.abs(q.dot(q0))).toBeCloseTo(1, 6);
   });
 });

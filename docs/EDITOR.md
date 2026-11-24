@@ -162,6 +162,12 @@ autopilot rival is not flown for each change.
   right-drag spins about the vertical, the wheel zooms by narrowing the lens. The sky is replaced by
   the horizon colour (the dome sits inside the near plane).
 - **.** focuses the selection (or a clicked problem), **Home** frames the whole track.
+- **Turning in steps** (`edit.viewStep`: 15, 45 or 90°; **0** / numpad 0 or the panel cycles it):
+  yaw (**1** / **2**, numpad 4 / 6), pitch (**3** / **4**, numpad 8 / 2) and roll (**5** / **6**,
+  numpad 7 / 9) about the camera's own axes, round the orbit target (`turnView` in `src/gen/edit.ts`;
+  the fly cam turns in place). The camera's up follows, and OrbitControls is told its new up, so
+  orbiting goes round the turned view; top and side stop holding their angle until picked again.
+  **H** (numpad 5) centers the selection, or the whole track, without zooming.
 
 **Selecting and moving**
 - Control points are drawn through the walls at a constant size on screen (first point green,

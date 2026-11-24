@@ -19,9 +19,26 @@ export interface PanelView {
   /** differs from the track as opened */
   changed: boolean;
   notice: string;
+  /** view turn step, degrees */
+  step: string;
 }
 /** Key labels for the buttons. */
-export type PanelKeys = Record<'edit' | 'focus' | 'frame' | 'insert' | 'remove' | 'rollLeft' | 'rollRight' | 'smooth' | 'camera' | 'record' | 'wider' | 'narrower', string>;
+export type PanelKeys = Record<
+  | 'edit' | 'focus' | 'frame' | 'insert' | 'remove' | 'rollLeft' | 'rollRight' | 'smooth' | 'camera' | 'record' | 'wider' | 'narrower'
+  | 'center' | 'yawLeft' | 'yawRight' | 'pitchUp' | 'pitchDown' | 'viewRollLeft' | 'viewRollRight' | 'step',
+  string
+>;
+
+/** The view turn buttons: action, label, key name, tooltip. */
+const TURNS = [
+  ['yawLeft', '↶', 'turn left'],
+  ['yawRight', '↷', 'turn right'],
+  ['pitchUp', '▲', 'turn up'],
+  ['pitchDown', '▼', 'turn down'],
+  ['viewRollLeft', '⟲', 'roll left'],
+  ['viewRollRight', '⟳', 'roll right'],
+] as const;
+export const VIEW_STEP_OPTIONS = ['15', '45', '90'] as const;
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 const km = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(2)} km` : `${m.toFixed(0)} m`);
@@ -34,6 +51,8 @@ export function panelHtml(v: PanelView, k: PanelKeys): string {
   const first = sel.length ? v.doc.points[sel[0]] : null;
   const cam = v.cam;
   const camBtns = EDIT_CAMS.map((c) => `<button data-cam="${c}"${c === cam ? ' class="on"' : ''}>${c}</button>`).join('');
+  const stepBtns = VIEW_STEP_OPTIONS.map((x) => `<button data-step="${x}"${x === v.step ? ' class="on"' : ''}>${x}°</button>`).join('');
+  const turnBtns = TURNS.map(([a, label, what]) => `<button data-a="${a}" title="${what} ${v.step}° (${esc(k[a])})">${label}</button>`).join('');
   const viewBtns = (['ghost', 'solid'] as const).map((x) => `<button data-view="${x}"${x === v.view ? ' class="on"' : ''}>${x}</button>`).join('');
   const selText = !sel.length ? 'No point selected. Click one.' : one ? `Point ${sel[0] + 1} of ${v.doc.points.length}` : `${sel.length} points`;
   const probs = v.problems.length
@@ -45,6 +64,8 @@ export function panelHtml(v: PanelView, k: PanelKeys): string {
       <label class="ed-title">Name <input type="text" maxlength="80" data-f="title" value="${esc(v.doc.title ?? '')}" placeholder="Untitled track"></label>
       <div class="ed-row"><span>Camera</span><span class="ed-seg">${camBtns}</span><small>${esc(k.camera)}</small></div>
       <div class="ed-row"><span>View</span><span class="ed-seg">${viewBtns}</span></div>
+      <div class="ed-row"><span>Turn</span><span class="ed-seg">${stepBtns}</span><small>${esc(k.step)}</small><button data-a="center" title="center on the selection, or the whole track (${esc(k.center)})">Center ${esc(k.center)}</button></div>
+      <div class="ed-row ed-turn"><span></span>${turnBtns}</div>
       <section class="ed-sel">
         <p>${selText}</p>
         ${
@@ -87,4 +108,22 @@ export function helpText(cam: EditCam): string {
     : cam === 'orbit'
       ? 'Drag to orbit · right-drag to pan · wheel to zoom · click a point to select, shift-click to add · drag the arrows to move · double-click the line to add a point'
       : 'Drag to pan · right-drag to spin · wheel to zoom · click a point to select, shift-click to add · drag the arrows to move';
+}
+
+/**
+ * How the orbit controls behave for each editor camera: orbit zooms and orbits with the left button;
+ * the flat views pan with it, spin with the right, zoom with their lens, and hold their angle (top
+ * straight down, side level) until the view is turned by steps.
+ */
+export function orbitLimits(cam: EditCam, turned: boolean, extent: number) {
+  const orbit = cam === 'orbit';
+  const hold = !turned && !orbit && cam !== 'fly';
+  return {
+    zoom: orbit,
+    minPolar: hold && cam === 'side' ? Math.PI / 2 : 0,
+    maxPolar: hold ? (cam === 'top' ? 0 : Math.PI / 2) : Math.PI,
+    minDistance: orbit ? 2 : 0,
+    maxDistance: orbit ? extent * 30 : Infinity,
+    leftDrag: (orbit ? 'rotate' : 'pan') as 'rotate' | 'pan',
+  };
 }

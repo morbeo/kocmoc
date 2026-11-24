@@ -7,7 +7,7 @@ import { keyLabel } from '../input/bindings';
 import { canvasInput, invert, sampleInput } from '../input/input';
 import { touchUi } from '../input/touch';
 import { noControls } from '../sim/ship';
-import { compileBase, deletePoints, EditHistory, flyStep, insertPoint, movePoints, radiusPoints, rollPoints, sampleSegment, smoothPoints, type Vec3 } from '../gen/edit';
+import { compileBase, deletePoints, EditHistory, flyStep, insertPoint, movePoints, radiusPoints, rollPoints, sampleSegment, smoothPoints, turnView, type TurnAxis, type Vec3 } from '../gen/edit';
 import { trackProblems, type Problem } from '../gen/record';
 import { parseTrackText, serializeTrackDoc, type TrackDoc } from '../gen/trackDoc';
 import { radiusAt, type Track } from '../gen/track';
@@ -15,7 +15,7 @@ import { gameMode, trackDoc, trackText } from '../world/race';
 import { bakeCurrent, loadTrackDoc } from '../world/trackFile';
 import { saveTrack } from '../world/library';
 import { createEditScene, type Pick } from '../world/editScene';
-import { EDIT_CAMS, helpText, panelHtml, type EditCam } from './editorPanel';
+import { EDIT_CAMS, helpText, orbitLimits, panelHtml, VIEW_STEP_OPTIONS, type EditCam } from './editorPanel';
 import './editor.css';
 
 const tags = ['edit'];
@@ -27,6 +27,7 @@ const ev = {
   flyTurn: vars.num('edit.fly.turn', 1.4, { min: 0.1, max: 6, hardMin: 0.01, unit: 'rad/s', tags, desc: 'fly cam turn rate' }),
   look: vars.num('edit.look', 0.003, { min: 0.0005, max: 0.02, hardMin: 0, unit: 'rad/px', tags, desc: 'mouse look while the right button is held (fly cam)' }),
   rollStep: vars.num('edit.rollStep', 5, { min: 0.5, max: 45, hardMin: 0.01, unit: '°', tags, desc: 'roll added per key press' }),
+  viewStep: vars.enum('edit.viewStep', '45', VIEW_STEP_OPTIONS, { tags, desc: 'degrees the view turns per press of the turn keys or buttons' }),
   radiusStep: vars.num('edit.radiusStep', 5, { min: 0.5, max: 50, hardMin: 0.1, unit: 'm', tags, desc: 'tube radius change per key press' }),
 };
 
@@ -47,6 +48,14 @@ export interface EditorKeys {
   record: Key;
   wider: Key;
   narrower: Key;
+  center: Key;
+  yawLeft: Key;
+  yawRight: Key;
+  pitchUp: Key;
+  pitchDown: Key;
+  viewRollLeft: Key;
+  viewRollRight: Key;
+  step: Key;
 }
 export interface EditorHost {
   scene: THREE.Scene;
@@ -113,6 +122,8 @@ export function createEditor(host: EditorHost) {
   let gizmoGrabbed = false;
   /** flat views: half the view's height, m */
   let flatHalf = 500;
+  /** the view was turned by steps: top and side no longer hold their angle */
+  let turned = false;
   let extent = 1000;
   const centre = new THREE.Vector3();
   let notice = '';
@@ -326,6 +337,8 @@ export function createEditor(host: EditorHost) {
       camera.position.copy(orbit.target).addScaledVector(fwd, -dist);
     }
     camera.up.set(0, 1, 0);
+    turned = false;
+    syncOrbitUp();
     if (next !== 'fly') camera.lookAt(orbit.target);
     configure();
     draw();
@@ -335,17 +348,61 @@ export function createEditor(host: EditorHost) {
     vars.change([{ layer: 'user', path: ev.cam.path, before: vars.layerValue('user', ev.cam.path), after: c === 'orbit' ? undefined : c }], false);
   }
 
+  /** OrbitControls orbits about `camera.up` as it was when made: tell it the up changed. */
+  function syncOrbitUp(): void {
+    const o = orbit as unknown as { _quat: THREE.Quaternion; _quatInverse: THREE.Quaternion };
+    o._quat.setFromUnitVectors(camera.up, v.set(0, 1, 0));
+    o._quatInverse.copy(o._quat).invert();
+  }
+
+  /**
+   * Turn the view a step about one of its own axes, round the point it orbits (the fly cam turns in
+   * place). Orbiting then goes round the view's new up, and top and side stop holding their angle.
+   */
+  function turn(axis: TurnAxis, sign: number): void {
+    const cam = ev.cam.value;
+    const pivot = cam === 'fly' ? camera.position.clone() : orbit.target;
+    turnView(camera.position, camera.quaternion, pivot, axis, sign * rad(Number(ev.viewStep.value)));
+    if (cam !== 'fly') {
+      camera.up.set(0, 1, 0).applyQuaternion(camera.quaternion);
+      syncOrbitUp();
+      turned = true;
+      configure();
+    }
+  }
+
+  /** Put the selection's middle (or the whole track's) in the middle of the view, without zooming. */
+  function center(): void {
+    if (!doc || !base) return;
+    const p = new THREE.Vector3();
+    if (selection.size) {
+      for (const i of selection) p.add(v.fromArray(doc.points[i].p));
+      p.divideScalar(selection.size);
+    } else p.copy(new THREE.Box3().setFromPoints(base.pos).getCenter(v));
+    if (ev.cam.value === 'fly') {
+      // face it, keeping the roll
+      camera.up.set(0, 1, 0).applyQuaternion(camera.quaternion);
+      camera.lookAt(p);
+      camera.up.set(0, 1, 0);
+      return;
+    }
+    camera.position.add(v.subVectors(p, orbit.target));
+    orbit.target.copy(p);
+    orbit.update();
+  }
+
   function configure(): void {
     const cam = ev.cam.value;
     orbit.enabled = active && cam !== 'fly' && !gizmo.dragging;
-    orbit.enableZoom = cam === 'orbit';
+    const l = orbitLimits(cam, turned, extent);
+    orbit.enableZoom = l.zoom;
     orbit.enableRotate = true;
-    orbit.minPolarAngle = cam === 'side' ? Math.PI / 2 : 0;
-    orbit.maxPolarAngle = cam === 'top' ? 0 : cam === 'side' ? Math.PI / 2 : Math.PI;
-    orbit.minDistance = cam === 'orbit' ? 2 : 0;
-    orbit.maxDistance = cam === 'orbit' ? extent * 30 : Infinity;
-    // flat views pan with either button and spin about the vertical
-    orbit.mouseButtons = cam === 'orbit' ? { LEFT: THREE.MOUSE.ROTATE, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.PAN } : { LEFT: THREE.MOUSE.PAN, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: THREE.MOUSE.ROTATE };
+    orbit.minPolarAngle = l.minPolar;
+    orbit.maxPolarAngle = l.maxPolar;
+    orbit.minDistance = l.minDistance;
+    orbit.maxDistance = l.maxDistance;
+    const [left, right] = l.leftDrag === 'rotate' ? [THREE.MOUSE.ROTATE, THREE.MOUSE.PAN] : [THREE.MOUSE.PAN, THREE.MOUSE.ROTATE];
+    orbit.mouseButtons = { LEFT: left, MIDDLE: THREE.MOUSE.DOLLY, RIGHT: right };
   }
 
   /** Look at a point, `size` m across, from where the camera is looking now. */
@@ -392,7 +449,7 @@ export function createEditor(host: EditorHost) {
 
   function draw(): void {
     if (!active || !doc || !base) return;
-    const view = { doc, length: base.length, selection: selected(), problems, cam: ev.cam.value, view: ev.view.value, canUndo: history.canUndo, canRedo: history.canRedo, changed: history.current !== original, notice };
+    const view = { doc, length: base.length, selection: selected(), problems, cam: ev.cam.value, view: ev.view.value, canUndo: history.canUndo, canRedo: history.canRedo, changed: history.current !== original, notice, step: ev.viewStep.value };
     const keys = Object.fromEntries(Object.entries(host.keys).map(([n, k]) => [n, keyOf(k)])) as Record<keyof EditorKeys, string>;
     panel.innerHTML = panelHtml(view, keys);
     help.innerHTML = helpText(view.cam);
@@ -404,6 +461,10 @@ export function createEditor(host: EditorHost) {
     if (!b) return;
     b.blur();
     if (b.dataset.cam) return setCam(b.dataset.cam as EditCam);
+    if (b.dataset.step) {
+      vars.change([{ layer: 'user', path: ev.viewStep.path, before: vars.layerValue('user', ev.viewStep.path), after: b.dataset.step === '45' ? undefined : b.dataset.step }], false);
+      return draw();
+    }
     if (b.dataset.view) {
       vars.change([{ layer: 'user', path: ev.view.path, before: vars.layerValue('user', ev.view.path), after: b.dataset.view }], false);
       return draw();
@@ -431,7 +492,7 @@ export function createEditor(host: EditorHost) {
 
   // --- actions -----------------------------------------------------------------------------
 
-  type Action = 'close' | 'insert' | 'delete' | 'smooth' | 'focus' | 'frame' | 'undo' | 'redo' | 'revert' | 'save' | 'download' | 'record' | 'rollLeft' | 'rollRight' | 'wider' | 'narrower' | 'camera' | 'all' | 'none';
+  type Action = 'close' | 'insert' | 'delete' | 'smooth' | 'focus' | 'frame' | 'undo' | 'redo' | 'revert' | 'save' | 'download' | 'record' | 'rollLeft' | 'rollRight' | 'wider' | 'narrower' | 'camera' | 'all' | 'none' | 'center' | 'step' | 'yawLeft' | 'yawRight' | 'pitchUp' | 'pitchDown' | 'viewRollLeft' | 'viewRollRight';
 
   function act(a: Action): void {
     // not while a recording from the fly cam has the screen
@@ -498,6 +559,24 @@ export function createEditor(host: EditorHost) {
         gizmoHelper.visible = false;
         overlay.show(false);
         return host.record();
+      case 'center':
+        return center();
+      case 'step': {
+        const i = VIEW_STEP_OPTIONS.indexOf(ev.viewStep.value as (typeof VIEW_STEP_OPTIONS)[number]);
+        const next = VIEW_STEP_OPTIONS[(i + 1) % VIEW_STEP_OPTIONS.length];
+        vars.change([{ layer: 'user', path: ev.viewStep.path, before: vars.layerValue('user', ev.viewStep.path), after: next === '45' ? undefined : next }], false);
+        tell(`Turns ${next}°`);
+        return;
+      }
+      case 'yawLeft':
+      case 'yawRight':
+        return turn('yaw', a === 'yawRight' ? 1 : -1);
+      case 'pitchUp':
+      case 'pitchDown':
+        return turn('pitch', a === 'pitchUp' ? 1 : -1);
+      case 'viewRollLeft':
+      case 'viewRollRight':
+        return turn('roll', a === 'viewRollRight' ? 1 : -1);
       case 'camera':
         return setCam(EDIT_CAMS[(EDIT_CAMS.indexOf(ev.cam.value) + 1) % EDIT_CAMS.length]);
       case 'all':
@@ -610,6 +689,8 @@ export function createEditor(host: EditorHost) {
       screen: (i: number) => (doc?.points[i] ? screen(new THREE.Vector3(...doc.points[i].p)) : null),
       line: (i: number) => (base?.pos[i] ? screen(base.pos[i]) : null),
       samples: () => base?.pos.length ?? 0,
+      /** the camera's line of sight and up, and the point it orbits */
+      view: () => ({ fwd: camera.getWorldDirection(new THREE.Vector3()).toArray(), up: new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion).toArray(), target: orbit.target.toArray() }),
       /** a spot `px` along the gizmo's arrow for `axis`, and the pivot */
       arrow: (axis: 'x' | 'y' | 'z', px: number) => {
         const c = screen(pivot.position);
@@ -648,6 +729,14 @@ export function createEditor(host: EditorHost) {
       rollRight: on('rollRight'),
       smooth: on('smooth'),
       camera: on('camera'),
+      center: on('center'),
+      step: on('step'),
+      yawLeft: on('yawLeft'),
+      yawRight: on('yawRight'),
+      pitchUp: on('pitchUp'),
+      pitchDown: on('pitchDown'),
+      viewRollLeft: on('viewRollLeft'),
+      viewRollRight: on('viewRollRight'),
     },
     /** A recording from the fly cam ended (or was discarded): show the editor again. */
     resume(): void {

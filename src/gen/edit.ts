@@ -282,3 +282,27 @@ export function flyStep(pos: Vector3, quat: Quaternion, a: FlyAxes, p: FlyParams
   if (rate < 1e-9) return;
   quat.multiply(_q.setFromAxisAngle(_axis.divideScalar(rate), rate * dt)).normalize();
 }
+
+// --- view turns ------------------------------------------------------------------
+
+export type TurnAxis = 'yaw' | 'pitch' | 'roll';
+
+const _turn = new Quaternion();
+const _axisW = new Vector3();
+const _off = new Vector3();
+/**
+ * Turn a camera by `angle` radians about one of its own axes, through `pivot` (the point it orbits,
+ * or its own position): yaw about its up (positive turns the view right), pitch about its right
+ * (positive looks up), roll about its line of sight (positive rolls right). `pos` and `quat` change
+ * in place; the camera keeps looking at the pivot if it was.
+ */
+export function turnView(pos: Vector3, quat: Quaternion, pivot: Vector3, axis: TurnAxis, angle: number): void {
+  if (axis === 'yaw') _axisW.set(0, -1, 0);
+  else if (axis === 'pitch') _axisW.set(1, 0, 0);
+  else _axisW.set(0, 0, -1);
+  _axisW.applyQuaternion(quat);
+  _turn.setFromAxisAngle(_axisW, angle);
+  _off.subVectors(pos, pivot).applyQuaternion(_turn);
+  pos.copy(pivot).add(_off);
+  quat.premultiply(_turn).normalize();
+}
