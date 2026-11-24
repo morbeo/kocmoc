@@ -1,4 +1,6 @@
 import type { Scenario } from '../core/scenarios';
+import type { SavedTrack } from '../world/library';
+import { keyLabel } from '../input/bindings';
 import './tracks.css';
 
 /**
@@ -10,6 +12,13 @@ export interface TracksHost {
   /** name of the venue loaded last, if any */
   current(): string | null;
   play(sc: Scenario): void;
+  /** record a new track by flying it */
+  record(): void;
+  recordKey: { value: string };
+  /** tracks saved in this browser, newest first */
+  mine(): Promise<SavedTrack[]>;
+  playMine(text: string): void;
+  removeMine(id: string): Promise<void>;
 }
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -45,8 +54,27 @@ export function createTracks(host: TracksHost) {
   root.hidden = true;
   document.body.appendChild(root);
 
+  let saved: SavedTrack[] = [];
+  const mineList = () =>
+    saved.length
+      ? `<h3>My tracks</h3><div class="tk-mine">${saved
+          .map(
+            (t) => `<div class="mine"><button class="play" data-mine="${esc(t.id)}"><b>${esc(t.title)}</b><small>${esc(new Date(t.time).toLocaleString())}</small></button><button class="rm" data-rm="${esc(t.id)}" title="delete">×</button></div>`,
+          )
+          .join('')}</div><h3>Venues</h3>`
+      : '';
+  const refreshMine = () =>
+    host.mine().then(
+      (list) => {
+        saved = list;
+        if (!root.hidden) draw();
+      },
+      () => undefined,
+    );
+
   function draw(): void {
     const current = host.current();
+    const rk = host.recordKey.value.split(',')[0]?.trim();
     const items = host
       .venues()
       .map((sc) => {
@@ -63,6 +91,8 @@ export function createTracks(host: TracksHost) {
       <div class="tk-panel" role="dialog" aria-label="Race tracks">
         <header><h2>Race tracks</h2><button class="tk-close" title="close (Esc)">×</button></header>
         <p class="tk-help">Fifteen worlds to race, five of them underground. Each has its own shortcuts, tunnels and hazards, and your ghosts are kept per track.</p>
+        <p class="tk-record"><button class="record">● Record a track${rk ? ` (${esc(keyLabel(rk))})` : ''}</button> fly it in open space and a tube is laid behind you</p>
+        ${mineList()}
         <div class="tk-list">${items}</div>
       </div>`;
   }
@@ -70,6 +100,17 @@ export function createTracks(host: TracksHost) {
   root.addEventListener('click', (e) => {
     const el = e.target as HTMLElement;
     if (el === root || el.closest('.tk-close')) return toggle(false);
+    if (el.closest('.record')) {
+      toggle(false);
+      return host.record();
+    }
+    const rm = el.closest<HTMLElement>('[data-rm]')?.dataset.rm;
+    if (rm) return void host.removeMine(rm).then(refreshMine, () => undefined);
+    const mine = saved.find((t) => t.id === el.closest<HTMLElement>('[data-mine]')?.dataset.mine);
+    if (mine) {
+      toggle(false);
+      return host.playMine(mine.text);
+    }
     const name = el.closest<HTMLElement>('[data-venue]')?.dataset.venue;
     const sc = host.venues().find((x) => x.name === name);
     if (sc) {
@@ -84,6 +125,7 @@ export function createTracks(host: TracksHost) {
   function toggle(force = root.hidden): void {
     if (force) {
       draw();
+      void refreshMine();
       if (document.pointerLockElement) document.exitPointerLock();
     }
     root.hidden = !force;

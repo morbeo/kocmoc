@@ -12,7 +12,7 @@ import { BOT_ROUTES, botControls, botTargets, defaultBot, type BotRoute } from '
 import { flyBotLap, makeRival, standings, type Rival } from './sim/rivals';
 import { session } from './core/session';
 import { createReplayBar } from './ui/replayBar';
-import { attachInput, sampleInput, pollPad, onKey, assistKey, cameraKey, cinematicKey, controlsKey, respawnKey, autopilotKey, replayKey, levelsKey, nextLevelKey, tracksKey, zoom, debug as inputDebug, pointerMode } from './input/input';
+import { attachInput, sampleInput, pollPad, onKey, assistKey, cameraKey, cinematicKey, controlsKey, respawnKey, autopilotKey, replayKey, levelsKey, nextLevelKey, tracksKey, recordKeys, zoom, debug as inputDebug, pointerMode } from './input/input';
 import { keyLabel } from './input/bindings';
 import { camMode, cameraEvent, cycleCamera, toggleCinematic, updateCamera } from './cam/rigs';
 import { cineReplay, cineScene } from './cam/cinematic';
@@ -39,7 +39,7 @@ import { createGauntletScene, gauntlet, nearMissDistance, shipRadius } from './w
 import { createJuice } from './juice';
 import { raceDistance, splitDelta, startSpawnS, type RaceState, type WallParams } from './sim/race';
 import { scenarios, applyScenario, parseScenario, setSpawnHandler, setSpawnSource, venues } from './core/scenarios';
-import { parseTrackDoc } from './gen/trackDoc';
+import { parseTrackDoc, parseTrackText } from './gen/trackDoc';
 import { raceSpan, startLine } from './gen/track';
 import { loadTrackDoc, trackFromHash, TRACK_HASH } from './world/trackFile';
 import type { ProvingHud } from './ui/hud';
@@ -48,6 +48,9 @@ import { bestKey, ghostKey, LADDER_KEY, loadLadder } from './world/records';
 import { currentShip, currentVenue, playLevel } from './core/selection';
 import { createRivalModels, RIVAL_NAMES, type RivalKind } from './render/rivals';
 import { keyButton } from './ui/keyButton';
+import { createRecordScene } from './world/recording';
+import { createRecording } from './ui/record';
+import { listTracks, removeTrack } from './world/library';
 
 // --- vars ------------------------------------------------------------------
 const lightColor = vars.color('render.light.color', '#ffffff', { tags: ['render'] });
@@ -314,7 +317,21 @@ let outcome: RunOutcome | null = null;
 const levels = createLevels({ ladder: () => ladder, ship: currentShip, play: playLevel });
 
 // --- race tracks -------------------------------------------------------------
-const tracks = createTracks({ venues: () => venues(), current: currentVenue, play: (sc) => applyScenario(vars, sc) });
+const recordScene = createRecordScene(scene);
+const recording = createRecording({ scene: recordScene, ship: () => curr, respawn: () => respawn(), track: () => (onTrack() ? track.value : null), keys: recordKeys });
+const tracks = createTracks({
+  venues: () => venues(),
+  current: currentVenue,
+  play: (sc) => applyScenario(vars, sc),
+  record: () => recording.start(),
+  recordKey: recordKeys.record,
+  mine: listTracks,
+  playMine: (text) => {
+    const doc = parseTrackText(text);
+    if (doc) loadTrackDoc(doc);
+  },
+  removeMine: removeTrack,
+});
 
 /** Start a recording from its spawn and fast-forward to `tick`. */
 function seekReplay(tick: number): void {
@@ -449,6 +466,11 @@ onKey(cinematicKey, toggleCinematic);
 onKey(vizKey, () => inputViz.set(!inputViz.value));
 onKey(levelsKey, () => levels.toggle());
 onKey(tracksKey, () => tracks.toggle());
+onKey(recordKeys.record, () => recording.recordKey());
+onKey(recordKeys.wider, () => recording.act('wider'));
+onKey(recordKeys.narrower, () => recording.act('narrower'));
+onKey(recordKeys.pause, () => recording.act('pause'));
+onKey(recordKeys.undo, () => recording.act('undo'));
 onKey(nextLevelKey, () => {
   if (race?.proving?.result !== 'clear') return;
   playLevel(provingLevel.value + 1, currentShip() ?? 'balanced');
@@ -590,7 +612,7 @@ renderer.setAnimationLoop((now) => {
   const warp = juice.timeScale(paused.value ? 0 : dt);
   const playing = !replay || (replay.playing && !replay.player.done);
   const speedX = replay ? replay.speed : 1;
-  const alpha = loop.advance(paused.value || !playing ? 0 : dt * timeScale.value * warp * speedX, (step) => {
+  const alpha = loop.advance(paused.value || !playing || recording.frozen ? 0 : dt * timeScale.value * warp * speedX, (step) => {
     if (replay) {
       if (!replay.player.next(controls)) return;
     } else {
@@ -614,6 +636,7 @@ renderer.setAnimationLoop((now) => {
       }
     }
   });
+  recording.frame();
   replayBar.update({
     active: !!replay,
     playing: !!replay && replay.playing && !replay.player.done,

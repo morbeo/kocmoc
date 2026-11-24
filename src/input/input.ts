@@ -45,6 +45,14 @@ export const replayKey = bind('replay', 'KeyB');
 export const levelsKey = bind('levels', 'KeyL');
 export const nextLevelKey = bind('nextLevel', 'KeyN');
 export const tracksKey = bind('tracks', 'KeyT');
+/** record a track by flying: start, then finish; the rest only while recording */
+export const recordKeys = {
+  record: bind('record', 'KeyJ'),
+  wider: bind('recordWider', 'BracketRight'),
+  narrower: bind('recordNarrower', 'BracketLeft'),
+  pause: bind('recordPause', 'KeyU'),
+  undo: bind('recordUndo', 'Backspace'),
+};
 
 const keyRamp = vars.num('input.key.ramp', 8, { min: 0, max: 30, hardMin: 0, unit: '/s', tags: keyTags, desc: 'how fast key axes move to full; 0 = instant' });
 export const invert = {

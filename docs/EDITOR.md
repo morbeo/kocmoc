@@ -1,4 +1,4 @@
-# Kocmoc — Track editor (M8, proposed)
+# Kocmoc — Track editor (M8)
 
 Make race tracks by flying them, then shape them in an editor: move points, set sections,
 branches, hazards, pads and scenery, look at the whole thing from above, playtest, and share.
@@ -78,22 +78,38 @@ or the name of a bundled `tracks/<name>.json`); loading any scenario replaces a 
 venue or seed, with its forks, sections, hazards, pads and look) as `*.kocmoc-track.json`; **load**
 or a file drop opens one; **link** copies a `#t=<lz-string>` URL; **generated** goes back.
 
-## Record a track by flying
+## Record a track by flying (built, M8c)
 
-1. Pick **Record** in the editor (or the track list). The ship starts in open space (`profile: open`,
-   no walls) with a ghost tube growing behind it, so you see the corridor as you make it.
-2. While flying, the recorder drops a sample every few metres: position and the ship's roll against
-   the rotation-minimising frame. Path source is the **ship** by default, or the **free camera** for
-   paths the ship can't fly yet.
-3. Live controls: tube radius up/down, pause/resume, undo the last stretch.
-4. **Close the loop**: when you come back near the start heading the same way, it offers to close;
-   otherwise **Bridge** joins the end to the start with a Hermite curve (as shortcuts are built today).
-5. **Fit**: smooth out jitter, then reduce to control points within a tolerance (default 0.25 tube
-   radius), keeping extra points where curvature is high. The result opens in the editor.
-6. **Check**: the generator's acceptance tests (`minSeparation` > 2.4 R, `minCurvatureRadius` > 1.2 R)
-   run on the result. Failures are marked red on the track instead of silently retrying.
+1. Press **J** or pick **Record a track** in the track list. The game switches to free flight (open
+   space, no walls; the mode it was in comes back on discard) and a see-through tube grows behind the
+   ship, so you see the corridor as you make it. A ring marks the start.
+2. While flying, `PathRecorder` (`src/gen/record.ts`) keeps a sample every `record.step` m (4):
+   position, the ship's up vector and the tube radius at the time. Path source is the ship; the free
+   camera source waits for the editor's fly cam (M8d).
+3. Live controls: `]` / `[` tube radius by `record.radiusStep`, `U` pause/resume, `Backspace` undo
+   the last `record.undo` m (200). The same actions are buttons under the recording HUD.
+4. **J** again finishes (at least `record.minLength`, 200 m) and the sim stops while you choose:
+   - **Close the loop** is offered when the path is at least 20 radii long, ends within
+     `record.closeNear` radii (3) of the start and heads within about 60° of the start's heading (the
+     start ring turns green). `closeLoop` cuts the end where it passes nearest the start.
+   - **Bridge back to the start** joins the end to the start with a cubic Hermite curve (tangents
+     along the path, as long as the gap), sampled like the rest.
+   - **Keep it open** makes a point-to-point run (M8b rules).
+5. **Fit** (`recordingToDoc`): a moving average over half a radius each side smooths out jitter;
+   control points start one every 8 radii, then the sample that strays furthest from the spline is
+   added in every segment where it strays more than `record.tolerance` (0.25) radii, until none do,
+   so tight turns keep more points. Roll at each control point is the ship's up against the
+   rotation-minimising frame of the unrolled spline, unwrapped; on a loop, whole turns become `twist`.
+   Each point keeps the radius flown there; the file's `radius` is the median.
+6. **Check** (`trackProblems`): the generator's acceptance tests per sample, the tube within 2.4 radii
+   of another part of itself more than 4 radii further along, and bends tighter than 1.2 radii. Failing
+   stretches are listed, drawn red on the fitted tube, and marked with red rings while you fly it.
+7. **Fly it** loads the file like a dropped one (race mode; a mode left in the user layer is cleared),
+   **Save to My tracks** stores it in IndexedDB (`kocmoc-tracks` database, `src/world/library.ts`),
+   **Download file** saves `*.kocmoc-track.json`. **Back** returns to the choice, and from there to
+   recording.
 
-If you don't close it, the recording is a point-to-point track (below).
+**My tracks**: the track list shows saved tracks above the venues, newest first, with a delete button.
 
 ## Point-to-point tracks (built, M8b)
 
@@ -170,7 +186,7 @@ They reuse the same checks the generators use to accept a candidate.
 
 | Where | How |
 |---|---|
-| Library | IndexedDB (`idb-keyval`, already used for snapshots); listed under **My tracks** in the track list |
+| Library | IndexedDB (`idb-keyval`, own `kocmoc-tracks` database); listed under **My tracks** in the track list (built in M8c: play, delete) |
 | File | export / import `*.kocmoc-track.json`; drop onto the page to load |
 | URL | `#t=<lz-string>` like the existing `#s=`; a 60-point track with props is about 2–4 KB |
 | Repo | `tracks/<name>.json`, referenced from a venue scenario |
@@ -184,7 +200,7 @@ be opened, edited and saved as new tracks.
 |---|---|
 | M8a | **Built.** Track doc + `compileTrack` (closed and open), per-point radius, anchors, explicit lists in place of generators, scenario `track` field, Bake, file and URL load. Test: a baked track compiles to the same samples as the generator |
 | M8b | **Built.** Point-to-point race rules: one run, start run-up, finish gate, run-off braking, end walls, results; bot and ghosts on open tracks; open minimap; bundled Canyon Run |
-| M8c | Record by flying: ghost tube, sampling, close or bridge, fit, checks, save to library |
+| M8c | **Built.** Record by flying: ghost tube, sampling, radius / pause / undo, close or bridge or open, fit, checks marked red, save to My tracks, download |
 | M8d | Editor shell (desktop only): `edit` mode, orbit / fly / ortho cams, picking, point gizmo, insert / delete / roll / radius, undo, validation overlay |
 | M8e | Placement: lap timeline, sections, branches, hazards, pads, movers, screens, scenery pins, Fill buttons |
 | M8f | Playtest and share: play from here and back, bot lap, heat strip, My tracks in the track list, URL share |
