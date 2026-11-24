@@ -1,10 +1,11 @@
 import { Vector3 } from 'three';
-import { nearestOnTrack, type Nearest, type Track } from '../gen/track';
+import { nearestOnTrack, raceSpan, startLine, type Nearest, type Track } from '../gen/track';
 import { locate, newRouteState } from '../gen/routes';
 import { GhostRecorder, type Ghost } from './ghost';
 import { botControls, type BotCourse, type BotParams } from './bot';
 import { noControls } from './ship';
 import { newSim, spawnSim, stepSim, type SimConfig } from './world';
+import { startSpawnS } from './race';
 
 /**
  * A ghost raced as an opponent. It flies its one recorded lap over and over, so its progress and
@@ -20,11 +21,13 @@ export interface Rival {
 const STRIDE = 7;
 const _p = new Vector3();
 
-/** Distance along the track at every ghost sample, unwrapped from the start line. */
+/** Distance along the track at every ghost sample, unwrapped from the start line (capped at one lap or run). */
 export function ghostProfile(g: Ghost, track: Track): Float64Array {
   const n = g.samples.length / STRIDE;
   const out = new Float64Array(n);
   const L = track.length;
+  const open = track.closed === false;
+  const span = raceSpan(track);
   let hint = -1;
   let prevS = 0;
   let along = 0;
@@ -39,7 +42,8 @@ export function ghostProfile(g: Ghost, track: Track): Float64Array {
       near = at;
     } else near = nearestOnTrack(track, _p, hint);
     hint = near.index;
-    if (i === 0) along = near.s > L / 2 ? near.s - L : near.s;
+    if (open) along = near.s - startLine(track);
+    else if (i === 0) along = near.s > L / 2 ? near.s - L : near.s;
     else {
       let ds = near.s - prevS;
       if (ds > L / 2) ds -= L;
@@ -48,7 +52,7 @@ export function ghostProfile(g: Ghost, track: Track): Float64Array {
     }
     prevS = near.s;
     // a wobble backwards (wall bounce) shouldn't make the rival "lose" places it already took
-    out[i] = Math.min(L, i > 0 ? Math.max(out[i - 1], along) : along);
+    out[i] = Math.min(span, i > 0 ? Math.max(out[i - 1], along) : along);
   }
   return out;
 }
@@ -126,7 +130,7 @@ export function standings(rivals: readonly Rival[], dist: number, time: number, 
 }
 
 /**
- * Let the autopilot fly one lap from a standing start just behind the line, and keep it as a ghost.
+ * Let the autopilot fly one lap (or run) from a standing start just behind the line, and keep it as a ghost.
  * Deterministic, so the same track always gives the same rival. Null if it doesn't finish in `limit` s.
  * Yields every `every` steps so a caller can spread the work over frames.
  */
@@ -134,7 +138,7 @@ export function* flyBotLap(cfg: SimConfig, gauntlet: BotCourse | null, step: num
   const track = cfg.track;
   if (!track) return null;
   const sim = newSim();
-  spawnSim(sim, track, { s: -Math.min(30, track.length * 0.05), speed: 0 });
+  spawnSim(sim, track, { s: startSpawnS(track), speed: 0 });
   const rec = new GhostRecorder();
   const c = noControls();
   const race = sim.race!;

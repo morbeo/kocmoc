@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { effect } from '@preact/signals-core';
 import { vars, type Change, type Var } from '../core/vars';
-import type { Track } from '../gen/track';
+import { segmentAt, type Track } from '../gen/track';
 import './hudLayout.css';
 
 /**
@@ -202,8 +202,26 @@ export function createHudLayout(elements: { speed: HTMLElement; timer: HTMLEleme
           if (i === 0) g.moveTo(px(p.x), pz(p.z));
           else g.lineTo(px(p.x), pz(p.z));
         }
-        g.closePath();
+        const open = t.closed === false;
+        if (open) {
+          const e = t.pos[t.pos.length - 1];
+          g.lineTo(px(e.x), pz(e.z));
+        } else g.closePath();
         g.stroke();
+        // point to point: a bar across the track at the start line and the finish gate
+        if (open) {
+          for (const [s, c] of [[t.start ?? 0, '#ffd23f'], [t.finish ?? t.length, '#1b1030']] as const) {
+            const [i] = segmentAt(t, s);
+            const p = t.pos[i];
+            const a = Math.atan2(t.tan[i].z, t.tan[i].x) + Math.PI / 2;
+            g.strokeStyle = c;
+            g.lineWidth = 4;
+            g.beginPath();
+            g.moveTo(px(p.x) - Math.cos(a) * 7, pz(p.z) - Math.sin(a) * 7);
+            g.lineTo(px(p.x) + Math.cos(a) * 7, pz(p.z) + Math.sin(a) * 7);
+            g.stroke();
+          }
+        }
         // alternate routes, thinner, in their route's colour
         g.lineWidth = 2;
         (t.branches ?? []).forEach((b, k) => {
@@ -221,7 +239,7 @@ export function createHudLayout(elements: { speed: HTMLElement; timer: HTMLEleme
           g.stroke();
         });
         if (f.nextCp !== null) {
-          const p = t.pos[Math.min(t.pos.length - 1, Math.floor((f.nextCp / t.length) * t.pos.length))];
+          const p = t.pos[segmentAt(t, f.nextCp)[0]];
           g.fillStyle = '#0aa5c8';
           g.beginPath();
           g.arc(px(p.x), pz(p.z), 4, 0, Math.PI * 2);
@@ -245,7 +263,7 @@ export function createHudLayout(elements: { speed: HTMLElement; timer: HTMLEleme
       arrow.hidden = !showArrow && !editMode.value;
       if (showArrow && f.track) {
         const t = f.track;
-        const p = f.target ?? t.pos[Math.min(t.pos.length - 1, Math.floor((f.nextCp! / t.length) * t.pos.length))];
+        const p = f.target ?? t.pos[segmentAt(t, f.nextCp!)[0]];
         _v.copy(p).applyMatrix4(f.camera.matrixWorldInverse);
         // 0° = straight up the screen; behind the camera it fades so "turn around" reads
         arrowHead.style.transform = `rotate(${(Math.atan2(_v.x, _v.y) * 180) / Math.PI}deg)`;

@@ -1,0 +1,40 @@
+{
+  "kind": "kocmoc.track",
+  "version": 1,
+  "title": "Canyon Run",
+  "closed": false,
+  "seed": 77,
+  "radius": 40,
+  "spacing": 4,
+  "checkpoints": 6,
+  "twist": 0,
+  "points": [
+    { "p": [0, 120, 0] },
+    { "p": [0, 115, -300] },
+    { "p": [180, 90, -620], "roll": -0.5 },
+    { "p": [120, 60, -980], "roll": 0.3 },
+    { "p": [-160, 40, -1240], "roll": 0.6 },
+    { "p": [-260, 10, -1600], "r": 55 },
+    { "p": [-80, -20, -1940], "roll": -0.4, "r": 55 },
+    { "p": [220, -30, -2160], "roll": -0.8 },
+    { "p": [380, -60, -2500], "roll": 0.2, "r": 32 },
+    { "p": [300, -80, -2860] },
+    { "p": [300, -80, -3160] }
+  ],
+  "vars": {
+    "gen.race.profile": "halfpipe",
+    "render.track.color": "#7a3b1f",
+    "render.track.stripe": "#ffd23f",
+    "render.background": "#ffe2c4",
+    "render.sky.zenith": "#f4a56a",
+    "render.stars.enabled": false,
+    "render.ambient": 0.6,
+    "world.ground": "floor",
+    "world.ground.color": "#c9774a",
+    "world.ground.color2": "#d88a5a",
+    "world.scenery.kinds": "columns,shards",
+    "world.scenery.count": 90,
+    "world.scenery.color": "#b5603a",
+    "world.scenery.color2": "#e3a070"
+  }
+}

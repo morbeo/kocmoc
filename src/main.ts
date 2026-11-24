@@ -37,9 +37,10 @@ import { createLevels } from './ui/levels';
 import { createTracks } from './ui/tracks';
 import { createGauntletScene, gauntlet, nearMissDistance, shipRadius } from './world/gauntlet';
 import { createJuice } from './juice';
-import { raceDistance, splitDelta, type RaceState, type WallParams } from './sim/race';
+import { raceDistance, splitDelta, startSpawnS, type RaceState, type WallParams } from './sim/race';
 import { scenarios, applyScenario, parseScenario, setSpawnHandler, setSpawnSource, venues } from './core/scenarios';
 import { parseTrackDoc } from './gen/trackDoc';
+import { raceSpan, startLine } from './gen/track';
 import { loadTrackDoc, trackFromHash, TRACK_HASH } from './world/trackFile';
 import type { ProvingHud } from './ui/hud';
 import './ui/hud.css';
@@ -252,7 +253,7 @@ function spawnFor(t: number, speed: number): Spawn {
   if (!onTrack()) return { s: 0, speed };
   const L = track.value.length;
   // t = 0 spawns a little behind the line so crossing it starts the clock
-  return { s: t === 0 ? -Math.min(30, L * 0.05) : t * L, speed };
+  return { s: t === 0 ? startSpawnS(track.value) : t * L, speed };
 }
 
 /** Put the ship at a spawn point (fraction of the lap on a track; origin in free mode). */
@@ -669,7 +670,8 @@ renderer.setAnimationLoop((now) => {
     rivalModels[k].mat.color.set(colors[k]);
     rivalModels[k].mat.opacity = ghostOpacity.value;
   }
-  const L = track.value.length;
+  // one lap, or start line to finish gate on a point-to-point track
+  const L = raceSpan(track.value);
   const racing = !!race && race.laps > 0;
   if (race?.started) {
     const lerp = race.finished ? 0 : (1 - alpha) * loop.step;
@@ -719,6 +721,7 @@ renderer.setAnimationLoop((now) => {
     checkpoints: track.value.checkpoints.length,
     seed: seedVar.value,
     laps: race.laps,
+    run: track.value.closed === false,
     raceTime: race.raceTime,
     finished: race.finished,
     finishTime: race.finishTime,
@@ -750,7 +753,7 @@ renderer.setAnimationLoop((now) => {
     shipPos: view.pos,
     shipQuat: view.quat,
     track: onTrack() ? track.value : null,
-    nextCp: race?.started ? (race.nextCp === 0 ? 0 : track.value.checkpoints[race.nextCp]) : race ? 0 : null,
+    nextCp: race?.finished ? null : race?.started ? (race.nextCp === 0 ? (track.value.finish ?? 0) : track.value.checkpoints[race.nextCp]) : race ? startLine(track.value) : null,
     target: race?.proving && provingCourse.value && !race.proving.result ? nextGatePoint(provingCourse.value, race.proving, _gate) : null,
     branchColors: onTrack() ? branchColors() : [],
   });
