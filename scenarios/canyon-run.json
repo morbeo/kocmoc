@@ -1,0 +1,8 @@
+{
+  "name": "canyon-run",
+  "desc": "Point to point: one run down a canyon, from the start line to the finish gate",
+  "mode": "race",
+  "spawn": { "trackT": 0, "speed": 0 },
+  "track": "canyon-run",
+  "presets": []
+}

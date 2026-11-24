@@ -59,7 +59,7 @@ only source and become "fill" tools that write into it.
 - **Branches** keep the generator's shape (`branchFrom`: a Hermite cut or a bulge of `amp` m towards
   `theta`); free control points for branches come with the editor (M8e).
 - **Open tracks** (`"closed": false`) compile, with frames that run free from the start and no
-  segment back from the end. Race rules for them (start run-up, finish gate, run-off, minimap) are M8b.
+  segment back from the end. Their race rules are in [Point-to-point tracks](#point-to-point-tracks-built-m8b).
 - Positions are rounded to 0.1 m, angles to 0.001 rad and anchors to 1e-4, so files diff well and
   links stay short (a 12-point loop is about 600 characters as a link).
 - `vars` holds the look (palette, profile, ground, sky, scenery settings), applied under the scenario.
@@ -95,21 +95,29 @@ or a file drop opens one; **link** copies a `#t=<lz-string>` URL; **generated** 
 
 If you don't close it, the recording is a point-to-point track (below).
 
-## Point-to-point tracks
+## Point-to-point tracks (built, M8b)
 
 `"closed": false` makes a track with a start and a separate finish, like a downhill run.
+`tracks/canyon-run.json` is one (`?scenario=canyon-run`).
 
 - Spline: an open centripetal Catmull-Rom, with its end tangents taken from the first and last
   segments. Frames are transported from the start with no closure fix, so there is no seam.
-- Race rules: one run, no laps (`race.laps` is ignored). The start line is at `s = 0` and the finish
-  gate at the end; checkpoints and splits work as now. Progress is plain `s` that never wraps.
-- Ends: the tube is capped behind the start; past the finish it opens into a run-off area where the
-  ship slows down, and the results card shows.
-- Ghosts, rivals, positions and gaps work unchanged, since they already measure distance from the start.
-  The bot flies it once instead of a lap.
-- Branches can't merge after the finish, and the start-line and lap checks that look across the seam
-  are skipped.
-- The editor shows open tracks the same way; the lap timeline becomes a start-to-finish timeline.
+- Lines: a **run-up** of `RUN_UP` = 60 m (at most a tenth of the track) before the start line, and a
+  **run-off** of `RUN_OFF` = 250 m (at most a fifth) after the finish gate (`openLines`, stored as
+  `Track.start` / `Track.finish`). Checkpoints split start to finish evenly, `checkpoints[0]` is the
+  start line. `raceSpan(track)` is the race distance: one lap on a loop, start to finish here.
+- Race rules: one run, no laps (`race.laps` is ignored). The ship spawns halfway down the run-up;
+  crossing the start line starts the clock, the finish gate stops it. Progress is `s` from the start
+  line and never wraps; `segmentAt`, `sampleAt` and `pointOnTrack` clamp to the ends instead of wrapping.
+- Ends: both ends of the tube are flat walls (`collideEnds`); the far one is drawn as a disc. Past the
+  finish gate the run-off brakes the ship (at least 30 m/s², more if needed) to stop 15 m short of
+  the end, and the results card shows.
+- HUD: the lap label reads **RUN**, there is no race total, and the minimap draws the track open
+  with a bar at the start line and the finish gate.
+- Ghosts, rivals, positions and gaps measure distance from the start line up to `raceSpan`; the
+  autopilot rival flies one run from the standing start.
+- Not yet: checking that a branch on an open track merges before the finish gate, and the
+  editor's start-to-finish timeline (both M8e).
 
 ## Editor
 
@@ -175,7 +183,7 @@ be opened, edited and saved as new tracks.
 | # | Scope |
 |---|---|
 | M8a | **Built.** Track doc + `compileTrack` (closed and open), per-point radius, anchors, explicit lists in place of generators, scenario `track` field, Bake, file and URL load. Test: a baked track compiles to the same samples as the generator |
-| M8b | Point-to-point race rules: one run, finish gate, run-off, results; bot and ghosts on open tracks |
+| M8b | **Built.** Point-to-point race rules: one run, start run-up, finish gate, run-off braking, end walls, results; bot and ghosts on open tracks; open minimap; bundled Canyon Run |
 | M8c | Record by flying: ghost tube, sampling, close or bridge, fit, checks, save to library |
 | M8d | Editor shell (desktop only): `edit` mode, orbit / fly / ortho cams, picking, point gizmo, insert / delete / roll / radius, undo, validation overlay |
 | M8e | Placement: lap timeline, sections, branches, hazards, pads, movers, screens, scenery pins, Fill buttons |

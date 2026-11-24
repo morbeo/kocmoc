@@ -21,6 +21,7 @@ it('labels laps against the race length, held at the last lap', () => {
   expect(lapLabel(2, 3)).toBe('LAP 2/3');
   expect(lapLabel(4, 3)).toBe('LAP 3/3');
   expect(lapLabel(5, 0)).toBe('LAP 5');
+  expect(lapLabel(1, 1, true)).toBe('RUN');
 });
 
 const run: ProvingHud = {

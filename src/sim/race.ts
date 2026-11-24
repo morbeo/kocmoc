@@ -1,6 +1,6 @@
 import { Matrix4, Vector3 } from 'three';
 import type { ShipState } from './ship';
-import { nearestOnTrack, radiusAt, type Nearest, type Track } from '../gen/track';
+import { nearestOnTrack, radiusAt, raceSpan, segmentAt, startLine, type Nearest, type Track } from '../gen/track';
 import { locate, newRouteState, resetRoute, type RouteKind, type RouteState } from '../gen/routes';
 import type { Gauntlet } from '../gen/gauntlet';
 import { polar, sectionAt, wallAt, wallNormal, type Wall } from '../gen/sections';
@@ -69,7 +69,7 @@ export interface RaceState {
   lapTime: number;
   /** time since the start-line crossing, s; stops at the finish */
   raceTime: number;
-  /** laps in the race; 0 = endless practice */
+  /** laps in the race; 0 = endless practice (an open track is always one run) */
   laps: number;
   /** set on crossing the line after the last lap */
   finished: boolean;
@@ -108,15 +108,16 @@ export interface RaceState {
 export function newRace(track: Track, ship: ShipState, laps = 0): RaceState {
   const loc = newRouteState(track, ship.pos);
   const near = { ...loc.main, point: loc.main.point.clone() };
+  const open = track.closed === false;
   return {
     near,
     loc,
-    along: wrapAlong(near.s, track.length),
+    along: open ? near.s - startLine(track) : wrapAlong(near.s, track.length),
     started: false,
     lap: 0,
     lapTime: 0,
     raceTime: 0,
-    laps: Math.max(0, Math.round(laps)),
+    laps: open ? 1 : Math.max(0, Math.round(laps)),
     finished: false,
     finishTime: null,
     lapTimes: [],
@@ -142,13 +143,17 @@ export function newRace(track: Track, ship: ShipState, laps = 0): RaceState {
 /** Arc length → distance from the start line in (-L/2, L/2], so a spawn just behind the line reads negative. */
 const wrapAlong = (s: number, length: number) => (s > length / 2 ? s - length : s);
 
+/**
+ * Arc length a run starts from, standing: 30 m behind the line on a loop (so crossing it starts the
+ * clock), halfway down the run-up on an open track.
+ */
+export function startSpawnS(track: Track): number {
+  return track.closed === false ? startLine(track) / 2 : -Math.min(30, track.length * 0.05);
+}
+
 /** Place the ship on the centreline at arc length `s`, facing along the track, moving at `speed`. */
 export function spawnOnTrack(ship: ShipState, track: Track, s: number, speed: number): void {
-  const n = track.pos.length;
-  const ss = ((s % track.length) + track.length) % track.length;
-  const i = Math.min(n - 1, Math.floor((ss / track.length) * n));
-  const j = (i + 1) % n;
-  const t = (ss - track.s[i]) / ((j === 0 ? track.length : track.s[j]) - track.s[i]);
+  const [i, j, t] = segmentAt(track, s);
   ship.pos.lerpVectors(track.pos[i], track.pos[j], t);
   const fwd = track.tan[i];
   const up = track.up[i];
@@ -218,6 +223,29 @@ export function collideSection(ship: ShipState, near: Nearest, track: Track, p: 
   return true;
 }
 
+/** Keep the ship off the flat end walls of an open track's tube: push back out and bounce. */
+export function collideEnds(ship: ShipState, track: Track, s: number, p: WallParams, out?: { impact: number }): boolean {
+  if (out) out.impact = 0;
+  const n = track.pos.length;
+  // only near an end: a track that curls round could pass behind an end wall's plane elsewhere
+  const reach = track.radius * 3;
+  for (const [i, sign] of [[0, 1], [n - 1, -1]] as const) {
+    if (sign > 0 ? s > reach : s < track.length - reach) continue;
+    // inward normal of the end wall, and how far the ship's skin is past it
+    _n.copy(track.tan[i]).multiplyScalar(sign);
+    const pen = p.shipRadius - _z.subVectors(ship.pos, track.pos[i]).dot(_n);
+    if (pen <= 0) continue;
+    ship.pos.addScaledVector(_n, pen);
+    const vn = -ship.vel.dot(_n);
+    if (vn > 0) {
+      ship.vel.addScaledVector(_n, (1 + p.bounce) * vn);
+      if (out) out.impact = vn;
+    }
+    return true;
+  }
+  return false;
+}
+
 /** One fixed step of race rules after the ship has moved: walls, progress, checkpoints, laps. */
 export function stepRace(r: RaceState, ship: ShipState, track: Track, p: WallParams, dt: number, course?: Course): void {
   const prevS = r.near.s;
@@ -280,6 +308,15 @@ export function stepRace(r: RaceState, ship: ShipState, track: Track, p: WallPar
       }
     }
   }
+  // the two ends of an open track's tube are flat walls
+  if (track.closed === false && !p.open && r.loc.route < 0 && collideEnds(ship, track, r.near.s, p, _wall)) {
+    if (!r.contact) {
+      r.wallHits++;
+      r.events.push({ type: 'hit', what: 'wall', impact: _wall.impact });
+    }
+    r.contact = true;
+    nearestOnTrack(track, ship.pos, r.near.index, 24, r.near);
+  }
   const onMain = !branches?.length || r.loc.route < 0;
   if (course?.pads?.list.length) {
     const entered = onMain ? stepPads(course.pads.list, ship, track, r.near, course.pads.fx, dt, r.zone) : ((r.zone.pad = -1), null);
@@ -311,10 +348,14 @@ export function stepRace(r: RaceState, ship: ShipState, track: Track, p: WallPar
     }
   }
 
-  // progress along the track, unwrapped across the seam
+  const open = track.closed === false;
+  // run-off: past the finish gate of an open track, brake to a stop before the end of the tube
+  if (open && r.near.s > (track.finish ?? track.length)) runOff(ship, track, r.near.s, dt);
+
+  // progress along the track, unwrapped across the seam (an open track has none)
   let ds = r.near.s - prevS;
-  if (ds > track.length / 2) ds -= track.length;
-  else if (ds < -track.length / 2) ds += track.length;
+  if (!open && ds > track.length / 2) ds -= track.length;
+  else if (!open && ds < -track.length / 2) ds += track.length;
   const before = r.along;
   r.along += ds;
   if (r.started && !r.finished) {
@@ -337,8 +378,10 @@ export function stepRace(r: RaceState, ship: ShipState, track: Track, p: WallPar
   if (r.finished) return;
 
   // checkpoints must be passed in order; the finish line is checkpoint 0 at one full lap
+  // (on an open track: the finish gate, with distances counted from the start line)
   const cps = track.checkpoints;
-  const target = r.nextCp === 0 ? track.length : cps[r.nextCp];
+  const span = raceSpan(track);
+  const target = r.nextCp === 0 ? span : cps[r.nextCp] - cps[0];
   if (r.along >= target) {
     if (r.nextCp === 0) {
       r.lastLap = r.lapTime;
@@ -351,7 +394,7 @@ export function stepRace(r: RaceState, ship: ShipState, track: Track, p: WallPar
       r.lap++;
       r.lapTime = 0;
       r.splits = [];
-      r.along -= track.length;
+      r.along -= span;
       r.events.push({ type: 'lap' });
       // past the last lap: the clock stops (lap stays one past the count, so ghost recording sees the change)
       if (r.laps > 0 && r.lap > r.laps) {
@@ -368,9 +411,27 @@ export function stepRace(r: RaceState, ship: ShipState, track: Track, p: WallPar
   }
 }
 
-/** Distance flown since the start line over the whole race, m (negative before it). */
-export function raceDistance(r: RaceState, length: number): number {
-  return r.started ? (r.lap - 1) * length + r.along : r.along;
+/** Distance flown since the start line over the whole race, m (negative before it); `span` is one lap (`raceSpan`). */
+export function raceDistance(r: RaceState, span: number): number {
+  return r.started ? (r.lap - 1) * span + r.along : r.along;
+}
+
+/** Ship's nose clearance at the end of an open track's tube, m. */
+export const RUN_OFF_STOP = 15;
+
+/**
+ * Past the finish gate of an open track: shed speed along the track so the ship stops
+ * `RUN_OFF_STOP` m short of the end, at least 30 m/s² (and boost is cut).
+ */
+export function runOff(ship: ShipState, track: Track, s: number, dt: number): void {
+  const left = Math.max(1, track.length - RUN_OFF_STOP - s);
+  const i = segmentAt(track, s)[0];
+  const v = ship.vel.length();
+  if (v < 1e-3) return;
+  const fwd = Math.max(0, ship.vel.dot(track.tan[i]));
+  const decel = Math.max(30, (fwd * fwd) / (2 * left));
+  ship.vel.multiplyScalar(Math.max(0, v - decel * dt) / v);
+  ship.boosting = false;
 }
 
 /** Difference between the latest split and the best lap's split at the same checkpoint (negative = ahead). */

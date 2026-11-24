@@ -10,7 +10,7 @@ export interface Broadcast {
   time: string;
 }
 
-type Info = Pick<RaceHud, 'lap' | 'laps' | 'started' | 'finished' | 'raceTime' | 'lapTime' | 'finishTime' | 'standings'>;
+type Info = Pick<RaceHud, 'lap' | 'laps' | 'run' | 'started' | 'finished' | 'raceTime' | 'lapTime' | 'finishTime' | 'standings'>;
 
 export function broadcast(r: Info | null): Broadcast | null {
   if (!r || !r.started) return null;
@@ -26,7 +26,7 @@ export function broadcast(r: Info | null): Broadcast | null {
   const time = r.finished ? (r.finishTime ?? r.raceTime) : r.laps > 0 ? r.raceTime : r.lapTime;
   return {
     tag: st ? `P${st.position}/${st.of}` : 'LIVE',
-    lap: r.finished ? 'FINISH' : lapLabel(r.lap, r.laps),
+    lap: r.finished ? 'FINISH' : lapLabel(r.lap, r.laps, r.run),
     gap,
     time: formatTime(time),
   };

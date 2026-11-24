@@ -14,6 +14,8 @@ export interface RaceHud {
   seed: number;
   /** laps in the race; 0 = endless practice */
   laps: number;
+  /** a point-to-point track: one run from the start line to the finish gate */
+  run?: boolean;
   raceTime: number;
   finished: boolean;
   finishTime: number | null;
@@ -62,8 +64,9 @@ export function ordinal(n: number): string {
   return `${n}${s}`;
 }
 
-/** Lap label: "LAP 2/3" in a race (held at the last lap once finished), "LAP 2" in practice. */
-export function lapLabel(lap: number, laps: number): string {
+/** Lap label: "LAP 2/3" in a race (held at the last lap once finished), "LAP 2" in practice, "RUN" point to point. */
+export function lapLabel(lap: number, laps: number, run = false): string {
+  if (run) return 'RUN';
   return laps > 0 ? `LAP ${Math.min(lap, laps)}/${laps}` : `LAP ${lap}`;
 }
 
@@ -79,7 +82,7 @@ export function formatTime(t: number | null): string {
 
 function raceCard(r: RaceHud): string {
   const bestI = r.lapTimes.indexOf(Math.min(...r.lapTimes));
-  const laps = r.lapTimes.map((t, i) => `<li${i === bestI ? ' class="best"' : ''}><span>LAP ${i + 1}</span><span>${formatTime(t)}</span></li>`).join('');
+  const laps = r.lapTimes.map((t, i) => `<li${i === bestI ? ' class="best"' : ''}><span>${r.run ? 'RUN' : `LAP ${i + 1}`}</span><span>${formatTime(t)}</span></li>`).join('');
   const order = [{ name: 'YOU', time: r.finishTime ?? 0, you: true }, ...r.rivalTimes.map((x) => ({ ...x, you: false }))].sort((a, b) => a.time - b.time);
   const place = order.findIndex((x) => x.you) + 1;
   return `
@@ -189,14 +192,14 @@ export function createHud() {
       } else if (r) {
         time.classList.remove('low');
         time.textContent = r.finished ? formatTime(r.finishTime) : r.started ? formatTime(r.lapTime) : 'cross the line';
-        lap.textContent = r.finished ? 'FINISHED' : r.started ? lapLabel(r.lap, r.laps) : '';
+        lap.textContent = r.finished ? 'FINISHED' : r.started ? lapLabel(r.lap, r.laps, r.run) : '';
         cp.textContent = r.started && !r.finished ? `CP ${r.checkpoint}/${r.checkpoints}` : '';
         delta.textContent = r.delta === null ? '' : `${r.delta < 0 ? '−' : '+'}${Math.abs(r.delta).toFixed(2)}`;
         delta.className = `delta ${r.delta !== null && r.delta < 0 ? 'ahead' : 'behind'}`;
         last.textContent = `LAST ${formatTime(r.lastLap)}`;
         best.textContent = `BEST ${formatTime(r.bestLap)}`;
         seedEl.textContent = `SEED ${r.seed}`;
-        total.textContent = r.laps > 0 && r.started && !r.finished ? `TOTAL ${formatTime(r.raceTime)}` : '';
+        total.textContent = r.laps > 0 && !r.run && r.started && !r.finished ? `TOTAL ${formatTime(r.raceTime)}` : '';
       }
       const rt = r && !r.finished ? (r.route ?? null) : null;
       route.hidden = !rt;

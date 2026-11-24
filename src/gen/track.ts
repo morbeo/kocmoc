@@ -158,6 +158,9 @@ export interface Track {
   sections?: Section[];
   /** false: a point-to-point track from the first sample to the last (default: a closed loop) */
   closed?: boolean;
+  /** open tracks: arc length of the start line (after the run-up) and the finish gate (before the run-off) */
+  start?: number;
+  finish?: number;
   /** tube radius at each sample, when it varies along the track (else `radius` everywhere) */
   rad?: number[];
   /** what the centreline was built from, so it can be baked into a track file */
@@ -211,6 +214,41 @@ export function radiusAtS(track: Track, s: number): number {
   const span = (j === i ? 0 : j === 0 ? L : track.s[j]) - track.s[i];
   const f = span > 0 ? Math.min(1, Math.max(0, (ss - track.s[i]) / span)) : 0;
   return track.rad[i] + (track.rad[j] - track.rad[i]) * f;
+}
+
+/** Open tracks: distance from the first sample to the start line, m (at most a tenth of the track). */
+export const RUN_UP = 60;
+/** Open tracks: distance from the finish gate to the end of the tube, to brake in, m (at most a fifth). */
+export const RUN_OFF = 250;
+
+/** Start and finish lines of an open track, from its length. */
+export function openLines(length: number): { start: number; finish: number } {
+  return { start: Math.min(RUN_UP, length * 0.1), finish: length - Math.min(RUN_OFF, length * 0.2) };
+}
+
+/** Arc length of the start line: 0 on a loop. */
+export const startLine = (track: Pick<Track, 'start'>): number => track.start ?? 0;
+
+/** Race distance from the start line to the finish: one lap, or start to finish gate on an open track. */
+export function raceSpan(track: Pick<Track, 'length' | 'closed' | 'start' | 'finish'>): number {
+  return track.closed === false ? (track.finish ?? track.length) - (track.start ?? 0) : track.length;
+}
+
+/** Sample index, next sample and fraction between them at arc length `s` (wrapped on a loop, clamped on an open track). */
+export function segmentAt(track: Pick<Track, 'pos' | 's' | 'length' | 'closed'>, s: number): [number, number, number] {
+  const n = track.pos.length;
+  const L = track.length;
+  if (track.closed === false) {
+    const ss = Math.min(L, Math.max(0, s));
+    const i = Math.min(n - 2, Math.floor((ss / L) * (n - 1)));
+    const span = track.s[i + 1] - track.s[i];
+    return [i, i + 1, span > 0 ? Math.min(1, Math.max(0, (ss - track.s[i]) / span)) : 0];
+  }
+  const ss = ((s % L) + L) % L;
+  const i = Math.min(n - 1, Math.floor((ss / L) * n));
+  const j = (i + 1) % n;
+  const span = (j === 0 ? L : track.s[j]) - track.s[i];
+  return [i, j, span > 0 ? (ss - track.s[i]) / span : 0];
 }
 
 const WORLD_UP = new Vector3(0, 1, 0);
@@ -339,6 +377,8 @@ export function sampleTrack(ctrl: Vector3[], rolls: number[], o: SampleOptions):
     if (rad && radii) rad.push(radii[i0] + (radii[i1] - radii[i0]) * f);
   }
   const cps = Math.max(1, Math.round(o.checkpoints));
+  // an open track races from the start line (after the run-up) to the finish gate (before the run-off)
+  const lines = closed ? { start: 0, finish: length } : openLines(length);
   const track: Omit<Track, 'attempts'> = {
     pos,
     tan,
@@ -347,10 +387,10 @@ export function sampleTrack(ctrl: Vector3[], rolls: number[], o: SampleOptions):
     s,
     length,
     radius: o.radius,
-    checkpoints: Array.from({ length: cps }, (_, k) => (k * length) / cps),
+    checkpoints: Array.from({ length: cps }, (_, k) => lines.start + (k * (lines.finish - lines.start)) / cps),
     source: { points: ctrl.map((v) => v.clone()), rolls: [...rolls], twist: turns, spacing: o.spacing, checkpoints: cps, ...(radii ? { radii: [...radii] } : {}) },
   };
-  if (!closed) track.closed = false;
+  if (!closed) Object.assign(track, { closed: false }, lines);
   if (rad) track.rad = rad;
   return track;
 }

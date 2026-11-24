@@ -226,7 +226,9 @@ function ringMatrices(mesh: THREE.InstancedMesh, t: Path, at: number[], length: 
   const m = new THREE.Matrix4();
   const sc = new THREE.Matrix4();
   at.forEach((s, k) => {
-    const i = Math.min(n - 1, Math.round((s / length) * n)) % n;
+    // an open main track has a sample at each end (n - 1 gaps); a loop's last gap wraps to the first
+    const gaps = (t as Track).closed === false ? n - 1 : n;
+    const i = Math.min(n - 1, Math.round((s / length) * gaps)) % n;
     // torus lies in its XY plane: map X → right, Y → up, Z → forward
     m.makeBasis(t.right[i], t.up[i], t.tan[i]).setPosition(t.pos[i]);
     if (scale) m.multiply(sc.makeScale(scale(i), scale(i), 1));
@@ -317,6 +319,7 @@ export function createRaceScene(scene: THREE.Scene) {
   const guideMat = new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.35, depthWrite: false });
   const cpMat = new THREE.MeshBasicMaterial({ vertexColors: false });
   const startMat = new THREE.MeshBasicMaterial();
+  const capMat = new THREE.MeshBasicMaterial({ side: THREE.DoubleSide, transparent: true, opacity: 0.85 });
   const colA = new THREE.Color();
   const colB = new THREE.Color();
   const disposables: { dispose(): void }[] = [];
@@ -427,10 +430,21 @@ export function createRaceScene(scene: THREE.Scene) {
     const cps = new THREE.InstancedMesh(cpGeo, cpMat, Math.max(1, t.checkpoints.length - 1));
     ringMatrices(cps, t, t.checkpoints.slice(1), t.length, ringScale);
     cps.count = t.checkpoints.length - 1;
-    const start = new THREE.InstancedMesh(new THREE.TorusGeometry(R * 0.98, 0.6, 6, 48), startMat, 1);
-    ringMatrices(start, t, [0], t.length, ringScale);
+    // the start line, and on a point-to-point track the finish gate too
+    const lines = closedPath ? [0] : [t.checkpoints[0], t.finish ?? t.length];
+    const start = new THREE.InstancedMesh(new THREE.TorusGeometry(R * 0.98, 0.6, 6, 48), startMat, lines.length);
+    ringMatrices(start, t, lines, t.length, ringScale);
     group.add(cps, start);
     disposables.push(cpGeo, cps, start.geometry, start);
+    if (!closedPath && look !== 'open') {
+      // the far end of the tube is a wall: a disc across it (the near end only collides, as the
+      // chase camera sits behind it at the start)
+      const capGeo = new THREE.CircleGeometry(R, 40);
+      const caps = new THREE.InstancedMesh(capGeo, capMat, 1);
+      ringMatrices(caps, t, [t.length], t.length, ringScale);
+      group.add(caps);
+      disposables.push(capGeo, caps);
+    }
   });
 
   return {
@@ -441,6 +455,7 @@ export function createRaceScene(scene: THREE.Scene) {
       guideMat.color.set(stripeColor.value);
       cpMat.color.set(cpColor.value).multiplyScalar(cpGlow.value);
       startMat.color.set(startColor.value).multiplyScalar(cpGlow.value);
+      capMat.color.set(stripeColor.value);
     },
   };
 }

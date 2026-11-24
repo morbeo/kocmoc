@@ -1,6 +1,6 @@
 import type { Vector3 } from 'three';
 import { rng } from '../core/rng';
-import type { Track } from './track';
+import { segmentAt, type Track } from './track';
 
 /**
  * Gauntlet obstacles live in track space: `s` is arc length along the centreline and (x, y) are
@@ -377,19 +377,12 @@ export function generateHazards(track: Track, p: HazardParams): Gauntlet {
 
 /** Track index of the sample at or before arc length `s`. */
 export function sampleAt(track: Track, s: number): number {
-  const n = track.pos.length;
-  const ss = ((s % track.length) + track.length) % track.length;
-  return Math.min(n - 1, Math.floor((ss / track.length) * n));
+  return segmentAt(track, s)[0];
 }
 
 /** World position of track-space (s, x, y). */
 export function pointOnTrack(track: Track, s: number, x: number, y: number, out: Vector3): Vector3 {
-  const i = sampleAt(track, s);
-  const n = track.pos.length;
-  const j = (i + 1) % n;
-  const ss = ((s % track.length) + track.length) % track.length;
-  const span = (j === 0 ? track.length : track.s[j]) - track.s[i];
-  const f = span > 0 ? (ss - track.s[i]) / span : 0;
+  const [i, j, f] = segmentAt(track, s);
   return out
     .lerpVectors(track.pos[i], track.pos[j], f)
     .addScaledVector(track.right[i], x)
