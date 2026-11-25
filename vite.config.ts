@@ -18,7 +18,7 @@ export default defineConfig({
       exclude: ['src/**/*.test.ts'],
       reporter: ['text-summary', 'json-summary', 'html'],
       // a floor just under today's numbers, so coverage can't drop unnoticed; raise it as tests land
-      thresholds: { lines: 55, statements: 55, branches: 53, functions: 50 },
+      thresholds: { lines: 56, statements: 56, branches: 56, functions: 51 },
     },
   },
 });
