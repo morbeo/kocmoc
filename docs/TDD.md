@@ -67,3 +67,6 @@ why it matters, context, exact steps (`! npm run tdd -- lock`), and the alternat
 - `tsconfigFile` points at a nonexistent file because Stryker's tsconfig rewriter calls an API
   TypeScript 7 removed. Revisit both when the Stryker plugins catch up.
 - `npm run test:mutate` runs Stryker over all of `src/` outside the TDD flow.
+- `npm run test:mutate:sim` runs it over `src/sim` only (`stryker.sim.config.mjs`): just the sim tests,
+  stopping at the first failure, with incremental results (`--force` re-tests everything,
+  `--mutate src/sim/x.ts` one file). A full run takes about two hours on a 4-core container.
