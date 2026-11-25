@@ -65,10 +65,10 @@ export function sampleGhost(g: Ghost, t: number, pos: Vector3, quat: Quaternion)
   const b = a + STRIDE;
   const s = g.samples;
   pos.set(s[a] + (s[b] - s[a]) * k, s[a + 1] + (s[b + 1] - s[a + 1]) * k, s[a + 2] + (s[b + 2] - s[a + 2]) * k);
-  quat.set(s[a + 3], s[a + 4], s[a + 5], s[a + 6]);
-  const qa = quat.clone();
-  quat.set(s[b + 3], s[b + 4], s[b + 5], s[b + 6]);
-  quat.slerpQuaternions(qa.normalize(), quat.normalize(), k);
+  // two copies: slerpQuaternions writes `quat` before reading its second argument
+  const qa = quat.clone().set(s[a + 3], s[a + 4], s[a + 5], s[a + 6]).normalize();
+  const qb = quat.clone().set(s[b + 3], s[b + 4], s[b + 5], s[b + 6]).normalize();
+  quat.slerpQuaternions(qa, qb, k);
   return true;
 }
 
