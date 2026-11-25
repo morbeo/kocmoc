@@ -1,0 +1,71 @@
+#edit-panel {
+  --c-bg: #fbfaf7;
+  --c-fg: #1d1b26;
+  --c-dim: #8a879a;
+  --c-line: #dcdae4;
+  --c-accent: #e0217f;
+  position: fixed; right: 12px; top: 12px; z-index: 1000; width: min(340px, calc(100vw - 24px));
+  max-height: calc(100vh - 24px); overflow: auto;
+  font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--c-fg);
+}
+#edit-panel[hidden], #edit-help[hidden] { display: none; }
+#edit-panel * { box-sizing: border-box; }
+.ed-panel {
+  background: var(--c-bg); border: 1px solid var(--c-line); border-radius: 8px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.18); padding: 10px 12px;
+}
+.ed-panel header { display: flex; justify-content: space-between; align-items: center; }
+.ed-panel h2 { margin: 0; font-size: 14px; }
+.ed-panel button {
+  font: inherit; color: inherit; cursor: pointer;
+  background: #fff; border: 1px solid var(--c-line); border-radius: 4px; padding: 3px 8px;
+}
+.ed-panel button:hover:not(:disabled) { border-color: var(--c-accent); }
+.ed-panel button:disabled { color: var(--c-dim); cursor: default; }
+.ed-panel button.go { border-color: var(--c-accent); color: var(--c-accent); font-weight: 600; }
+.ed-panel button.on { background: var(--c-fg); color: var(--c-bg); border-color: var(--c-fg); }
+.ed-close { border: 0 !important; font-size: 16px !important; padding: 0 4px !important; }
+.ed-title { display: flex; gap: 8px; align-items: center; margin: 8px 0; color: var(--c-dim); }
+.ed-panel input {
+  font: inherit; padding: 2px 6px; border: 1px solid var(--c-line); border-radius: 4px; background: #fff; color: var(--c-fg);
+}
+.ed-title input { flex: 1; }
+.ed-row { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+.ed-row > span:first-child { width: 52px; color: var(--c-dim); }
+.ed-row small { color: var(--c-dim); }
+.ed-seg { display: inline-flex; }
+.ed-seg button { border-radius: 0; margin-left: -1px; }
+.ed-seg button:first-child { border-radius: 4px 0 0 4px; margin-left: 0; }
+.ed-seg button:last-child { border-radius: 0 4px 4px 0; }
+.ed-sel { border-top: 1px solid var(--c-line); margin-top: 8px; padding-top: 6px; }
+.ed-sel p { margin: 0 0 6px; }
+.ed-fields { display: flex; gap: 10px; margin-bottom: 6px; }
+.ed-fields input { width: 64px; }
+.ed-btns { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.ed-facts { color: var(--c-dim); margin: 8px 0 4px; border-top: 1px solid var(--c-line); padding-top: 6px; }
+.ed-ok { color: #1f7a2e; margin: 4px 0; }
+.ed-problems { margin: 4px 0; padding: 0; list-style: none; max-height: 120px; overflow: auto; }
+.ed-problems button { border: 0; background: none; color: #b3261e; padding: 1px 0; text-align: left; text-decoration: underline dotted; }
+.ed-msg { color: var(--c-dim); margin: 6px 0 0; min-height: 1.4em; }
+
+#edit-help {
+  position: fixed; left: 12px; bottom: 12px; z-index: 60; max-width: calc(100vw - 380px);
+  font: 12px/1.4 ui-monospace, SFMono-Regular, Menlo, monospace;
+  color: #fff; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8); user-select: none;
+}
+
+/* the game's HUD and corner buttons step aside while editing */
+body.editing #hud, body.editing #race-hud, body.editing #standings, body.editing #results,
+body.editing #minimap, body.editing #cp-arrow, body.editing #hud-editor, body.editing #viewports,
+body.editing #levels-btn, body.editing #tracks-btn, body.editing #controls-btn, body.editing .letterbox { display: none !important; }
+.ed-turn button { min-width: 30px; }
+.ed-row > button[data-a="center"] { margin-left: auto; }
+.ed-panel select { font: inherit; padding: 1px 4px; border: 1px solid var(--c-line); border-radius: 4px; background: #fff; color: var(--c-fg); }
+.ed-shape { display: inline-flex; gap: 6px; align-items: center; }
+.ed-fields small { color: var(--c-dim); align-self: center; }
+.ed-secs { border-top: 1px solid var(--c-line); margin-top: 8px; padding-top: 6px; }
+.ed-secs > p { margin: 0 0 4px; color: var(--c-dim); }
+.ed-sec { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin: 3px 0; }
+.ed-sec input { width: 52px; }
+.ed-sec button[data-sec-go] { border: 0; background: none; padding: 0; text-decoration: underline dotted; }
+.ed-sec button[data-sec-rm] { padding: 0 6px; }

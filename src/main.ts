@@ -12,7 +12,7 @@ import { BOT_ROUTES, botControls, botTargets, defaultBot, type BotRoute } from '
 import { flyBotLap, makeRival, standings, type Rival } from './sim/rivals';
 import { session } from './core/session';
 import { createReplayBar } from './ui/replayBar';
-import { attachInput, sampleInput, pollPad, onKey, assistKey, cameraKey, cinematicKey, controlsKey, respawnKey, autopilotKey, replayKey, levelsKey, nextLevelKey, tracksKey, recordKeys, zoom, debug as inputDebug, pointerMode } from './input/input';
+import { attachInput, sampleInput, pollPad, onKey, assistKey, cameraKey, cinematicKey, controlsKey, respawnKey, autopilotKey, replayKey, levelsKey, nextLevelKey, tracksKey, recordKeys, editKeys, zoom, debug as inputDebug, pointerMode } from './input/input';
 import { keyLabel } from './input/bindings';
 import { camMode, cameraEvent, cycleCamera, toggleCinematic, updateCamera } from './cam/rigs';
 import { cineReplay, cineScene } from './cam/cinematic';
@@ -51,6 +51,7 @@ import { keyButton } from './ui/keyButton';
 import { createRecordScene } from './world/recording';
 import { createRecording } from './ui/record';
 import { listTracks, removeTrack } from './world/library';
+import { createEditor } from './ui/editor';
 
 // --- vars ------------------------------------------------------------------
 const lightColor = vars.color('render.light.color', '#ffffff', { tags: ['render'] });
@@ -222,6 +223,8 @@ function refreshRivals(): void {
 /** Fly the autopilot rival for this track in the background, once, a few ms per frame. */
 function queueBotLap(): void {
   const key = botKey();
+  // not while editing: every edit is a new track (closing the editor respawns and asks again)
+  if (editor?.active) return;
   if (!rivalBot.value || !onTrack() || gameMode.value === 'proving' || botLaps.has(key) || botFlying === key) return;
   clearTimeout(botPending);
   botFlying = key;
@@ -318,13 +321,39 @@ const levels = createLevels({ ladder: () => ladder, ship: currentShip, play: pla
 
 // --- race tracks -------------------------------------------------------------
 const recordScene = createRecordScene(scene);
-const recording = createRecording({ scene: recordScene, ship: () => curr, respawn: () => respawn(), track: () => (onTrack() ? track.value : null), keys: recordKeys });
+/** a recording from the editor's fly cam is up: the editor comes back when it ends */
+let recordingFromEditor = false;
+const recording = createRecording({
+  scene: recordScene,
+  ship: () => curr,
+  respawn: () => respawn(),
+  track: () => (onTrack() ? track.value : null),
+  keys: recordKeys,
+  camera: () => editor.pose(),
+  edit: (doc) => editor.open(doc),
+  leaving: () => editor.close(),
+});
+const editor = createEditor({
+  scene,
+  camera,
+  canvas: renderer.domElement,
+  keys: { ...editKeys, camera: cameraKey, record: recordKeys.record, wider: recordKeys.wider, narrower: recordKeys.narrower },
+  respawn: () => respawn(),
+  record: () => {
+    recordingFromEditor = true;
+    recording.start('camera');
+  },
+  view: () => viewports.mainRect(),
+});
 const tracks = createTracks({
   venues: () => venues(),
   current: currentVenue,
   play: (sc) => applyScenario(vars, sc),
   record: () => recording.start(),
   recordKey: recordKeys.record,
+  edit: (text) => editor.open(text ? parseTrackText(text) : undefined),
+  editKey: editKeys.edit,
+  canEdit: () => !touchUi.value,
   mine: listTracks,
   playMine: (text) => {
     const doc = parseTrackText(text);
@@ -456,25 +485,42 @@ addEventListener('drop', async (e) => {
 });
 
 attachInput(renderer.domElement);
-onKey(respawnKey, () => (replay ? seekReplay(0) : respawn()));
-onKey(hudEditKey, () => hudEdit.set(!hudEdit.value));
-onKey(autopilotKey, () => autopilot.set(!autopilot.value));
-onKey(replayKey, () => (replay ? (replay.playing = !replay.playing) : session.replayRun()));
-onKey(assistKey, () => assist.set(!assist.value));
-onKey(cameraKey, cycleCamera);
-onKey(cinematicKey, toggleCinematic);
+/** game keys do nothing while the editor is open */
+const game = (fn: () => void) => () => {
+  if (!editor.active) fn();
+};
+const recordingNow = () => recording.state === 'recording';
+onKey(respawnKey, game(() => (replay ? seekReplay(0) : respawn())));
+onKey(hudEditKey, game(() => hudEdit.set(!hudEdit.value)));
+onKey(autopilotKey, game(() => autopilot.set(!autopilot.value)));
+onKey(replayKey, game(() => (replay ? (replay.playing = !replay.playing) : session.replayRun())));
+onKey(assistKey, game(() => assist.set(!assist.value)));
+onKey(cameraKey, () => (editor.active ? editor.keys.camera() : cycleCamera()));
+onKey(cinematicKey, game(toggleCinematic));
 onKey(vizKey, () => inputViz.set(!inputViz.value));
-onKey(levelsKey, () => levels.toggle());
-onKey(tracksKey, () => tracks.toggle());
-onKey(recordKeys.record, () => recording.recordKey());
-onKey(recordKeys.wider, () => recording.act('wider'));
-onKey(recordKeys.narrower, () => recording.act('narrower'));
+onKey(levelsKey, game(() => levels.toggle()));
+onKey(tracksKey, game(() => tracks.toggle()));
+onKey(recordKeys.record, () => (editor.active && recording.state === 'idle' ? editor.act('record') : recording.recordKey()));
+// [ ] and Backspace: the recording's while one runs, else the editor's (radius, delete)
+onKey(recordKeys.wider, () => (recordingNow() ? recording.act('wider') : editor.act('wider')));
+onKey(recordKeys.narrower, () => (recordingNow() ? recording.act('narrower') : editor.act('narrower')));
 onKey(recordKeys.pause, () => recording.act('pause'));
-onKey(recordKeys.undo, () => recording.act('undo'));
-onKey(nextLevelKey, () => {
+onKey(recordKeys.undo, () => (recordingNow() ? recording.act('undo') : editor.act('delete')));
+onKey(editKeys.edit, () => {
+  if (recording.state === 'idle' && !replay) editor.toggle();
+});
+onKey(editKeys.focus, editor.keys.focus);
+onKey(editKeys.frame, editor.keys.frame);
+onKey(editKeys.insert, editor.keys.insert);
+onKey(editKeys.remove, editor.keys.remove);
+onKey(editKeys.rollLeft, editor.keys.rollLeft);
+onKey(editKeys.rollRight, editor.keys.rollRight);
+onKey(editKeys.smooth, editor.keys.smooth);
+for (const k of ['center', 'step', 'yawLeft', 'yawRight', 'pitchUp', 'pitchDown', 'viewRollLeft', 'viewRollRight'] as const) onKey(editKeys[k], editor.keys[k]);
+onKey(nextLevelKey, game(() => {
   if (race?.proving?.result !== 'clear') return;
   playLevel(provingLevel.value + 1, currentShip() ?? 'balanced');
-});
+}));
 keyButton('levels-btn', 'Levels', levelsKey, () => levels.toggle());
 keyButton('tracks-btn', 'Tracks', tracksKey, () => tracks.toggle());
 
@@ -612,7 +658,8 @@ renderer.setAnimationLoop((now) => {
   const warp = juice.timeScale(paused.value ? 0 : dt);
   const playing = !replay || (replay.playing && !replay.player.done);
   const speedX = replay ? replay.speed : 1;
-  const alpha = loop.advance(paused.value || !playing || recording.frozen ? 0 : dt * timeScale.value * warp * speedX, (step) => {
+  const editing = editor.active;
+  const alpha = loop.advance(paused.value || !playing || recording.frozen || editing ? 0 : dt * timeScale.value * warp * speedX, (step) => {
     if (replay) {
       if (!replay.player.next(controls)) return;
     } else {
@@ -637,6 +684,10 @@ renderer.setAnimationLoop((now) => {
     }
   });
   recording.frame();
+  if (recordingFromEditor && recording.state === 'idle') {
+    recordingFromEditor = false;
+    editor.resume();
+  }
   replayBar.update({
     active: !!replay,
     playing: !!replay && replay.playing && !replay.player.done,
@@ -709,13 +760,15 @@ renderer.setAnimationLoop((now) => {
   gauntletScene.update(race ? race.time - (1 - alpha) * loop.step : 0);
   padScene.update(race ? race.time - (1 - alpha) * loop.step : 0);
   provingScene.update(race ? race.time : 0, race?.proving ?? null);
+  // the editor's ghost view: only the see-through tube
+  if (editor.ghost) raceScene.group.visible = padScene.group.visible = gauntletScene.group.visible = false;
   gizmoUi?.update();
 
   shipModel.object.position.copy(view.pos);
   shipModel.object.quaternion.copy(view.quat);
   // replays are shown through the cinematic director unless turned off
   const rig = replay && cineReplay.value ? 'cinematic' : camMode.value;
-  shipModel.object.visible = rig !== 'cockpit';
+  shipModel.object.visible = rig !== 'cockpit' && !editing;
   shipModel.update(view.boosting ? 1 : Math.max(0, controls.thrust));
   const rect = viewports.mainRect();
   if (camera.aspect !== rect.w / rect.h) {
@@ -725,9 +778,10 @@ renderer.setAnimationLoop((now) => {
   cineScene.track = race ? track.value : null;
   cineScene.near = race?.near ?? null;
   cineScene.route = race?.loc.route ?? -1;
-  updateCamera(camera, view, dt, zoom.value, rig);
-  letterboxUi.update(rig === 'cinematic', rect);
-  juice.frame({ dt, camera, ship: view, shipModel: shipModel.object, maxSpeed: p.maxSpeed.value, chase: rig === 'chase' || rig === 'far', scrape });
+  if (editing) editor.frame(dt);
+  else updateCamera(camera, view, dt, zoom.value, rig);
+  letterboxUi.update(rig === 'cinematic' && !editing, rect);
+  if (!editing) juice.frame({ dt, camera, ship: view, shipModel: shipModel.object, maxSpeed: p.maxSpeed.value, chase: rig === 'chase' || rig === 'far', scrape });
 
   const hint =
     pointerMode.value === 'stick' && !inputDebug.captured && !touchUi.value && !padName.value
@@ -784,7 +838,7 @@ renderer.setAnimationLoop((now) => {
   sky.update(camera, renderer.getPixelRatio());
   renderer.info.reset();
   pipeline.render(scene, camera, layout.value === 'single' ? undefined : rect);
-  viewports.render(view, dt);
+  if (!editing) viewports.render(view, dt);
   frameMs = performance.now() - t0;
 });
 

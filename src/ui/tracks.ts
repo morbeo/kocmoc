@@ -15,6 +15,11 @@ export interface TracksHost {
   /** record a new track by flying it */
   record(): void;
   recordKey: { value: string };
+  /** open the track editor on a saved track's text, or on the track flown now */
+  edit(text?: string): void;
+  editKey: { value: string };
+  /** the editor is offered (desktop only) */
+  canEdit(): boolean;
   /** tracks saved in this browser, newest first */
   mine(): Promise<SavedTrack[]>;
   playMine(text: string): void;
@@ -59,7 +64,10 @@ export function createTracks(host: TracksHost) {
     saved.length
       ? `<h3>My tracks</h3><div class="tk-mine">${saved
           .map(
-            (t) => `<div class="mine"><button class="play" data-mine="${esc(t.id)}"><b>${esc(t.title)}</b><small>${esc(new Date(t.time).toLocaleString())}</small></button><button class="rm" data-rm="${esc(t.id)}" title="delete">×</button></div>`,
+            (t) =>
+              `<div class="mine"><button class="play" data-mine="${esc(t.id)}"><b>${esc(t.title)}</b><small>${esc(new Date(t.time).toLocaleString())}</small></button>${
+                host.canEdit() ? `<button class="ed" data-ed="${esc(t.id)}" title="open in the track editor">edit</button>` : ''
+              }<button class="rm" data-rm="${esc(t.id)}" title="delete">×</button></div>`,
           )
           .join('')}</div><h3>Venues</h3>`
       : '';
@@ -75,6 +83,7 @@ export function createTracks(host: TracksHost) {
   function draw(): void {
     const current = host.current();
     const rk = host.recordKey.value.split(',')[0]?.trim();
+    const ek = host.editKey.value.split(',')[0]?.trim();
     const items = host
       .venues()
       .map((sc) => {
@@ -92,6 +101,7 @@ export function createTracks(host: TracksHost) {
         <header><h2>Race tracks</h2><button class="tk-close" title="close (Esc)">×</button></header>
         <p class="tk-help">Fifteen worlds to race, five of them underground. Each has its own shortcuts, tunnels and hazards, and your ghosts are kept per track.</p>
         <p class="tk-record"><button class="record">● Record a track${rk ? ` (${esc(keyLabel(rk))})` : ''}</button> fly it in open space and a tube is laid behind you</p>
+        ${host.canEdit() ? `<p class="tk-record"><button class="edit">✎ Edit this track${ek ? ` (${esc(keyLabel(ek))})` : ''}</button> move its points, change roll and width, check it</p>` : ''}
         ${mineList()}
         <div class="tk-list">${items}</div>
       </div>`;
@@ -103,6 +113,15 @@ export function createTracks(host: TracksHost) {
     if (el.closest('.record')) {
       toggle(false);
       return host.record();
+    }
+    if (el.closest('.edit')) {
+      toggle(false);
+      return host.edit();
+    }
+    const ed = saved.find((t) => t.id === el.closest<HTMLElement>('[data-ed]')?.dataset.ed);
+    if (ed) {
+      toggle(false);
+      return host.edit(ed.text);
     }
     const rm = el.closest<HTMLElement>('[data-rm]')?.dataset.rm;
     if (rm) return void host.removeMine(rm).then(refreshMine, () => undefined);
