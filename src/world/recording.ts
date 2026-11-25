@@ -3,10 +3,11 @@ import { radiusAt, type Track } from '../gen/track';
 import type { Problem } from '../gen/record';
 
 /** Segments round the ghost tube. */
-const RING = 14;
+const RING = 24;
 const GHOST = new THREE.Color('#7fe7ff');
 const GOOD = new THREE.Color('#7cff6b');
 const BAD = new THREE.Color('#ff3b3b');
+const SECTION = new THREE.Color('#6bb7ff');
 const Z = new THREE.Vector3(0, 0, 1);
 
 /**
@@ -14,7 +15,7 @@ const Z = new THREE.Vector3(0, 0, 1);
  * with failing stretches red, while it is reviewed), a ring at the start to come back to, and red
  * rings on a flown track where it fails the checks.
  */
-export function createRecordScene(parent: THREE.Scene, max = 8000) {
+export function createRecordScene(parent: THREE.Object3D, max = 8000) {
   const group = new THREE.Group();
   parent.add(group);
 
@@ -62,12 +63,14 @@ export function createRecordScene(parent: THREE.Scene, max = 8000) {
   const tan = new THREE.Vector3();
   const v = new THREE.Vector3();
 
-  function writeRing(i: number, p: THREE.Vector3, t: THREE.Vector3, up: THREE.Vector3, r: number, c: THREE.Color): void {
+  /** One ring of the tube: radius `r`, or a radius per angle (from right towards up). */
+  function writeRing(i: number, p: THREE.Vector3, t: THREE.Vector3, up: THREE.Vector3, r: number | ((a: number) => number), c: THREE.Color): void {
     const right = v.crossVectors(t, up).normalize();
     for (let k = 0; k < RING; k++) {
       const a = (k / RING) * Math.PI * 2;
-      const ca = Math.cos(a) * r;
-      const sa = Math.sin(a) * r;
+      const rr = typeof r === 'number' ? r : r(a);
+      const ca = Math.cos(a) * rr;
+      const sa = Math.sin(a) * rr;
       const o = (i * RING + k) * 3;
       position.array[o] = p.x + right.x * ca + up.x * sa;
       position.array[o + 1] = p.y + right.y * ca + up.y * sa;
@@ -134,12 +137,18 @@ export function createRecordScene(parent: THREE.Scene, max = 8000) {
     closable(on: boolean): void {
       startMat.color.set(on ? GOOD : '#ffd23f');
     },
-    /** Show a whole track (the fitted one) instead, red where it fails the checks. */
-    showTrack(track: Track, problems: readonly Problem[]): void {
+    /**
+     * Show a whole track (the fitted one) instead, red where it fails the checks. `shape` gives the
+     * wall at sample `i` and angle `a` where it isn't round, and marks those samples (sections).
+     */
+    showTrack(track: Track, problems: readonly Problem[], shape?: { wall(i: number, a: number): number; on(i: number): boolean }): void {
       const n = Math.min(max, track.pos.length);
       const bad = new Uint8Array(n);
       for (const p of problems) for (let i = p.i0; i <= p.i1 && i < n; i++) bad[i] = 1;
-      for (let i = 0; i < n; i++) writeRing(i, track.pos[i], track.tan[i], track.up[i], radiusAt(track, i), bad[i] ? BAD : GOOD);
+      for (let i = 0; i < n; i++) {
+        const on = !!shape?.on(i);
+        writeRing(i, track.pos[i], track.tan[i], track.up[i], on ? (a) => shape!.wall(i, a) : radiusAt(track, i), bad[i] ? BAD : on ? SECTION : GOOD);
+      }
       let shown = n;
       if (track.closed !== false && n < rings) {
         writeRing(n, track.pos[0], track.tan[0], track.up[0], radiusAt(track, 0), bad[0] ? BAD : GOOD);

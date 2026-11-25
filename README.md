@@ -35,6 +35,7 @@ npm run build        # static build → dist/
 | `H` | HUD editor: drag widgets to move, scroll to resize, × to hide |
 | `T` | race tracks: pick one of fifteen alien venues, your saved tracks, or record one |
 | `J` | record a track by flying it; `J` again to finish (`[` / `]` tube radius, `U` pause, `Backspace` undo) |
+| `G` | track editor (desktop): edit the track flown now; `G` again to fly it |
 | `L` | proving ground levels: pick a ship and a level |
 | `N` | next proving level (after a clear) |
 
@@ -105,6 +106,35 @@ The path is smoothed and fitted to a few control points (within `record.toleranc
 radius, more points in tight turns), then checked like a generated track: bends tighter than 1.2
 radii and parts of the tube within 2.4 radii of each other are listed and drawn red. Then **Fly it**,
 **Save to My tracks** (kept in this browser, listed at the top of the track list) or **Download file**.
+
+## Track editor
+
+Press `G` (or **Edit this track** in the track list, or **edit** on one of My tracks) on a desktop.
+The game stops and the track opens as control points: a generated venue is baked into a track file
+first. Every edit is written to that file, so `G` again (or **Fly it**) races the edited track.
+
+- **Cameras** (`V` cycles): orbit (drag to orbit, right-drag to pan, wheel to zoom), fly (the flight
+  keys move it without physics, hold the right button to look, wheel for speed), top and side (flat
+  views: drag to pan, right-drag to spin, wheel to zoom). `.` focuses the selection, `Home` the whole track.
+- **Turn and center the view** in steps of 15°, 45° or 90° (`0` or the panel cycles the step):
+  `1` / `2` yaw, `3` / `4` pitch, `5` / `6` roll (or numpad `4` `6`, `8` `2`, `7` `9`), round the point
+  the camera orbits. `H` (numpad `5`) centers the selection, or the whole track, without zooming.
+- **Points**: click to select, shift-click to add, `Ctrl+A` all, `Esc` none. Drag the gizmo's arrows
+  to move them. `I` inserts a point after the selected one (or double-click the centreline),
+  `Delete` / `Backspace` deletes, `;` / `'` roll, `[` / `]` tube radius, `M` smooths. Roll and radius
+  can also be typed in the panel. Each selected point shows its tube ring and a roll tick.
+- **Tube shape**: with points selected, **Shape** gives the stretch between the first and last of
+  them (or the segment after one point) its own cross-section: hex, square, rect, diamond, ellipse,
+  triangle, octagon, star, irregular, cavern or open air; **round** takes it back. Each section is
+  listed with its shape, corner roll and ramp (how far it blends in), and drawn in its shape (blue)
+  on the see-through tube.
+- **Undo**: `Ctrl/Cmd+Z`, `Ctrl/Cmd+Shift+Z` (the editor's own history); **Revert** goes back to how
+  the track was when the editor opened.
+- **Checks**: the same tests as recorded tracks run after every edit. Failing stretches are red on the
+  see-through tube (ghost view; **solid** shows the track as raced) and listed; click one to look at it.
+- **Record from here** (fly cam, or `J`): record a new path from the fly cam instead of the ship;
+  **Edit it** on the result opens it in the editor.
+- **Save to My tracks** or **Download** the file.
 
 ## Race tracks
 

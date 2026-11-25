@@ -54,6 +54,26 @@ export const recordKeys = {
   undo: bind('recordUndo', 'Backspace'),
 };
 
+/** the track editor: open and close it, then its own keys (only while it is open) */
+export const editKeys = {
+  edit: bind('edit', 'KeyG'),
+  focus: bind('editFocus', 'Period'),
+  frame: bind('editFrame', 'Home'),
+  insert: bind('editInsert', 'KeyI,Insert'),
+  remove: bind('editDelete', 'Delete'),
+  rollLeft: bind('editRollLeft', 'Semicolon'),
+  rollRight: bind('editRollRight', 'Quote'),
+  smooth: bind('editSmooth', 'KeyM'),
+  center: bind('editCenter', 'KeyH,Numpad5'),
+  yawLeft: bind('editYawLeft', 'Digit1,Numpad4'),
+  yawRight: bind('editYawRight', 'Digit2,Numpad6'),
+  pitchUp: bind('editPitchUp', 'Digit3,Numpad8'),
+  pitchDown: bind('editPitchDown', 'Digit4,Numpad2'),
+  viewRollLeft: bind('editViewRollLeft', 'Digit5,Numpad7'),
+  viewRollRight: bind('editViewRollRight', 'Digit6,Numpad9'),
+  step: bind('editStep', 'Digit0,Numpad0'),
+};
+
 const keyRamp = vars.num('input.key.ramp', 8, { min: 0, max: 30, hardMin: 0, unit: '/s', tags: keyTags, desc: 'how fast key axes move to full; 0 = instant' });
 export const invert = {
   pointer: vars.bool('input.invert.pointerY', false, { tags, desc: 'touchpad/mouse: moving up pitches the nose down' }),
@@ -94,6 +114,8 @@ export const curveOf = (axis: Axis): Curve => ({
 });
 
 // --- state -----------------------------------------------------------------
+/** Off while the track editor owns the canvas: clicks don't capture the pointer, the wheel doesn't steer or throttle. */
+export const canvasInput = { on: true };
 const down = new Set<string>();
 const stick: Stick = { x: 0, y: 0 };
 const scroll = { yaw: 0, pitch: 0 };
@@ -166,7 +188,7 @@ export function attachInput(canvas: HTMLCanvasElement): void {
   });
 
   canvas.addEventListener('mousedown', (e) => {
-    if (e.button !== 0) return;
+    if (e.button !== 0 || !canvasInput.on) return;
     if (pointerMode.value === 'stick' && !captured) {
       void canvas.requestPointerLock?.();
       return;
@@ -189,6 +211,7 @@ export function attachInput(canvas: HTMLCanvasElement): void {
     'wheel',
     (e) => {
       e.preventDefault(); // no page zoom / scroll / swipe-back on the canvas
+      if (!canvasInput.on) return;
       const px = e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? 400 : 1;
       if (e.ctrlKey) {
         // trackpad pinch arrives as ctrl+wheel; pinch out = negative deltaY

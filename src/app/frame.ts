@@ -29,7 +29,8 @@ import {
 const _scrape = new THREE.Vector3();
 const _gate = new THREE.Vector3();
 
-export function startFrames(g: Game, replays: Replays, { recording }: Menus, gizmos: () => { update(): void } | undefined): void {
+export function startFrames(g: Game, replays: Replays, menus: Menus, gizmos: () => { update(): void } | undefined): void {
+  const { recording, editor } = menus;
   const s = g.stage;
   const { renderer, camera, juice, rivalModels, shipModel, viewports } = s;
   const { sim, prev, curr, view, controls, loop } = g;
@@ -45,7 +46,8 @@ export function startFrames(g: Game, replays: Replays, { recording }: Menus, giz
     const warp = juice.timeScale(paused.value ? 0 : dt);
     const playing = !g.replay || (g.replay.playing && !g.replay.player.done);
     const speedX = g.replay ? g.replay.speed : 1;
-    const alpha = loop.advance(paused.value || !playing || recording.frozen ? 0 : dt * timeScale.value * warp * speedX, (step) => {
+    const editing = editor.active;
+    const alpha = loop.advance(paused.value || !playing || recording.frozen || editing ? 0 : dt * timeScale.value * warp * speedX, (step) => {
       if (g.replay) {
         if (!g.replay.player.next(controls)) return;
       } else {
@@ -58,6 +60,10 @@ export function startFrames(g: Game, replays: Replays, { recording }: Menus, giz
       recordLap(g);
     });
     recording.frame();
+    if (menus.recordingFromEditor && recording.state === 'idle') {
+      menus.recordingFromEditor = false;
+      editor.resume();
+    }
     const replay = g.replay;
     replays.bar.update({
       active: !!replay,
@@ -114,13 +120,15 @@ export function startFrames(g: Game, replays: Replays, { recording }: Menus, giz
     s.gauntletScene.update(race ? race.time - (1 - alpha) * loop.step : 0);
     s.padScene.update(race ? race.time - (1 - alpha) * loop.step : 0);
     s.provingScene.update(race ? race.time : 0, race?.proving ?? null);
+    // the editor's ghost view: only the see-through tube
+    if (editor.ghost) s.raceScene.group.visible = s.padScene.group.visible = s.gauntletScene.group.visible = false;
     gizmos()?.update();
 
     shipModel.object.position.copy(view.pos);
     shipModel.object.quaternion.copy(view.quat);
     // replays are shown through the cinematic director unless turned off
     const rig = replay && cineReplay.value ? 'cinematic' : camMode.value;
-    shipModel.object.visible = rig !== 'cockpit';
+    shipModel.object.visible = rig !== 'cockpit' && !editing;
     shipModel.update(view.boosting ? 1 : Math.max(0, controls.thrust));
     const rect = viewports.mainRect();
     if (camera.aspect !== rect.w / rect.h) {
@@ -130,9 +138,10 @@ export function startFrames(g: Game, replays: Replays, { recording }: Menus, giz
     cineScene.track = race ? track.value : null;
     cineScene.near = race?.near ?? null;
     cineScene.route = race?.loc.route ?? -1;
-    updateCamera(camera, view, dt, zoom.value, rig);
-    s.letterboxUi.update(rig === 'cinematic', rect);
-    juice.frame({ dt, camera, ship: view, shipModel: shipModel.object, maxSpeed: shipVars.maxSpeed.value, chase: rig === 'chase' || rig === 'far', scrape });
+    if (editing) editor.frame(dt);
+    else updateCamera(camera, view, dt, zoom.value, rig);
+    s.letterboxUi.update(rig === 'cinematic' && !editing, rect);
+    if (!editing) juice.frame({ dt, camera, ship: view, shipModel: shipModel.object, maxSpeed: shipVars.maxSpeed.value, chase: rig === 'chase' || rig === 'far', scrape });
 
     const hint =
       pointerMode.value === 'stick' && !inputDebug.captured && !touchUi.value && !padName.value
@@ -154,7 +163,7 @@ export function startFrames(g: Game, replays: Replays, { recording }: Menus, giz
     s.sky.update(camera, renderer.getPixelRatio());
     renderer.info.reset();
     s.pipeline.render(s.scene, camera, layout.value === 'single' ? undefined : rect);
-    viewports.render(view, dt);
+    if (!editing) viewports.render(view, dt);
     g.perf.frameMs = performance.now() - t0;
   });
 }

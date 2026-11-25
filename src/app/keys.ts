@@ -2,7 +2,7 @@
 import { effect } from '@preact/signals-core';
 import { session } from '../core/session';
 import { currentShip, playLevel } from '../core/selection';
-import { attachInput, onKey, assistKey, cameraKey, cinematicKey, controlsKey, respawnKey, autopilotKey, replayKey, levelsKey, nextLevelKey, tracksKey, recordKeys } from '../input/input';
+import { attachInput, onKey, assistKey, cameraKey, cinematicKey, controlsKey, respawnKey, autopilotKey, replayKey, levelsKey, nextLevelKey, tracksKey, recordKeys, editKeys } from '../input/input';
 import { detectTouch, touchUi } from '../input/touch';
 import { cycleCamera, toggleCinematic } from '../cam/rigs';
 import { editKey as hudEditKey, editMode as hudEdit } from '../ui/hudLayout';
@@ -16,27 +16,44 @@ import type { Replays } from './replay';
 import { openDebug } from './debugTools';
 import { assist, autopilot, gizmos, inputViz, vizKey } from './tuning';
 
-export function bindKeys(g: Game, replays: Replays, { levels, tracks, recording }: Menus): void {
+export function bindKeys(g: Game, replays: Replays, { levels, tracks, recording, editor }: Menus): void {
   attachInput(g.stage.renderer.domElement);
-  onKey(respawnKey, () => (g.replay ? replays.seek(0) : respawn(g)));
-  onKey(hudEditKey, () => hudEdit.set(!hudEdit.value));
-  onKey(autopilotKey, () => autopilot.set(!autopilot.value));
-  onKey(replayKey, () => (g.replay ? (g.replay.playing = !g.replay.playing) : session.replayRun()));
-  onKey(assistKey, () => assist.set(!assist.value));
-  onKey(cameraKey, cycleCamera);
-  onKey(cinematicKey, toggleCinematic);
+  /** game keys do nothing while the editor is open */
+  const game = (fn: () => void) => () => {
+    if (!editor.active) fn();
+  };
+  const recordingNow = () => recording.state === 'recording';
+  onKey(respawnKey, game(() => (g.replay ? replays.seek(0) : respawn(g))));
+  onKey(hudEditKey, game(() => hudEdit.set(!hudEdit.value)));
+  onKey(autopilotKey, game(() => autopilot.set(!autopilot.value)));
+  onKey(replayKey, game(() => (g.replay ? (g.replay.playing = !g.replay.playing) : session.replayRun())));
+  onKey(assistKey, game(() => assist.set(!assist.value)));
+  onKey(cameraKey, () => (editor.active ? editor.keys.camera() : cycleCamera()));
+  onKey(cinematicKey, game(toggleCinematic));
   onKey(vizKey, () => inputViz.set(!inputViz.value));
-  onKey(levelsKey, () => levels.toggle());
-  onKey(tracksKey, () => tracks.toggle());
-  onKey(recordKeys.record, () => recording.recordKey());
-  onKey(recordKeys.wider, () => recording.act('wider'));
-  onKey(recordKeys.narrower, () => recording.act('narrower'));
+  onKey(levelsKey, game(() => levels.toggle()));
+  onKey(tracksKey, game(() => tracks.toggle()));
+  onKey(recordKeys.record, () => (editor.active && recording.state === 'idle' ? editor.act('record') : recording.recordKey()));
+  // [ ] and Backspace: the recording's while one runs, else the editor's (radius, delete)
+  onKey(recordKeys.wider, () => (recordingNow() ? recording.act('wider') : editor.act('wider')));
+  onKey(recordKeys.narrower, () => (recordingNow() ? recording.act('narrower') : editor.act('narrower')));
   onKey(recordKeys.pause, () => recording.act('pause'));
-  onKey(recordKeys.undo, () => recording.act('undo'));
-  onKey(nextLevelKey, () => {
+  onKey(recordKeys.undo, () => (recordingNow() ? recording.act('undo') : editor.act('delete')));
+  onKey(editKeys.edit, () => {
+    if (recording.state === 'idle' && !g.replay) editor.toggle();
+  });
+  onKey(editKeys.focus, editor.keys.focus);
+  onKey(editKeys.frame, editor.keys.frame);
+  onKey(editKeys.insert, editor.keys.insert);
+  onKey(editKeys.remove, editor.keys.remove);
+  onKey(editKeys.rollLeft, editor.keys.rollLeft);
+  onKey(editKeys.rollRight, editor.keys.rollRight);
+  onKey(editKeys.smooth, editor.keys.smooth);
+  for (const k of ['center', 'step', 'yawLeft', 'yawRight', 'pitchUp', 'pitchDown', 'viewRollLeft', 'viewRollRight'] as const) onKey(editKeys[k], editor.keys[k]);
+  onKey(nextLevelKey, game(() => {
     if (g.race?.proving?.result !== 'clear') return;
     playLevel(provingLevel.value + 1, currentShip() ?? 'balanced');
-  });
+  }));
   keyButton('levels-btn', 'Levels', levelsKey, () => levels.toggle());
   keyButton('tracks-btn', 'Tracks', tracksKey, () => tracks.toggle());
 

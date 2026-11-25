@@ -13,6 +13,7 @@ import { onTrack, track } from '../world/race';
 import { bestKey, ghostKey, loadLadder } from '../world/records';
 import { createRivals, type Rivals } from './rivals';
 import type { Stage } from './stage';
+import type { Editor } from './menus';
 import { raceLaps, simRate, spawnSpeed, spawnT } from './tuning';
 
 /** a recording being played back */
@@ -52,6 +53,8 @@ export interface Game {
   /** hidden routes flown this session (track key # branch), shown on the minimap from then on */
   foundRoutes: Set<string>;
   perf: { fps: number; frameMs: number };
+  /** the track editor, once the menus are up */
+  editor: Editor | null;
 }
 
 export function createGame(stage: Stage): Game {
@@ -79,6 +82,7 @@ export function createGame(stage: Stage): Game {
     outcome: null,
     foundRoutes: new Set<string>(),
     perf: { fps: 0, frameMs: 0 },
+    editor: null,
   };
 }
 
@@ -113,5 +117,5 @@ export function respawn(g: Game, t = spawnT.value, speed = spawnSpeed.value, at?
   g.startGhosts = { best: g.ghost, last: g.lastLaps.get(bestKey()) ?? null };
   g.outcome = null;
   g.recorder = g.replay ? null : new Recorder(vars.snapshot(), spawn, g.loop.step);
-  g.rivals.queueBotLap(g.loop.step);
+  g.rivals.queueBotLap(g);
 }

@@ -1,4 +1,4 @@
-import { Vector3 } from 'three';
+import { Vector3, type Quaternion } from 'three';
 import { vars } from '../core/vars';
 import { keyLabel } from '../input/bindings';
 import { bridge, canClose, closeLoop, describeProblem, PathRecorder, recordingToDoc, trackProblems, type Problem } from '../gen/record';
@@ -32,9 +32,17 @@ export interface RecordHost {
   /** the track flown now (null in free flight), to mark a recorded track's failing stretches on */
   track(): Track | null;
   keys: Keys;
+  /** the editor's fly cam, to record from instead of the ship */
+  camera?(): { pos: Vector3; quat: Quaternion };
+  /** open a recorded track in the editor (offers "Edit it") */
+  edit?(doc: TrackDoc): void;
+  /** about to fly a recorded track (the editor closes) */
+  leaving?(): void;
 }
 type Finish = 'close' | 'bridge' | 'open';
 type State = 'idle' | 'recording' | 'finishing' | 'review';
+/** what lays the path: the ship (in open space) or the editor's fly cam */
+export type RecordSource = 'ship' | 'camera';
 
 const esc = (s: string) => s.replace(/[&<>"]/g, (c) => `&#${c.charCodeAt(0)};`);
 const km = (m: number) => (m >= 1000 ? `${(m / 1000).toFixed(2)} km` : `${m.toFixed(0)} m`);
@@ -57,6 +65,7 @@ export function createRecording(host: RecordHost) {
   document.body.append(hud, panel);
 
   let state: State = 'idle';
+  let source: RecordSource = 'ship';
   let rec = new PathRecorder();
   let closable = false;
   let modeBefore: unknown;
@@ -71,9 +80,10 @@ export function createRecording(host: RecordHost) {
 
   const setMode = (after: unknown) => vars.change([{ layer: 'user', path: 'game.mode', before: vars.layerValue('user', 'game.mode'), after }], false);
 
-  function start(): void {
-    if (state !== 'idle') return;
+  function start(from: RecordSource = 'ship'): void {
+    if (state !== 'idle' || (from === 'camera' && !host.camera)) return;
     if (document.pointerLockElement) document.exitPointerLock();
+    source = from;
     modeBefore = vars.layerValue('user', 'game.mode');
     rec = new PathRecorder(rv.step.value);
     host.scene.reset();
@@ -81,7 +91,9 @@ export function createRecording(host: RecordHost) {
     state = 'recording';
     title = `Flown ${new Date().toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}`;
     // open space: no walls, no track; the mode change respawns the ship at the origin
-    if (gameMode.value !== 'free') setMode('free');
+    if (from === 'camera') {
+      /* the fly cam goes where it likes: the game under the editor stays as it is */
+    } else if (gameMode.value !== 'free') setMode('free');
     else host.respawn();
     hud.hidden = false;
     drawHud();
@@ -162,6 +174,7 @@ export function createRecording(host: RecordHost) {
         ${problems}
         <div class="rp-btns">
           <button data-a="fly" class="go">Fly it</button>
+          ${host.edit ? '<button data-a="edit">Edit it</button>' : ''}
           <button data-a="save">Save to My tracks</button>
           <button data-a="download">Download file</button>
         </div>
@@ -190,7 +203,7 @@ export function createRecording(host: RecordHost) {
 
   function discard(): void {
     close();
-    restoreMode();
+    if (source === 'ship') restoreMode();
   }
 
   function back(): void {
@@ -213,6 +226,7 @@ export function createRecording(host: RecordHost) {
   function fly(): void {
     const r = result;
     if (!r) return;
+    host.leaving?.();
     close();
     // race it: the track file's scenario says race, so no mode is left in the user layer
     setMode(undefined);
@@ -246,6 +260,11 @@ export function createRecording(host: RecordHost) {
     else if (a === 'resume' || a === 'back') back();
     else if (a === 'discard') discard();
     else if (a === 'fly') fly();
+    else if (a === 'edit' && result && host.edit) {
+      const doc = result.doc;
+      close();
+      host.edit(doc);
+    }
     else if (a === 'download' && result) download(result.doc);
     else if (a === 'save' && result) {
       saveTrack(result.doc).then(
@@ -295,10 +314,13 @@ export function createRecording(host: RecordHost) {
     get state(): State {
       return state;
     },
+    get source(): RecordSource {
+      return source;
+    },
     /** Once per frame, after the sim steps. */
     frame(): void {
       if (state === 'recording') {
-        const s = host.ship();
+        const s = source === 'camera' && host.camera ? host.camera() : host.ship();
         up.set(0, 1, 0).applyQuaternion(s.quat);
         if (rec.push(s.pos, up, rv.radius.value)) {
           host.scene.append(s.pos, rv.radius.value);

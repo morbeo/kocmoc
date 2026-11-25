@@ -36,7 +36,7 @@ export function watchRestarts(g: Game): void {
     if (!g.replay) respawn(g);
   });
   effect(() => {
-    if (rivalBot.value) g.rivals.queueBotLap(g.loop.step);
+    if (rivalBot.value) g.rivals.queueBotLap(g);
   });
   // keep ?seed= in the address bar on a track, so the URL names it
   effect(() => {

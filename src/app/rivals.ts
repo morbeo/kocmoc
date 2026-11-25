@@ -14,7 +14,7 @@ export interface Rivals {
   /** Rebuild the rival list if the ghosts or the toggles behind it changed. */
   refresh(g: Game): void;
   /** Fly the autopilot rival for this track in the background, once, a few ms per frame. */
-  queueBotLap(step: number): void;
+  queueBotLap(g: Game): void;
 }
 
 export function createRivals(): Rivals {
@@ -50,13 +50,15 @@ export function createRivals(): Rivals {
     },
 
     /** Fly the autopilot rival for this track in the background, once, a few ms per frame. */
-    queueBotLap(step: number): void {
+    queueBotLap(g: Game): void {
       const key = botKey();
+      // not while editing: every edit is a new track (closing the editor respawns and asks again)
+      if (g.editor?.active) return;
       if (!rivalBot.value || !onTrack() || gameMode.value === 'proving' || botLaps.has(key) || botFlying === key) return;
       clearTimeout(botPending);
       botFlying = key;
       const cfg = simConfig();
-      const fly = flyBotLap(cfg, botTargets(cfg.course), step, 600, botParams(rivalBotRoute.value));
+      const fly = flyBotLap(cfg, botTargets(cfg.course), g.loop.step, 600, botParams(rivalBotRoute.value));
       const slice = () => {
         if (key !== botKey()) {
           botFlying = '';

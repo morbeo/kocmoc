@@ -13,6 +13,7 @@ import './ui/tracks.css';
 import './juice/juice.css';
 import './ui/hud.css';
 import './ui/record.css';
+import './ui/editor.css';
 import { applySeedParam, openFromOutside, watchRestarts } from './app/load';
 import { createStage } from './app/stage';
 import { createGame } from './app/game';
