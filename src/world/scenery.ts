@@ -2,13 +2,14 @@ import * as THREE from 'three';
 import { computed, effect } from '@preact/signals-core';
 import { vars } from '../core/vars';
 import { toon } from '../render/toon';
-import { generateScenery, GROUND_MODES, SCENERY_KINDS, UNIT, type Scenery, type SceneryKind, type SceneryParams } from '../gen/scenery';
+import { BUILT_KINDS, generateScenery, GROUND_MODES, SCENERY_KINDS, UNIT, type BuiltKind, type Scenery, type SceneryKind, type SceneryParams } from '../gen/scenery';
+import { builtGeometry } from './propMeshes';
 import { onTrack, seedVar, track } from './race';
 
 const g = ['world', 'scenery'];
 const sp = {
   kinds: vars.str('world.scenery.kinds', '', { tags: g, regen: true, desc: `comma-separated: ${SCENERY_KINDS.join(', ')}` }),
-  count: vars.int('world.scenery.count', 120, { min: 0, max: 600, hardMin: 0, hardMax: 5000, tags: g, regen: true, desc: 'props per kind (ribs and halos a tenth)' }),
+  count: vars.int('world.scenery.count', 120, { min: 0, max: 600, hardMin: 0, hardMax: 5000, tags: g, regen: true, desc: 'props per kind (ribs, halos, spines and wrecks a tenth)' }),
   size: vars.num('world.scenery.size', 60, { min: 5, max: 300, hardMin: 1, unit: 'm', tags: g, regen: true, desc: 'typical prop size' }),
   spread: vars.num('world.scenery.spread', 700, { min: 0, max: 3000, hardMin: 0, unit: 'm', tags: g, regen: true, desc: 'how far props spread from the corridor' }),
   clearance: vars.num('world.scenery.clearance', 1.6, { min: 1.1, max: 4, hardMin: 1.01, unit: '× tube', tags: g, regen: true, desc: 'props keep this far from the centreline' }),
@@ -60,6 +61,8 @@ function unitGeometry(kind: SceneryKind): THREE.BufferGeometry {
       return new THREE.TorusGeometry(1, UNIT.ribTube, 6, 40, UNIT.ribArc).rotateZ(-(UNIT.ribArc - Math.PI) / 2);
     case 'halos':
       return new THREE.TorusGeometry(1, UNIT.haloTube, 6, 64);
+    default:
+      return builtGeometry(kind);
   }
 }
 
@@ -89,6 +92,9 @@ export function createScenery(parent: THREE.Scene) {
   const group = new THREE.Group();
   parent.add(group);
   const solid = toon();
+  // built kinds shade their details (eye sockets, windows, scorch) through vertex colours
+  const shaded = toon({ vertexColors: true });
+  const isBuilt = (k: SceneryKind): k is BuiltKind => (BUILT_KINDS as readonly string[]).includes(k);
   const groundMat = toon({ vertexColors: true, side: THREE.DoubleSide });
   const glowMat = new THREE.MeshBasicMaterial();
   const disposables: { dispose(): void }[] = [];
@@ -111,7 +117,7 @@ export function createScenery(parent: THREE.Scene) {
       const props = sc.props.filter((p) => p.kind === kind);
       if (!props.length) continue;
       const geo = unitGeometry(kind);
-      const mesh = new THREE.InstancedMesh(geo, kind === 'halos' ? glowMat : solid, props.length);
+      const mesh = new THREE.InstancedMesh(geo, kind === 'halos' ? glowMat : isBuilt(kind) ? shaded : solid, props.length);
       props.forEach((p, i) => {
         mesh.setMatrixAt(i, m.compose(p.pos, p.quat, p.scale));
         if (kind !== 'halos') mesh.setColorAt(i, tmp.copy(ca).lerp(cb, p.tint));

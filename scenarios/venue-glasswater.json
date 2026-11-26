@@ -14,7 +14,7 @@
     "gen.race.tubeRadius": 45,
     "gen.race.height": 120,
     "gen.race.wobble": 0.2,
-    "world.scenery.kinds": "spires",
+    "world.scenery.kinds": "spires,wrecks",
     "world.scenery.count": 220,
     "world.scenery.size": 45,
     "world.scenery.spread": 900,

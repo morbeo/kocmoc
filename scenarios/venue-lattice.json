@@ -14,7 +14,7 @@
     "gen.race.height": 300,
     "gen.race.tubeRadius": 40,
     "gen.race.profile": "halfpipe",
-    "world.scenery.kinds": "lattice,columns",
+    "world.scenery.kinds": "lattice,columns,domes",
     "world.scenery.count": 160,
     "world.scenery.size": 22,
     "world.scenery.spread": 900,

@@ -2,7 +2,7 @@
 import { describe, it, expect } from 'vitest';
 import { scenarios, venues } from './scenarios';
 import { generateTrack, TRACK_SHAPES, type RaceGenParams, type TrackShape } from '../gen/track';
-import { generateScenery, SCENERY_KINDS, GROUND_MODES, type SceneryKind } from '../gen/scenery';
+import { generateScenery, placements, SCENERY_KINDS, GROUND_MODES, type SceneryKind } from '../gen/scenery';
 import { venueTags } from '../ui/tracks';
 import { addSections, SECTION_KINDS, type SectionKind } from '../gen/sections';
 import { HAZARD_KINDS, generateHazards, type HazardKind } from '../gen/gauntlet';
@@ -125,7 +125,7 @@ describe('race venues', () => {
       const sc = generateScenery(t, { seed: p.seed, kinds, count, size: num('world.scenery.size', 60), spread: num('world.scenery.spread', 700), ground, gap: num('world.ground.gap', 200), clearance: 1.6 });
       // most candidates fit: the scenery is as busy as the venue asks for
       for (const k of kinds) {
-        const want = k === 'ribs' || k === 'halos' ? count / 10 : count;
+        const want = placements(k, count);
         expect(sc.props.filter((q) => q.kind === k).length, `${v.name} ${k}`).toBeGreaterThan(want * 0.5);
       }
     }

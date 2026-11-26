@@ -15,7 +15,7 @@
     "gen.race.twist": 1,
     "gen.race.tubeRadius": 45,
     "gen.race.profile": "rails",
-    "world.scenery.kinds": "halos,ribs,shards",
+    "world.scenery.kinds": "halos,ribs,shards,wrecks",
     "world.scenery.count": 80,
     "world.scenery.size": 35,
     "world.scenery.spread": 900,

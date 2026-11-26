@@ -1,4 +1,4 @@
-import { Matrix4, Quaternion, Vector3 } from 'three';
+import { Euler, Matrix4, Quaternion, Vector3 } from 'three';
 import { rng } from '../core/rng';
 import type { Track } from './track';
 import { reachAt } from './sections';
@@ -16,16 +16,46 @@ import { reachAt } from './sections';
  * - lattice: long beams on a grid, crossing above, below and beside the track
  * - shards: a cloud of tumbling splinters close to the track
  * - columns: pillars from floor to ceiling (or up out of the floor)
+ * - skulls: giant horned skulls half sunk in the floor, or drifting
+ * - spines: long backbones of vertebrae, lying on the floor or coiling through space
+ * - arches: ruined gateways with a broken span
+ * - towers: alien towers rising from the floor or hanging from the ceiling
+ * - domes: domed outposts with a mast and an annex
+ * - wrecks: enormous crashed starships, bow broken and nosed into the floor, or adrift
  */
-export const SCENERY_KINDS = ['spires', 'monoliths', 'peaks', 'orbs', 'ribs', 'halos', 'lattice', 'shards', 'columns'] as const;
+export const SCENERY_KINDS = [
+  'spires',
+  'monoliths',
+  'peaks',
+  'orbs',
+  'ribs',
+  'halos',
+  'lattice',
+  'shards',
+  'columns',
+  'skulls',
+  'spines',
+  'arches',
+  'towers',
+  'domes',
+  'wrecks',
+] as const;
 export type SceneryKind = (typeof SCENERY_KINDS)[number];
+/** Kinds whose unit mesh is merged from several parts (`world/propMeshes.ts`), checked by `LOCAL_BALLS`. */
+export const BUILT_KINDS = ['skulls', 'spines', 'arches', 'towers', 'domes', 'wrecks'] as const satisfies readonly SceneryKind[];
+export type BuiltKind = (typeof BUILT_KINDS)[number];
+/** Kinds placed a tenth as often as `count` says: each is huge, or a whole run of props. */
+export const SPARSE_KINDS: readonly SceneryKind[] = ['ribs', 'halos', 'spines', 'wrecks'];
+/** How many placements a kind gets for a `count` (a spine's vertebrae count as one). */
+export const placements = (kind: SceneryKind, count: number): number =>
+  SPARSE_KINDS.includes(kind) ? Math.max(1, Math.round(count / 10)) : Math.max(0, Math.round(count));
 export const GROUND_MODES = ['none', 'floor', 'ceiling', 'both'] as const;
 export type GroundMode = (typeof GROUND_MODES)[number];
 
 export interface SceneryParams {
   seed: number;
   kinds: SceneryKind[];
-  /** props per kind (ribs and halos place a tenth as many) */
+  /** props per kind (ribs, halos, spines and wrecks place a tenth as many) */
   count: number;
   /** typical prop size, m */
   size: number;
@@ -67,6 +97,40 @@ export const UNIT = {
   ribTube: 0.05,
   haloTube: 0.025,
 } as const;
+
+type B = readonly [x: number, y: number, z: number, r: number];
+const row = (n: number, f: (t: number) => B): B[] => Array.from({ length: n }, (_, i) => f(i / (n - 1)));
+/** where the broken bow of a wreck sits on its hull */
+export const WRECK_BOW = new Matrix4().compose(new Vector3(0.08, 0, 0), new Quaternion().setFromEuler(new Euler(0, 0.15, -0.2)), new Vector3(1, 1, 1));
+const onBow = (x: number, r: number): B => {
+  const c = new Vector3(x, 0, 0).applyMatrix4(WRECK_BOW);
+  return [c.x, c.y, c.z, r];
+};
+
+/**
+ * Balls in unit space that cover each built kind's mesh (scaled uniformly), for the clearance check.
+ * They must contain every vertex of `builtGeometry(kind)`; the propMeshes test checks it.
+ */
+export const LOCAL_BALLS: Record<BuiltKind, readonly B[]> = {
+  skulls: [[0, 0.2, -0.05, 1.2], [0, -0.6, 0.45, 0.72], [0, -0.95, 0.35, 0.66], [-0.78, 1.18, -0.6, 0.5], [0.78, 1.18, -0.6, 0.5]],
+  spines: [[0, 0, 0, 0.7], [0, 0.8, -0.05, 0.32], [0, 1.25, -0.25, 0.28], [0, 1.65, -0.45, 0.24], [-0.8, 0.25, 0, 0.45], [0.8, 0.25, 0, 0.45]],
+  arches: [
+    ...row(5, (t) => [-1, 0.2 + 1.8 * t, 0, 0.5]),
+    ...row(5, (t) => [1, 0.2 + 1.8 * t, 0, 0.5]),
+    ...row(9, (t) => [Math.cos(2.5 * t), 2 + Math.sin(2.5 * t), 0, 0.32]),
+    [-1.5, 0.15, 0.5, 0.42],
+    [0.6, 0.12, -0.6, 0.35],
+  ],
+  towers: [...row(4, (t) => [0, 0.15 + 0.9 * t, 0, 0.68]), ...row(10, (t) => [0, 1.2 + 3.3 * t, 0, 0.5])],
+  domes: [[0, 0.25, 0, 1.12], [0, 1.35, 0, 0.36], [0.95, 0.45, 0, 0.32], [0.95, 0.15, -0.75, 0.45]],
+  wrecks: [
+    ...row(7, (t) => [-1.25 + 1.25 * t, 0, 0, 0.3]),
+    ...row(6, (t) => onBow(0.1 + t, 0.26)),
+    ...row(3, (t) => [-0.85 + 0.6 * t, 0.25, 0, 0.3]),
+    ...row(3, (t) => [-0.85 + 0.6 * t, -0.05, 0.5, 0.43]),
+    [-0.6, -0.12, -0.32, 0.35],
+  ],
+};
 
 interface Ball {
   c: Vector3;
@@ -173,6 +237,16 @@ export function propBalls(p: Prop): Ball[] {
       return ring(p, s.x, s.x * UNIT.ribTube, -(UNIT.ribArc - Math.PI) / 2, UNIT.ribArc);
     case 'halos':
       return ring(p, s.x, s.x * UNIT.haloTube, 0, Math.PI * 2);
+    case 'skulls':
+    case 'spines':
+    case 'arches':
+    case 'towers':
+    case 'domes':
+    case 'wrecks': {
+      _m.compose(p.pos, p.quat, s);
+      const k = Math.max(s.x, s.y, s.z);
+      return LOCAL_BALLS[p.kind].map(([x, y, z, r]) => ({ c: new Vector3(x, y, z).applyMatrix4(_m), r: r * k }));
+    }
     default:
       // orbs, shards: a unit sphere / tetrahedron
       return [{ c: p.pos.clone(), r: Math.max(s.x, s.y, s.z) }];
@@ -207,6 +281,11 @@ export function generateScenery(track: Track, p: SceneryParams): Scenery {
   const randQuat = () => new Quaternion().setFromAxisAngle(_v.set(rand() * 2 - 1, rand() * 2 - 1, rand() * 2 - 1).normalize(), rand() * Math.PI * 2);
   const tilt = (amount: number) =>
     new Quaternion().setFromAxisAngle(_v.set(rand() * 2 - 1, 0, rand() * 2 - 1).normalize(), (rand() * 2 - 1) * amount);
+  const uniform = (k: number) => new Vector3(k, k, k);
+  /** a random heading about +Y, tilted off vertical by up to `amount` */
+  const upright = (amount: number) => (amount > 0 ? tilt(amount) : new Quaternion()).multiply(new Quaternion().setFromAxisAngle(Y, rand() * Math.PI * 2));
+  /** upside down, for props hanging from the ceiling */
+  const flip = () => new Quaternion().setFromAxisAngle(X, Math.PI);
   /** a point off the track: a random sample, pushed out sideways */
   const nearTrack = (minOut: number, spread = p.spread) => {
     const i = Math.floor(rand() * track.pos.length);
@@ -225,9 +304,9 @@ export function generateScenery(track: Track, p: SceneryParams): Scenery {
   };
 
   for (const kind of p.kinds) {
-    const n = kind === 'ribs' || kind === 'halos' ? Math.max(1, Math.round(p.count / 10)) : Math.max(0, Math.round(p.count));
-    // a prop that reaches into the corridor is tried again somewhere else (rings fit less often)
-    const tries = kind === 'halos' ? 16 : kind === 'ribs' ? 1 : 4;
+    const n = placements(kind, p.count);
+    // a prop that reaches into the corridor is tried again somewhere else (rings and wrecks fit less often)
+    const tries = kind === 'halos' ? 16 : kind === 'ribs' || kind === 'spines' ? 1 : kind === 'wrecks' ? 8 : 4;
     for (let k = 0; k < n; k++) for (let attempt = 0, before = props.length; attempt < tries && props.length === before; attempt++) {
       const tint = rand();
       switch (kind) {
@@ -308,6 +387,75 @@ export function generateScenery(track: Track, p: SceneryParams): Scenery {
           _m.makeBasis(track.right[i], track.up[i], _back.copy(track.tan[i]).negate()); // right-handed, so a rotation
           const quat = new Quaternion().setFromRotationMatrix(_m).multiply(new Quaternion().setFromAxisAngle(X, (rand() * 2 - 1) * 0.5));
           keep({ kind, pos: track.pos[i].clone(), quat, scale: new Vector3(A, A, A), tint });
+          break;
+        }
+        case 'skulls': {
+          const r = S * range(1.2, 3.5);
+          // on the floor sunk to the cheekbones, gazing up; else adrift
+          if (floorY !== null) keep({ kind, pos: ground().setY(floorY + r * 0.35), quat: upright(0.2).multiply(new Quaternion().setFromAxisAngle(X, -range(0.15, 0.5))), scale: uniform(r), tint });
+          else keep({ kind, pos: nearTrack(r * 1.6), quat: randQuat(), scale: uniform(r), tint });
+          break;
+        }
+        case 'arches': {
+          const a = S * range(0.8, 2);
+          if (floorY !== null) keep({ kind, pos: ground().setY(floorY - a * 0.1), quat: upright(0.12), scale: uniform(a), tint });
+          else keep({ kind, pos: nearTrack(a * 2.6), quat: randQuat(), scale: uniform(a), tint });
+          break;
+        }
+        case 'towers': {
+          const t = S * range(1, 2.6);
+          const up = floorY !== null && (ceilY === null || rand() < 0.65);
+          if (up) keep({ kind, pos: ground().setY(floorY! - t * 0.05), quat: upright(0.08), scale: uniform(t), tint });
+          else if (ceilY !== null) keep({ kind, pos: ground().setY(ceilY + t * 0.05), quat: flip().multiply(upright(0.08)), scale: uniform(t), tint });
+          else keep({ kind, pos: nearTrack(t * 4.6), quat: randQuat(), scale: uniform(t), tint });
+          break;
+        }
+        case 'domes': {
+          const d = S * range(1.2, 3.5);
+          const up = floorY !== null && (ceilY === null || rand() < 0.75);
+          if (up) keep({ kind, pos: ground().setY(floorY!), quat: upright(0), scale: uniform(d), tint });
+          else if (ceilY !== null) keep({ kind, pos: ground().setY(ceilY), quat: flip().multiply(upright(0)), scale: uniform(d), tint });
+          else keep({ kind, pos: nearTrack(d * 1.7), quat: randQuat(), scale: uniform(d), tint });
+          break;
+        }
+        case 'wrecks': {
+          const half = S * range(5, 12);
+          if (floorY !== null) {
+            // nosed into the floor: pitched bow-down, rolled onto a wing, the stern up in the air
+            const pitch = range(0.12, 0.4);
+            const quat = upright(0).multiply(new Quaternion().setFromEuler(new Euler((rand() * 2 - 1) * 0.35, 0, -pitch)));
+            keep({ kind, pos: ground().setY(floorY + half * (Math.sin(pitch) * 0.6 + 0.05)), quat, scale: uniform(half), tint });
+          } else keep({ kind, pos: nearTrack(half * 1.3), quat: randQuat(), scale: uniform(half), tint });
+          break;
+        }
+        case 'spines': {
+          // a backbone of vertebrae tapering to the tail, snaking along the floor or through space
+          const run = 14 + Math.floor(rand() * 14);
+          const v0 = S * range(0.5, 1.1);
+          const lying = floorY !== null;
+          const at = lying ? ground().setY(floorY!) : nearTrack(v0 * 4);
+          const dir = lying ? new Vector3(rand() * 2 - 1, 0, rand() * 2 - 1) : new Vector3(rand() * 2 - 1, rand() * 2 - 1, rand() * 2 - 1);
+          if (dir.lengthSq() < 1e-6) dir.set(1, 0, 0);
+          dir.normalize();
+          const up = lying ? Y.clone() : new Vector3(rand() * 2 - 1, rand() * 2 - 1, rand() * 2 - 1).cross(dir);
+          if (up.lengthSq() < 1e-6) up.copy(Math.abs(dir.y) < 0.9 ? Y : X).cross(dir);
+          up.normalize();
+          const phase = rand() * Math.PI * 2;
+          const bend = range(0.1, 0.25);
+          const turn = new Quaternion();
+          const side = new Vector3();
+          for (let j = 0; j < run; j++) {
+            const v = v0 * (1 - (0.65 * j) / run);
+            side.crossVectors(up, dir).normalize();
+            _m.makeBasis(side, up, dir);
+            const pos = at.clone();
+            if (lying) pos.y = floorY! + v * 0.2;
+            keep({ kind, pos, quat: new Quaternion().setFromRotationMatrix(_m), scale: uniform(v), tint });
+            // the next one a vertebra on, the spine curling side to side
+            at.addScaledVector(dir, v * 0.72);
+            turn.setFromAxisAngle(up, bend * Math.sin(phase + j * 0.45));
+            dir.applyQuaternion(turn).normalize();
+          }
           break;
         }
       }

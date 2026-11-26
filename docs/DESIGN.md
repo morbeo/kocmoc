@@ -293,10 +293,13 @@ finish with positions. AI racers stay out of scope; ghosts are the rivals.
     sampled finely enough; wobble and height noise are
     laid over the base curve and the usual retries keep it clear of itself;
   - scenery (`src/gen/scenery.ts`, `world.scenery.*`): spires, monoliths, peaks, orbs, ribs (runs of
-    arches over the track), halos (glowing rings it threads), lattice beams, shards and columns; each
-    prop is a set of balls checked against a hashed centreline of the loop and every branch, and is
-    tried elsewhere if it would reach into the corridor; a banded floor and/or ceiling
-    (`world.ground`) a gap from the track, with spires and peaks rooted in them;
+    arches over the track), halos (glowing rings it threads), lattice beams, shards and columns, plus
+    built props merged from several parts (`src/world/propMeshes.ts`, vertex-shaded details): giant
+    skulls, spines (runs of tapering vertebrae), ruined arches, towers, domes and crashed starships
+    (wrecks); each prop is a set of balls checked against a hashed centreline of the loop and every
+    branch, and is tried elsewhere if it would reach into the corridor; a banded floor and/or ceiling
+    (`world.ground`) a gap from the track, with spires, peaks, towers, domes, skulls, arches and wrecks
+    rooted in them;
   - sky (`render.sky.planet.*`, `render.sky.moons`): a toon-lit, striped planet with a ring whose
     near half is drawn over it, and moons;
   - sections (`src/gen/sections.ts`, `gen.race.sections` / `sectionKinds` / `sectionMin` / `sectionMax`,
