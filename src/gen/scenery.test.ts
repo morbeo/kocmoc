@@ -69,6 +69,26 @@ describe('generateScenery', () => {
     }
   });
 
+  it('tendrils rise from the floor or hang from the ceiling', () => {
+    const up = new Vector3();
+    const tendrils = sc.props.filter((x) => x.kind === 'tendrils');
+    expect(tendrils.length).toBeGreaterThan(0);
+    for (const p of tendrils) {
+      expect([sc.floorY, sc.ceilY]).toContain(p.pos.y);
+      up.set(0, 1, 0).applyQuaternion(p.quat);
+      expect(p.pos.y === sc.floorY ? up.y : -up.y).toBeGreaterThan(0.9);
+    }
+  });
+
+  it('leviathans swim level-ish, and horrors, moons and leviathans mostly fit', () => {
+    const nose = new Vector3();
+    for (const p of sc.props.filter((x) => x.kind === 'leviathans')) {
+      nose.set(1, 0, 0).applyQuaternion(p.quat);
+      expect(Math.abs(nose.y)).toBeLessThan(Math.sin(0.31));
+    }
+    for (const k of ['horrors', 'moons', 'leviathans'] as const) expect(sc.props.filter((x) => x.kind === k).length, k).toBeGreaterThanOrEqual(placements(k, params.count) / 2);
+  });
+
   it('wrecks are huge, and nose down into the floor', () => {
     const wrecks = sc.props.filter((x) => x.kind === 'wrecks');
     expect(wrecks.length).toBeGreaterThan(0);

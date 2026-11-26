@@ -15,7 +15,7 @@
     "gen.race.height": 150,
     "gen.race.profile": "rails",
     "gen.race.twistNoise": 0.9,
-    "world.scenery.kinds": "halos,orbs",
+    "world.scenery.kinds": "halos,orbs,horrors,moons",
     "world.scenery.count": 90,
     "world.scenery.size": 40,
     "world.scenery.spread": 1200,

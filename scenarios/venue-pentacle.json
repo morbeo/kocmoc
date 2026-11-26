@@ -15,7 +15,7 @@
     "gen.race.tubeRadius": 38,
     "gen.race.profile": "gates",
     "render.track.gateEvery": 80,
-    "world.scenery.kinds": "shards,orbs",
+    "world.scenery.kinds": "shards,orbs,leviathans",
     "world.scenery.count": 260,
     "world.scenery.size": 30,
     "world.scenery.spread": 700,

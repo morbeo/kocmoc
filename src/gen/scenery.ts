@@ -1,4 +1,4 @@
-import { Euler, Matrix4, Quaternion, Vector3 } from 'three';
+import { CatmullRomCurve3, Euler, Matrix4, Quaternion, Vector3 } from 'three';
 import { rng } from '../core/rng';
 import type { Track } from './track';
 import { reachAt } from './sections';
@@ -22,6 +22,10 @@ import { reachAt } from './sections';
  * - towers: alien towers rising from the floor or hanging from the ceiling
  * - domes: domed outposts with a mast and an annex
  * - wrecks: enormous crashed starships, bow broken and nosed into the floor, or adrift
+ * - tendrils: giant curling tentacles reaching up from the floor or down from the ceiling
+ * - horrors: drifting eye-beasts trailing a crown of tentacles
+ * - moons: living moons, cratered, with a heavy-lidded eye and a fanged grimace
+ * - leviathans: star-whales swimming past, fins and flukes spread
  */
 export const SCENERY_KINDS = [
   'spires',
@@ -39,13 +43,17 @@ export const SCENERY_KINDS = [
   'towers',
   'domes',
   'wrecks',
+  'tendrils',
+  'horrors',
+  'moons',
+  'leviathans',
 ] as const;
 export type SceneryKind = (typeof SCENERY_KINDS)[number];
 /** Kinds whose unit mesh is merged from several parts (`world/propMeshes.ts`), checked by `LOCAL_BALLS`. */
-export const BUILT_KINDS = ['skulls', 'spines', 'arches', 'towers', 'domes', 'wrecks'] as const satisfies readonly SceneryKind[];
+export const BUILT_KINDS = ['skulls', 'spines', 'arches', 'towers', 'domes', 'wrecks', 'tendrils', 'horrors', 'moons', 'leviathans'] as const satisfies readonly SceneryKind[];
 export type BuiltKind = (typeof BUILT_KINDS)[number];
 /** Kinds placed a tenth as often as `count` says: each is huge, or a whole run of props. */
-export const SPARSE_KINDS: readonly SceneryKind[] = ['ribs', 'halos', 'spines', 'wrecks'];
+export const SPARSE_KINDS: readonly SceneryKind[] = ['ribs', 'halos', 'spines', 'wrecks', 'horrors', 'moons', 'leviathans'];
 /** How many placements a kind gets for a `count` (a spine's vertebrae count as one). */
 export const placements = (kind: SceneryKind, count: number): number =>
   SPARSE_KINDS.includes(kind) ? Math.max(1, Math.round(count / 10)) : Math.max(0, Math.round(count));
@@ -107,6 +115,44 @@ const onBow = (x: number, r: number): B => {
   return [c.x, c.y, c.z, r];
 };
 
+/** A creature's limb or body in unit space: a tube along a Catmull-Rom path, tapering by `rad`. */
+export interface Limb {
+  pts: readonly (readonly [number, number, number])[];
+  /** radius at t = 0 (root) .. 1 (tip) */
+  rad: (t: number) => number;
+  /** tube segments; the clearance balls sit on the same samples */
+  segs: number;
+}
+const taper = (r0: number, r1: number) => (t: number) => r0 + (r1 - r0) * t;
+/** path points, turned `a` radians about +Y */
+const turnY = (pts: Limb['pts'], a: number): Limb['pts'] => pts.map(([x, y, z]) => [x * Math.cos(a) + z * Math.sin(a), y, -x * Math.sin(a) + z * Math.cos(a)] as const);
+
+export const TENDRIL: Limb = {
+  pts: [[0, -0.3, 0], [0.3, 1.5, 0], [-0.2, 3, 0.2], [0.4, 4.5, 0], [1.4, 5.3, 0], [1.9, 4.6, 0], [1.4, 4.0, 0]],
+  rad: taper(0.45, 0.04),
+  segs: 40,
+};
+/** a horror's eight arms, hanging and curling out from under its body */
+export const HORROR_ARMS: Limb[] = Array.from({ length: 8 }, (_, k) => ({
+  pts: turnY([[0.55, -0.55, 0], [1.2, -1.2, 0.1], [1.7, -2.3, -0.1], [1.4, -3.3, 0.1], [1.9, -3.9, 0], [2.5, -3.6, 0]], (k * Math.PI * 2) / 8 + (k % 2) * 0.2),
+  rad: taper(0.22, 0.025),
+  segs: 24,
+}));
+/** a leviathan's body, tail (t = 0) to head, nose at +X */
+export const LEVIATHAN: Limb = {
+  pts: [[-1.15, 0.12, 0], [-0.7, -0.02, 0.05], [-0.2, 0.05, -0.04], [0.4, 0, 0], [0.85, 0.02, 0]],
+  rad: (t) => (t < 0.7 ? 0.04 + 0.3 * (t / 0.7) ** 0.8 : 0.34 - 0.12 * ((t - 0.7) / 0.3) ** 2),
+  segs: 30,
+};
+
+/** Points along a limb at its tube's samples (arc-length spaced). */
+export function limbSamples(l: Limb): { p: Vector3; r: number }[] {
+  const curve = new CatmullRomCurve3(l.pts.map(([x, y, z]) => new Vector3(x, y, z)));
+  return Array.from({ length: l.segs + 1 }, (_, i) => ({ p: curve.getPointAt(i / l.segs), r: l.rad(i / l.segs) }));
+}
+// a little over the tube radius, for suckers and spots set into it
+const limbBalls = (l: Limb): B[] => limbSamples(l).map(({ p, r }) => [p.x, p.y, p.z, r * 1.12 + 1e-3]);
+
 /**
  * Balls in unit space that cover each built kind's mesh (scaled uniformly), for the clearance check.
  * They must contain every vertex of `builtGeometry(kind)`; the propMeshes test checks it.
@@ -129,6 +175,17 @@ export const LOCAL_BALLS: Record<BuiltKind, readonly B[]> = {
     ...row(3, (t) => [-0.85 + 0.6 * t, 0.25, 0, 0.3]),
     ...row(3, (t) => [-0.85 + 0.6 * t, -0.05, 0.5, 0.43]),
     [-0.6, -0.12, -0.32, 0.35],
+  ],
+  tendrils: limbBalls(TENDRIL),
+  horrors: [[0, 0, 0, 1.12], [0, 0.1, 0.85, 0.62], ...HORROR_ARMS.flatMap(limbBalls)],
+  moons: [[0, 0, 0, 1.1], [0, 0.25, 0.8, 0.55], [0, -0.4, 0.82, 0.5]],
+  leviathans: [
+    ...limbBalls(LEVIATHAN),
+    [0.95, 0, 0, 0.42],
+    [0.3, -0.15, 0.45, 0.4],
+    [0.3, -0.15, -0.45, 0.4],
+    [-1.3, 0.12, 0, 0.45],
+    ...row(4, (t) => [-0.6 + 1.2 * t, 0.38, 0, 0.18]),
   ],
 };
 
@@ -242,7 +299,11 @@ export function propBalls(p: Prop): Ball[] {
     case 'arches':
     case 'towers':
     case 'domes':
-    case 'wrecks': {
+    case 'wrecks':
+    case 'tendrils':
+    case 'horrors':
+    case 'moons':
+    case 'leviathans': {
       _m.compose(p.pos, p.quat, s);
       const k = Math.max(s.x, s.y, s.z);
       return LOCAL_BALLS[p.kind].map(([x, y, z, r]) => ({ c: new Vector3(x, y, z).applyMatrix4(_m), r: r * k }));
@@ -306,7 +367,7 @@ export function generateScenery(track: Track, p: SceneryParams): Scenery {
   for (const kind of p.kinds) {
     const n = placements(kind, p.count);
     // a prop that reaches into the corridor is tried again somewhere else (rings and wrecks fit less often)
-    const tries = kind === 'halos' ? 16 : kind === 'ribs' || kind === 'spines' ? 1 : kind === 'wrecks' ? 8 : 4;
+    const tries = kind === 'halos' ? 16 : kind === 'ribs' || kind === 'spines' ? 1 : SPARSE_KINDS.includes(kind) ? 8 : 4;
     for (let k = 0; k < n; k++) for (let attempt = 0, before = props.length; attempt < tries && props.length === before; attempt++) {
       const tint = rand();
       switch (kind) {
@@ -426,6 +487,32 @@ export function generateScenery(track: Track, p: SceneryParams): Scenery {
             const quat = upright(0).multiply(new Quaternion().setFromEuler(new Euler((rand() * 2 - 1) * 0.35, 0, -pitch)));
             keep({ kind, pos: ground().setY(floorY + half * (Math.sin(pitch) * 0.6 + 0.05)), quat, scale: uniform(half), tint });
           } else keep({ kind, pos: nearTrack(half * 1.3), quat: randQuat(), scale: uniform(half), tint });
+          break;
+        }
+        case 'tendrils': {
+          const t = S * range(0.7, 1.8);
+          const up = floorY !== null && (ceilY === null || rand() < 0.6);
+          if (up) keep({ kind, pos: ground().setY(floorY!), quat: upright(0.25), scale: uniform(t), tint });
+          else if (ceilY !== null) keep({ kind, pos: ground().setY(ceilY), quat: flip().multiply(upright(0.25)), scale: uniform(t), tint });
+          else keep({ kind, pos: nearTrack(t * 6), quat: randQuat(), scale: uniform(t), tint });
+          break;
+        }
+        case 'horrors': {
+          // drifting upright-ish, arms hanging, the eye turned somewhere round the track
+          const h = S * range(1.5, 4);
+          keep({ kind, pos: nearTrack(h * 4.5), quat: upright(0.4), scale: uniform(h), tint });
+          break;
+        }
+        case 'moons': {
+          const m = S * range(4, 9);
+          keep({ kind, pos: nearTrack(m * 1.4, p.spread * 1.5), quat: upright(0.5), scale: uniform(m), tint });
+          break;
+        }
+        case 'leviathans': {
+          // swimming level-ish, a slight climb or dive and roll
+          const half = S * range(5, 11);
+          const quat = upright(0).multiply(new Quaternion().setFromEuler(new Euler((rand() * 2 - 1) * 0.3, 0, (rand() * 2 - 1) * 0.25)));
+          keep({ kind, pos: nearTrack(half * 1.5), quat, scale: uniform(half), tint });
           break;
         }
         case 'spines': {

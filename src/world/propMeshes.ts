@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js';
-import { WRECK_BOW, type BuiltKind } from '../gen/scenery';
+import { HORROR_ARMS, LEVIATHAN, limbSamples, TENDRIL, WRECK_BOW, type BuiltKind, type Limb } from '../gen/scenery';
 
 /**
  * Unit meshes for the built scenery kinds: several primitives merged into one geometry, so a kind is
@@ -13,6 +13,8 @@ type V3 = readonly [number, number, number];
 interface At {
   at?: V3;
   rot?: V3;
+  /** instead of `rot` */
+  quat?: THREE.Quaternion;
   scale?: V3;
   /** 0..1 brightness of this part */
   shade?: number;
@@ -25,11 +27,11 @@ const DARK = 0.18;
 class Kit {
   private parts: THREE.BufferGeometry[] = [];
 
-  add(geo: THREE.BufferGeometry, { at = [0, 0, 0], rot = [0, 0, 0], scale = [1, 1, 1], shade = 1, parent }: At = {}): this {
+  add(geo: THREE.BufferGeometry, { at = [0, 0, 0], rot = [0, 0, 0], quat, scale = [1, 1, 1], shade = 1, parent }: At = {}): this {
     const g = geo.index ? geo.toNonIndexed() : geo;
     if (g !== geo) geo.dispose();
     g.deleteAttribute('uv');
-    const m = new THREE.Matrix4().compose(new THREE.Vector3(...at), new THREE.Quaternion().setFromEuler(new THREE.Euler(...rot)), new THREE.Vector3(...scale));
+    const m = new THREE.Matrix4().compose(new THREE.Vector3(...at), quat ?? new THREE.Quaternion().setFromEuler(new THREE.Euler(...rot)), new THREE.Vector3(...scale));
     if (parent) m.premultiply(parent);
     g.applyMatrix4(m);
     const n = g.getAttribute('position').count;
@@ -157,6 +159,129 @@ function wreck(): THREE.BufferGeometry {
   return k.build();
 }
 
+/** A limb's tube, tapered sample by sample (the clearance balls sit on the same samples). */
+function limbTube(l: Limb): THREE.BufferGeometry {
+  const samples = limbSamples(l);
+  const curve = new THREE.CatmullRomCurve3(l.pts.map(([x, y, z]) => new THREE.Vector3(x, y, z)));
+  const radial = 8;
+  const geo = new THREE.TubeGeometry(curve, l.segs, 1, radial, false);
+  const pos = geo.getAttribute('position');
+  const v = new THREE.Vector3();
+  for (let i = 0; i <= l.segs; i++)
+    for (let j = 0; j <= radial; j++) {
+      const k = i * (radial + 1) + j;
+      const { p, r } = samples[i];
+      v.fromBufferAttribute(pos, k).sub(p).multiplyScalar(r).add(p);
+      pos.setXYZ(k, v.x, v.y, v.z);
+    }
+  return geo;
+}
+
+/** Dark suckers down one side of a limb, every `step` samples. */
+function suckers(k: Kit, l: Limb, from: number, step: number): void {
+  const samples = limbSamples(l);
+  const curve = new THREE.CatmullRomCurve3(l.pts.map(([x, y, z]) => new THREE.Vector3(x, y, z)));
+  const frames = curve.computeFrenetFrames(l.segs, false);
+  for (let i = from; i < l.segs - 2; i += step) {
+    const { p, r } = samples[i];
+    const at = p.clone().addScaledVector(frames.normals[i], r * 0.8);
+    k.add(new THREE.SphereGeometry(r * 0.3, 8, 6), { at: [at.x, at.y, at.z], shade: 0.3 });
+  }
+}
+
+/** Point on a unit sphere from a rough direction. */
+const onSphere = (x: number, y: number, z: number, d: number): V3 => {
+  const n = Math.hypot(x, y, z);
+  return [(x / n) * d, (y / n) * d, (z / n) * d];
+};
+
+/** A giant tentacle rising from y = 0, curling over at the top, suckers on its inner side. */
+function tendril(): THREE.BufferGeometry {
+  const k = new Kit().add(limbTube(TENDRIL));
+  suckers(k, TENDRIL, 6, 3);
+  return k.build();
+}
+
+/** A floating eye-beast: a body of radius 1, one huge slit-pupilled eye at +Z, small eyes, a maw and eight arms. */
+function horror(): THREE.BufferGeometry {
+  const k = new Kit()
+    .add(new THREE.SphereGeometry(1, 24, 16), { shade: 0.55 })
+    .add(new THREE.SphereGeometry(0.55, 20, 14), { at: [0, 0.1, 0.62] })
+    .add(new THREE.SphereGeometry(0.34, 16, 10), { at: [0, 0.1, 1.06], scale: [1, 1, 0.45], shade: DARK })
+    // a pale slit pupil on the dark iris, so it reads from far off
+    .add(new THREE.BoxGeometry(0.07, 0.46, 0.06), { at: [0, 0.1, 1.2] })
+    .add(new THREE.SphereGeometry(0.4, 14, 8), { at: [0, -0.9, 0], scale: [1, 0.2, 1], shade: DARK });
+  for (const [x, y, z] of [[0.6, 0.5, 0.55], [-0.6, 0.5, 0.55], [0.8, -0.05, 0.5], [-0.8, -0.05, 0.5], [0.3, 0.85, 0.2], [-0.3, 0.85, 0.2]] as const) {
+    k.add(new THREE.SphereGeometry(0.14, 10, 8), { at: onSphere(x, y, z, 0.92) }).add(new THREE.SphereGeometry(0.07, 8, 6), { at: onSphere(x, y, z, 1.02), shade: DARK });
+  }
+  for (const [x, y, z] of [[0.3, 0.6, -0.7], [-0.6, 0.2, -0.7], [0.7, -0.3, -0.5], [-0.2, -0.5, -0.8]] as const)
+    k.add(new THREE.SphereGeometry(0.3, 10, 8), { at: onSphere(x, y, z, 0.78), shade: 0.65 });
+  for (let i = 0; i < 10; i++) {
+    const a = (i * Math.PI * 2) / 10;
+    k.add(new THREE.ConeGeometry(0.04, 0.16, 5), { at: [Math.cos(a) * 0.3, -0.98, Math.sin(a) * 0.3], rot: [Math.PI, 0, 0] });
+  }
+  for (const arm of HORROR_ARMS) {
+    k.add(limbTube(arm), { shade: 0.55 });
+    suckers(k, arm, 4, 4);
+  }
+  return k.build();
+}
+
+/** A living moon of radius 1: craters, a heavy-lidded eye and a fanged grimace facing +Z. */
+function moon(): THREE.BufferGeometry {
+  const k = new Kit()
+    .add(new THREE.SphereGeometry(1, 28, 18), { shade: 0.85 })
+    .add(new THREE.SphereGeometry(0.42, 18, 12), { at: [0, 0.25, 0.68] })
+    .add(new THREE.SphereGeometry(0.22, 14, 10), { at: [0, 0.25, 1.04], scale: [1, 1, 0.5], shade: DARK })
+    .add(new THREE.BoxGeometry(0.05, 0.28, 0.05), { at: [0, 0.25, 1.15] })
+    // the upper lid, half shut over the eye
+    .add(new THREE.SphereGeometry(0.46, 18, 8, 0, Math.PI * 2, 0, Math.PI / 2), { at: [0, 0.25, 0.68], rot: [-0.2, 0, 0], shade: 0.85 })
+    // a gaping maw set into the surface, fangs above and below
+    .add(new THREE.SphereGeometry(1, 18, 10), { at: [0, -0.45, 0.86], rot: [0.47, 0, 0], scale: [0.42, 0.15, 0.12], shade: DARK });
+  for (let i = 0; i < 6; i++) {
+    const x = -0.3 + i * 0.12;
+    const w = 1 - (x / 0.42) ** 2;
+    k.add(new THREE.ConeGeometry(0.045, 0.16, 5), { at: [x, -0.45 + 0.11 * w, 0.92], rot: [Math.PI + 0.47, 0, 0] });
+    if (i % 2) k.add(new THREE.ConeGeometry(0.04, 0.12, 5), { at: [x, -0.45 - 0.1 * w, 0.9], rot: [0.47, 0, 0] });
+  }
+  const up = new THREE.Vector3(0, 0, 1);
+  for (const [x, y, z, r] of [[0.8, 0.5, -0.2, 0.22], [-0.7, 0.6, 0.1, 0.18], [0.2, -0.6, -0.8, 0.26], [-0.6, -0.5, -0.5, 0.2], [0.1, 0.9, -0.4, 0.15], [-0.9, -0.1, -0.3, 0.24], [0.6, -0.2, -0.75, 0.16], [0.85, -0.45, 0.2, 0.14]] as const) {
+    const d = new THREE.Vector3(x, y, z).normalize();
+    const quat = new THREE.Quaternion().setFromUnitVectors(up, d);
+    k.add(new THREE.TorusGeometry(r, r * 0.22, 5, 16), { at: onSphere(x, y, z, 0.99), quat, shade: 0.95 }).add(new THREE.SphereGeometry(r, 12, 6), {
+      at: onSphere(x, y, z, 0.97),
+      quat,
+      scale: [1, 1, 0.25],
+      shade: 0.5,
+    });
+  }
+  return k.build();
+}
+
+/** A star-whale two units long, nose at +X: tapering body, broad head, fins, flukes and dorsal spines. */
+function leviathan(): THREE.BufferGeometry {
+  const k = new Kit()
+    .add(limbTube(LEVIATHAN), { shade: 0.85 })
+    .add(new THREE.SphereGeometry(1, 18, 12), { at: [0.95, 0, 0], scale: [0.4, 0.26, 0.28], shade: 0.85 })
+    .add(new THREE.BoxGeometry(0.42, 0.025, 0.46), { at: [1.08, -0.07, 0], shade: DARK })
+    .add(new THREE.BoxGeometry(0.3, 0.03, 0.8), { at: [-1.3, 0.12, 0], rot: [0, 0, 0.15] })
+    .add(new THREE.BoxGeometry(0.12, 0.05, 0.3), { at: [-1.2, 0.12, 0], shade: 0.6 });
+  for (const s of [-1, 1]) {
+    k.add(new THREE.SphereGeometry(0.06, 10, 8), { at: [1.05, 0.08, s * 0.2] })
+      .add(new THREE.SphereGeometry(0.035, 8, 6), { at: [1.08, 0.08, s * 0.24], shade: DARK })
+      .add(new THREE.BoxGeometry(0.5, 0.03, 0.35), { at: [0.3, -0.15, s * 0.45], rot: [s * 0.4, -s * 0.4, 0] });
+  }
+  for (let i = 0; i < 4; i++) k.add(new THREE.ConeGeometry(0.06, 0.3, 6), { at: [-0.6 + 0.4 * i, 0.38, 0], rot: [0, 0, 0.5] });
+  // a row of pale spots down each flank
+  for (let i = 0; i < 6; i++)
+    for (const s of [-1, 1]) {
+      const t = 0.3 + i * 0.1;
+      const p = limbSamples(LEVIATHAN)[Math.round(t * LEVIATHAN.segs)];
+      k.add(new THREE.SphereGeometry(p.r * 0.2, 8, 6), { at: [p.p.x, p.p.y - p.r * 0.2, p.p.z + s * p.r * 0.85], shade: 1 });
+    }
+  return k.build();
+}
+
 /** Unit geometry of a built kind, merged and vertex-shaded. */
 export function builtGeometry(kind: BuiltKind): THREE.BufferGeometry {
   switch (kind) {
@@ -172,5 +297,13 @@ export function builtGeometry(kind: BuiltKind): THREE.BufferGeometry {
       return dome();
     case 'wrecks':
       return wreck();
+    case 'tendrils':
+      return tendril();
+    case 'horrors':
+      return horror();
+    case 'moons':
+      return moon();
+    case 'leviathans':
+      return leviathan();
   }
 }

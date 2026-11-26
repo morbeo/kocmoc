@@ -14,7 +14,7 @@
     "gen.race.height": 220,
     "gen.race.tubeRadius": 42,
     "gen.race.profile": "halfpipe",
-    "world.scenery.kinds": "orbs,spires,domes",
+    "world.scenery.kinds": "orbs,spires,domes,tendrils",
     "world.scenery.count": 150,
     "world.scenery.size": 40,
     "world.ground": "floor",
