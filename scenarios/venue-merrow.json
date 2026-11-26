@@ -14,7 +14,7 @@
     "gen.race.wobble": 0.3,
     "gen.race.points": 14,
     "gen.race.tubeRadius": 45,
-    "world.scenery.kinds": "peaks,shards",
+    "world.scenery.kinds": "peaks,shards,towers,tendrils",
     "world.scenery.count": 110,
     "world.scenery.size": 70,
     "world.scenery.spread": 800,

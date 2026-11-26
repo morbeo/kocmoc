@@ -14,7 +14,7 @@
     "gen.race.twist": 2,
     "gen.race.wobble": 0.35,
     "gen.race.tubeRadius": 45,
-    "world.scenery.kinds": "columns,shards",
+    "world.scenery.kinds": "columns,shards,arches",
     "world.scenery.count": 120,
     "world.scenery.size": 45,
     "world.scenery.spread": 1000,

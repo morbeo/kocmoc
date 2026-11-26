@@ -13,7 +13,7 @@
     "gen.race.height": 90,
     "gen.race.wobble": 0.4,
     "gen.race.tubeRadius": 42,
-    "world.scenery.kinds": "ribs,monoliths",
+    "world.scenery.kinds": "ribs,monoliths,skulls,spines",
     "world.scenery.count": 60,
     "world.scenery.size": 40,
     "world.ground": "floor",

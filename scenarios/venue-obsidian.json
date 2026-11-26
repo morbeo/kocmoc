@@ -13,7 +13,7 @@
     "gen.race.radius": 1100,
     "gen.race.height": 260,
     "gen.race.tubeRadius": 40,
-    "world.scenery.kinds": "monoliths,halos",
+    "world.scenery.kinds": "monoliths,halos,towers",
     "world.scenery.count": 140,
     "world.scenery.size": 38,
     "world.ground": "floor",
